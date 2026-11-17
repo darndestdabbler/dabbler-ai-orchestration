@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dabbler view work-explorer (the Work Explorer's rows)",
+  "description": "The whole Work Explorer tree as `dabbler view work-explorer` prints it: each repository it was given, its buckets, its sessions, and under a session its tasks, verification, findings and what needs attention. It is a read, not a record: nothing on disk is written in this shape. Every rule that decides a row -- its words, its icon, whether it starts open, which actions it offers and what each one runs -- is the router's, so an interface renders these rows and works none of them out again. Every level is present in the data, whatever starts collapsed on screen.",
+  "type": "object",
+  "required": ["schemaVersion", "repositories"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "The shape this payload is written in."
+    },
+    "repositories": {
+      "type": "array",
+      "description": "One row per repository given that has a sessions root, in the order given.",
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "row": {
+      "description": "One row of the tree, and the rows beneath it.",
+      "type": "object",
+      "required": ["id", "kind", "label", "description", "tooltip", "icon", "collapsible", "contextValue", "click", "actions", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable across refreshes and unique across the whole tree, so an interface keeps what was open and selected."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["repository", "bucket", "session", "task", "verification", "finding", "attention", "refusal"]
+        },
+        "label": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "tooltip": {
+          "type": ["string", "null"],
+          "description": "Markdown source. A `$(name)` is an icon by name, as in the label."
+        },
+        "icon": {
+          "oneOf": [{ "$ref": "#/$defs/icon" }, { "type": "null" }]
+        },
+        "collapsible": {
+          "type": "string",
+          "enum": ["none", "collapsed", "expanded"],
+          "description": "Whether the row has children, and whether it starts open. `expanded` is the In Progress bucket's alone."
+        },
+        "contextValue": {
+          "type": "string",
+          "description": "The row's tokens, each wrapped in `;`: its kind, its state, and one `act-` token per action it offers."
+        },
+        "click": {
+          "description": "What activating the row does, or null where it does nothing.",
+          "oneOf": [{ "$ref": "#/$defs/action" }, { "type": "null" }]
+        },
+        "actions": {
+          "type": "array",
+          "description": "The actions the row offers, in menu order.",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/row" }
+        },
+        "error": {
+          "type": "string",
+          "description": "On a repository row whose progress reading failed: why, in words a person can act on. Such a row has no sessions."
+        }
+      }
+    },
+    "icon": {
+      "description": "An icon by name. A `theme` icon is the editor's own glyph, optionally in a named theme colour; a `file` icon is one of the operator's status pictures, by its file name under media/light and media/dark.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "const": "theme" },
+            "id": { "type": "string", "minLength": 1 },
+            "color": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "slug"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "const": "file" },
+            "slug": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "action": {
+      "description": "One action, as an interface shows and runs it: the `dabbler` command it stands for with its arguments filled in, or the file it opens -- exactly one of the two -- and what it needs from a person first. Nothing about it is left for the interface to decide.",
+      "type": "object",
+      "required": ["id", "title", "argv", "opens", "preview", "confirm", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "argv": {
+          "description": "The command, beginning `dabbler`, run in the repository's root.",
+          "oneOf": [
+            { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            { "type": "null" }
+          ]
+        },
+        "opens": {
+          "oneOf": [{ "$ref": "#/$defs/opens" }, { "type": "null" }]
+        },
+        "preview": {
+          "description": "A command that writes nothing, whose output the person reads before they are asked: a rollback's dry run, an exception's card. A rollback's dry run prints JSON whose `head` is passed back as `--as-of`.",
+          "oneOf": [
+            { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            { "type": "null" }
+          ]
+        },
+        "confirm": {
+          "oneOf": [{ "$ref": "#/$defs/confirmation" }, { "type": "null" }]
+        },
+        "reason": {
+          "oneOf": [{ "$ref": "#/$defs/reason" }, { "type": "null" }]
+        }
+      }
+    },
+    "opens": {
+      "description": "A file an action opens rather than a verb it runs.",
+      "type": "object",
+      "required": ["file", "line", "fragment"],
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "line": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "The line to open at, 1-based; null for the top."
+        },
+        "fragment": {
+          "type": ["string", "null"],
+          "description": "The page's own anchor, for a page rather than a text file."
+        }
+      }
+    },
+    "confirmation": {
+      "description": "A confirmation a person gives before the action runs, in the words they are shown.",
+      "type": "object",
+      "required": ["title", "detail", "accept", "keep"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "detail": {
+          "type": ["string", "null"],
+          "description": "What the question means, or null where the words come from the action's preview instead."
+        },
+        "accept": { "type": "string", "minLength": 1, "description": "The button that goes on." },
+        "keep": {
+          "type": ["string", "null"],
+          "description": "The button that keeps things as they are, or null where dismissing is the only way back."
+        }
+      }
+    },
+    "reason": {
+      "description": "A reason a person types before the action runs. It reaches the command as `--reason <text>` after its other arguments, and dismissing the box aborts.",
+      "type": "object",
+      "required": ["prompt", "placeholder", "blank"],
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1 },
+        "placeholder": { "type": "string" },
+        "blank": {
+          "type": ["string", "null"],
+          "description": "What an empty answer passes, or null where an empty answer changes nothing because the reason is the authority itself."
+        }
+      }
+    }
+  }
+}

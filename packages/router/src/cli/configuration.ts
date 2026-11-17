@@ -17,9 +17,12 @@
 // writes; a refresh is asked for. A verb that enumerated a vendor to answer
 // "what could I choose" would charge a question for being asked.
 
+import { resolve } from "node:path";
+
 import { ConfigError, explainMechanic, explainMechanicModel, type TransportReading } from "../config.ts";
 import { repoRootFor } from "../journal.ts";
 import { configurationNode } from "../projection.ts";
+import { configurationView, settableRows, type ProjectionConfiguration } from "../views/configuration.ts";
 import { workingDirectory } from "../workdir.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -30,7 +33,7 @@ const COMMANDS = ["options", "explain"] as const;
 
 function usage(): string {
   return [
-    "usage: dabbler configuration [-h] {options,explain} [--repo-root PATH]",
+    "usage: dabbler configuration [-h] {options,explain} [--repo-root PATH] [--json]",
     "",
     "what the next session may be run with, and what decided what it is",
     "",
@@ -46,6 +49,9 @@ function usage(): string {
     "",
     "options:",
     "  --repo-root PATH  the repository; derived from the cwd when absent",
+    "  --json            options only: each row that can be set, with its choices",
+    "                    and the `dabbler configure` command each one runs, as",
+    "                    `dabbler view configuration` carries them",
     "  -h, --help        show this message",
     "",
   ].join("\n");
@@ -317,7 +323,12 @@ export async function configurationVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
   let root: string | null = null;
+  let json = false;
   for (let index = 0; index < rest.length; index += 1) {
+    if (rest[index] === "--json" && command === "options") {
+      json = true;
+      continue;
+    }
     if (rest[index] !== "--repo-root") {
       writeErr(`dabbler configuration: unexpected argument '${rest[index]}'\n\n${usage()}`);
       return EXIT_USAGE;
@@ -334,7 +345,14 @@ export async function configurationVerb(argv: string[]): Promise<number> {
   const repoRoot = root ?? repoRootFor(here) ?? here;
   // Never throws: a configuration this router cannot load is a real state,
   // and it carries its own sentence saying how to fix it.
-  const configuration = node(configurationNode(repoRoot));
+  const reading = configurationNode(repoRoot);
+  if (json) {
+    // Absolute, because every command a choice names carries it.
+    const view = configurationView(resolve(repoRoot), reading as ProjectionConfiguration);
+    writeOut(`${JSON.stringify({ schemaVersion: 1, rows: settableRows(view) }, null, 2)}\n`);
+    return EXIT_OK;
+  }
+  const configuration = node(reading);
   writeOut(
     command === "options"
       ? renderOptions(configuration)

@@ -11,6 +11,7 @@ import * as path from "node:path";
 
 import { buildProjection } from "../progress.ts";
 import type { ProgressProjection } from "../generated/progress-projection.ts";
+import { configurationView, readConfiguration } from "../views/configuration.ts";
 import {
   hasSessionsRoot,
   sessionsDirOf,
@@ -23,11 +24,12 @@ import { writeErr, writeOut } from "./output.ts";
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
 
-const VIEWS = ["work-explorer"] as const;
+const VIEWS = ["work-explorer", "configuration"] as const;
 
 function usage(): string {
   return [
     "usage: dabbler view [-h] work-explorer --repo-root PATH [--repo-root PATH ...]",
+    "       dabbler view [-h] configuration [--repo-root PATH]",
     "",
     "  Print a view as JSON, as an interface renders it, and exit. Reads records;",
     "  spends nothing.",
@@ -38,10 +40,17 @@ function usage(): string {
     "                           verification, findings and what needs attention; each",
     "                           row with its words, icon, the command a click runs and",
     "                           its actions (schemas/work-explorer.schema.json)",
+    "  configuration            the Configuration section: Authoring AI, Reviewing AI",
+    "                           and API Keys and their rows, each with its value, the",
+    "                           layer that decided it and its actions; the catalog's",
+    "                           age is on the root's tooltip. With no --repo-root,",
+    "                           this machine's defaults alone",
+    "                           (schemas/configuration-view.schema.json)",
     "",
     "options:",
-    "  --repo-root PATH         a repository to show; may be given more than once,",
-    "                           and a folder with no sessions root shows nothing",
+    "  --repo-root PATH         a repository to show; work-explorer takes it more",
+    "                           than once, and a folder with no sessions root shows",
+    "                           nothing; configuration takes it at most once",
     "  -h, --help               show this message",
     "",
   ].join("\n");
@@ -55,7 +64,7 @@ interface Parsed {
 /** The arguments, or the one sentence saying why they are not arguments. */
 export function parseViewArgs(argv: readonly string[]): Parsed | string {
   const [view, ...rest] = argv;
-  if (view === undefined) return "name a view: work-explorer";
+  if (view === undefined) return `name a view: ${VIEWS.join(", ")}`;
   if (!(VIEWS as readonly string[]).includes(view)) return `unknown view: ${view}`;
   const roots: string[] = [];
   for (let index = 0; index < rest.length; index += 1) {
@@ -69,7 +78,8 @@ export function parseViewArgs(argv: readonly string[]): Parsed | string {
     }
     return `unrecognized arguments: ${token}`;
   }
-  if (roots.length === 0) return "work-explorer needs at least one --repo-root";
+  if (view === "work-explorer" && roots.length === 0) return "work-explorer needs at least one --repo-root";
+  if (view === "configuration" && roots.length > 1) return "configuration takes at most one --repo-root";
   return { view: view as Parsed["view"], roots };
 }
 
@@ -99,6 +109,11 @@ export function viewVerb(argv: string[]): Promise<number> {
   if (typeof parsed === "string") {
     writeErr(`${usage()}dabbler view: ${parsed}\n`);
     return Promise.resolve(EXIT_USAGE);
+  }
+  if (parsed.view === "configuration") {
+    const root = parsed.roots[0] ?? null;
+    writeOut(`${JSON.stringify(configurationView(root, readConfiguration(root)), null, 2)}\n`);
+    return Promise.resolve(EXIT_OK);
   }
   const entries = parsed.roots.filter((root) => hasSessionsRoot(root)).map(entryFor);
   writeOut(`${JSON.stringify(workExplorerTree(entries), null, 2)}\n`);

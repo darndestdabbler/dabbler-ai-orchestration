@@ -7,6 +7,42 @@
 // who uses whom -- is derived there. Two
 // implementations of one rule disagree eventually, and the disagreement
 // surfaces as a row nobody can explain.
+//
+// The Configuration section's rows are the router's (`views/configuration.ts`
+// in dabbler-ai-router), so every interface shows the same ones; this file
+// hands a configuration node to them.
+
+import {
+  configurationChildren,
+  configurationDescriptor,
+  type ConfigurationContext,
+  type ConfigurationIcon,
+  type ConfigurationNode,
+  type ProjectionConfiguration,
+} from "dabbler-ai-router";
+
+export {
+  ENUMERATION_WORDS,
+  MACHINE_DEFAULT_MEANS,
+  MECHANIC_MODES,
+  REVIEWER_HELP,
+  ROLE_COMMANDS,
+  ROLE_HELP,
+  ROLE_LABELS,
+  providerRelationWord,
+  whoseChoice,
+  type ConfigParticipant,
+  type ConfigRoleName,
+  type ConfigurationCredential,
+  type ConfigurationEngines,
+  type ConfigurationModel,
+  type ConfigurationRecord,
+  type ConfigurationRole,
+  type ConfigurationTransport,
+  type ConfigurationVehicle,
+  type DecidedLayer,
+  type ProjectionConfiguration,
+} from "dabbler-ai-router";
 
 export interface ProjectionSolution {
   name: string;
@@ -100,256 +136,6 @@ export interface ProjectionMember {
   reason?: string | null;
 }
 
-/** Which transport is effective, and which layer decided it. */
-export interface ConfigurationTransport {
-  effective: string;
-  decidedBy: string | null;
-  /** Every layer that named one, in precedence order; the first decided. */
-  layers: { source: string; value: string }[];
-}
-
-/** The engine CLIs this machine has, and what that decides on its own. */
-export interface ConfigurationEngines {
-  chosen: string | null;
-  reason: string;
-  /** `shim`: the copilot that answered is the npm package's `copilot.cmd`, not WinGet's `copilot.exe`. */
-  installed: { engine: string; program: string; path: string | null; shim?: boolean }[];
-}
-
-/** One model, as this machine's catalog lists it. */
-export interface ConfigurationModel {
-  /** The id the source listed, which is the id that goes on the wire. */
-  model: string;
-  provider: string;
-  /**
-   * Present only on a model the dated record says stopped being served,
-   * with when it went and when it was last seen. Such a model is in
-   * `withheld` and never in `candidates`.
-   */
-  retired?: { since: string; lastSeenAt: string | null } | null;
-  /**
-   * The price category the model's own source stated, verbatim, or null
-   * where it stated none. A PRICE and never a capability: this framework
-   * cannot grade a model, and a tag that implied it could would be teaching
-   * a developer to distrust the pane.
-   */
-  priceCategory?: string | null;
-  /**
-   * A reviewing candidate only: why it cannot review while today's author's
-   * vendor authors, in the router's words, or null. Marked and kept, because
-   * the author is chosen at each Start.
-   */
-  conflict?: string | null;
-}
-
-/**
- * What a role is dispatched THROUGH.
- *
- * One word in front of a developer and two kinds underneath, because the
- * value sets and the writability differ: the authoring model runs inside the
- * engine's own CLI, and a reviewer is dispatched by the router over a
- * transport. `options` is only what this machine can actually reach -- a
- * vehicle nothing can reach is a way to fail rather than a choice -- and
- * `withheld` says why each absent one is absent, because "not offered" with
- * no reason reads as a broken pane.
- */
-/**
- * Where a choice is kept, as the router's projection says it: this
- * repository's settings, this machine's default, what ships, or nowhere.
- */
-export type DecidedLayer = "checkout" | "machine" | "shipped" | "default";
-
-/**
- * Whose a row's choice is, in the words a row says it. Read from the
- * projection and decided nowhere here: a person with two windows open has to
- * be able to see which of the two a value is, and a value alone cannot say.
- */
-export function whoseChoice(layer: DecidedLayer | null | undefined): string {
-  if (layer === "checkout") return "this repository";
-  if (layer === "machine") return "machine default";
-  if (layer === "shipped") return "shipped default";
-  return "";
-}
-
-/** The same, as the sentence a tooltip carries; empty where nobody chose. */
-function whoseSentence(layer: DecidedLayer | null | undefined): string {
-  if (layer === "checkout") {
-    return "This is THIS REPOSITORY's choice, kept in its .vscode/settings.json: another repository open in another window has its own, and a change here reaches neither it nor the machine's default. The file is committed, so the choice travels to the next clone.";
-  }
-  if (layer === "machine") {
-    return "This is the MACHINE's default, which applies here because this repository names no choice of its own. Choosing one on this row makes it this repository's; Keep as Machine Default changes the default instead.";
-  }
-  if (layer === "shipped") return "Nobody chose this: it is what the distribution ships.";
-  return "";
-}
-
-export interface ConfigurationVehicle {
-  /** "engine" or "transport". */
-  kind: string;
-  options: Array<{ id: string; means: string }>;
-  withheld?: Array<{ id: string; means: string; note: string | null }>;
-  chosen: string | null;
-  decidedBy?: string | null;
-  decidedLayer?: DecidedLayer | null;
-  /** Which session a change here reaches. Always the next one. */
-  appliesTo?: string;
-  reason?: string;
-  layers?: Array<{ source: string; value: string }>;
-}
-
-/** How a role resolves: what it would pick, and what it was resolved against. */
-export interface ConfigurationRole {
-  role: string;
-  /**
-   * The AUTHORING row only: the provider the work is authored by.
-   *
-   * One fact about the author rather than a label stamped onto every
-   * candidate. It survives an engine that declares no model -- Claude Code's
-   * `session start` takes none -- because the router reads it from the
-   * engine, so the cross-provider word can be said on a row where there is
-   * no authoring model at all to compare against.
-   */
-  provider?: string | null;
-  /** A reviewing row only: why the model the operator chose cannot review today's author, or null. */
-  conflict?: string | null;
-  /** What carries this role: the engine's CLI, or the reviewer's transport. */
-  vehicle?: ConfigurationVehicle;
-  /**
-   * The model the operator CHOSE, or null where nobody chose.
-   *
-   * Reported and not applied to the list: a pane narrowed to the operator's
-   * own selection would offer them the choice they already made and no way
-   * back out of it. Where it is set, it is what the round dispatches to --
-   * used and never silently substituted.
-   */
-  selected?: string | null;
-  /**
-   * The vehicle whose list names neither this choice nor a counterpart of
-   * it, or null. The choice is kept; the row says where it will stop.
-   */
-  notListedBy?: string | null;
-  /** Where this role's model is kept for the next session. */
-  decidedLayer?: DecidedLayer | null;
-  /**
-   * The AUTHORING row only: true while a session in flight declared this
-   * model at `session start`.
-   *
-   * It marks the row a REPORT rather than a choice. The ledger carries the
-   * identity from the moment a session is registered, so offering to change
-   * it would be offering something the record will not honour -- and the
-   * refusal has to name that, because a control that silently declines is
-   * the shape this section shipped broken in.
-   */
-  declaredAtStart?: boolean;
-  chosen: ConfigurationModel | null;
-  candidates: ConfigurationModel[];
-  /** Models the record says are no longer served: offered to nobody. */
-  withheld?: ConfigurationModel[];
-  /** The providers the role was resolved AGAINST -- the invariant, made visible. */
-  excludes: string[];
-  fellThrough: boolean;
-  /**
-   * Which record the list came from -- the direct-API registry, or the seat's
-   * own catalog. The transport owns the enumeration, and a pane that showed a
-   * list without saying which record it read is how a seat came to read
-   * "nothing resolves" while its catalog held eighteen models.
-   */
-  enumeration?: string;
-  /** Why this transport can offer nothing, when it cannot. */
-  unavailable?: string | null;
-  /**
-   * What the reading itself says about this list, in the router's words.
-   *
-   * The authoring row's carries the one sentence that has to travel with
-   * every authoring list: it is a suggestion, and the engine's CLI is the
-   * authority -- Claude Code validates against its own bundled catalog and
-   * says so when it refuses, which no reading here can predict. Rendered
-   * rather than restated, so the row and the pick cannot come to say
-   * different things about the same list.
-   */
-  note?: string;
-  /**
-   * What narrows this role at the dispatch, in the router's words.
-   *
-   * Only the Auxiliary Reviewer carries one: what makes it a THIRD voice is
-   * every provider that has already reviewed a round, read from the
-   * session's own record at the adjudication, so a list drawn between
-   * sessions cannot be narrowed by it and must not read as though it were.
-   */
-  narrowedAtDispatch?: string;
-}
-
-/** One dated record, in the words the router's own freshness reading uses. */
-export interface ConfigurationRecord {
-  record: string;
-  path: string;
-  present: boolean;
-  datedAt: string | null;
-  ageHours: number | null;
-  thresholdHours: number;
-  command: string;
-  /** What asking for a refresh buys, in the router's own words. */
-  cost?: string;
-  stale: boolean;
-  notes: string[];
-}
-
-/**
- * What a session is run with, as the router read it.
- *
- * Every field is READ from a file by the router and rendered here. Nothing in
- * this module decides any of it, and nothing in this module may go and find
- * out: the registry is a dated record, and a pane that enumerated a vendor
- * when it opened would charge a window for being open.
- */
-/**
- * Which credential a provider is reached with, as everything but the key.
- *
- * **No field here can carry a secret, and that is deliberate rather than
- * incidental.** A name, a layer, whether this machine holds one -- not the
- * value, not a prefix of it, not its length: the leading characters of an
- * API key identify the account, and a length distinguishes one vendor's key
- * from another's. The row answers which credential is in force, who chose
- * it, and whether it will work here, and all three are answerable without
- * the secret.
- */
-export interface ConfigurationCredential {
-  provider: string;
-  displayLabel?: string;
-  /** The environment variable this provider reads where no credential is named. */
-  variable?: string;
-  /** True where that variable supplies the key: set, and no credential named. */
-  fromEnvironment?: boolean;
-  /** The credential's NAME, or null where no layer named one. */
-  reference?: string | null;
-  decidedBy?: string | null;
-  /** True where this machine actually holds a credential of that name. */
-  held?: boolean;
-  /** Why it cannot be used, in the router's own words, or null. */
-  stop?: string | null;
-  /** The command that stores one here. */
-  store?: string;
-  /** The command that names one for this checkout. */
-  choose?: string;
-}
-
-export interface ProjectionConfiguration {
-  transport?: ConfigurationTransport;
-  engines?: ConfigurationEngines;
-  authoring?: ConfigurationRole;
-  /** The Primary Reviewer: the model that reviews the work, and is not its author. */
-  primaryReviewer?: ConfigurationRole;
-  /** The Auxiliary Reviewer: the third voice at a disputed impasse. */
-  auxiliaryReviewer?: ConfigurationRole;
-  records?: ConfigurationRecord[];
-  /** The transports this machine can reach and has never read: `copilot-cli`, `api`. */
-  unread?: string[];
-  /** One per enabled provider: which key it is reached with. */
-  credentials?: ConfigurationCredential[];
-  /** Why there is nothing to show: a config this router could not load. */
-  unavailable?: string;
-}
-
 export interface Projection {
   solution: ProjectionSolution;
   /** In dependency order, as the router projects them. */
@@ -360,13 +146,7 @@ export interface Projection {
   configuration?: ProjectionConfiguration;
 }
 
-export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" | "milestone" };
-
-/** The two participants a session is run with: who writes, and who reviews. */
-export type ConfigParticipant = "authoring" | "reviewing";
-
-/** The four model rows, each a role the router resolves. */
-export type ConfigRoleName = "authoring" | "mechanic" | "primaryReviewer" | "auxiliaryReviewer";
+export type IconSpec = ConfigurationIcon;
 
 export type SolutionNode =
   | { kind: "solution" }
@@ -381,24 +161,8 @@ export type SolutionNode =
   | { kind: "externalConsumer"; id: string; repository: string }
   | { kind: "memberGroup" }
   | { kind: "member"; id: string }
-  | { kind: "configuration" }
-  // The two participants, each naming a thing being configured rather than
-  // the mechanism that configures it. A developer opening this section had
-  // to know that *Engine* meant what the authoring AI runs inside and
-  // *Transport* meant how a reviewer is reached before any of it meant
-  // anything; these say who, and their leaves say what about them.
-  | { kind: "configParticipant"; who: ConfigParticipant }
-  | { kind: "configVehicle"; who: ConfigParticipant }
-  | { kind: "configRole"; role: ConfigRoleName }
-  // Whether the framework may call in the Mechanic on a stop: dabbler.mechanic.
-  | { kind: "configMechanic" }
-  // Beside the participants rather than under one of them: a credential
-  // belongs to a PROVIDER, and whichever participant happens to be on that
-  // vendor uses it, so hanging it off a role would draw one fact twice.
-  // Grouped, because keys are set about once per machine and a model is
-  // what Configuration is usually opened to change.
-  | { kind: "configKeys" }
-  | { kind: "configCredential"; provider: string };
+  // The Configuration section's rows, which are the router's.
+  | ConfigurationNode;
 
 export interface RowDescriptor {
   id: string;
@@ -438,189 +202,6 @@ export function rootNodes(hasSolution = true): SolutionNode[] {
   // vehicle and the model depend on nothing a project writes, and they are
   // what a first session stops on when they are not set.
   return hasSolution ? [{ kind: "solution" }, { kind: "configuration" }] : [{ kind: "configuration" }];
-}
-
-function configuration(p: Projection): ProjectionConfiguration {
-  return p.configuration ?? {};
-}
-
-function configRole(p: Projection, which: Exclude<ConfigRoleName, "mechanic">): ConfigurationRole | undefined {
-  return configuration(p)[which];
-}
-
-/** The vehicle a participant is reached through, off the role that has one. */
-function configVehicle(
-  p: Projection,
-  who: ConfigParticipant,
-): ConfigurationVehicle | undefined {
-  // ONE reviewing vehicle, carried identically on both reviewing rows: the
-  // auxiliary's own was state that reached dispatch and that no surface
-  // could show or set, so the row for it was a control that appeared to work
-  // and changed nothing.
-  return who === "authoring"
-    ? configuration(p).authoring?.vehicle
-    : configuration(p).primaryReviewer?.vehicle;
-}
-
-/** How old a record is, in the units a person reads it in. */
-function agePhrase(hours: number | null): string {
-  if (hours === null) return "no readable date";
-  if (hours < 1) return "under an hour old";
-  if (hours < 48) return `${Math.round(hours)}h old`;
-  return `${Math.round(hours / 24)} days old`;
-}
-
-/**
- * What each answer READS as, and the three are three.
- *
- * `not known` is not an absence of a problem and it is not approval: it is
- * the common case, and the day it renders like `honoured` is the day this
- * pane starts making a promise the record cannot keep.
- */
-/**
- * Which record a role's list was read from, in words.
- *
- * The router names the enumeration; this only spells it. A name it does not
- * know is printed as it came, because an unknown record is still worth
- * saying and a pane that swallowed it would be back to a list from nowhere.
- */
-export const ENUMERATION_WORDS: Record<string, string> = {
-  "api-catalog": "vendors' own model lists",
-  "seat-catalog": "seat's own catalog",
-};
-
-/**
- * How a candidate's provider stands to the author's, in words.
- *
- * DERIVED from two providers the reading already carries -- the authoring
- * row's own, and this candidate's -- rather than read from a field. It was a
- * field on every one of 261 candidates, computed and never stored, which is
- * 261 copies of one comparison; the authoring row states its provider once
- * and the comparison is made where the word is needed.
- *
- * This is the whole of what cross-provider review is now: a LABEL the person
- * choosing can weigh, where there used to be a refusal. A different provider
- * reduces the chance the reviewer shares the author's blind spots -- it does
- * not eliminate it, and the same provider does not guarantee it, which is
- * why the framework states the fact and leaves the judgement where the data
- * to make it actually is.
- *
- * One function, read by the row AND by the pick. Two copies of a vocabulary
- * drift, and sessions 143 and 147 each paid for finding that out.
- */
-export function providerRelationWord(
-  author: string | null | undefined,
-  provider: string | null | undefined,
-): string {
-  if (!author || !provider) return "provider unknown";
-  return author === provider ? "same provider" : "different provider";
-}
-
-/**
- * What each model row is called, under the participant it belongs to.
- *
- * Named for the thing being configured rather than for the mechanism: the
- * rows were *Authoring model* and *Primary Reviewer* at the top level, which
- * a reader had to already understand the framework to parse. Under
- * **Authoring AI** and **Reviewing AI** the same facts need three words
- * between them. **Auxiliary** is the word `roles.auxiliary-reviewer` uses,
- * here and in the router alike: a label that disagreed with the role it sets
- * would be the second copy of a vocabulary.
- */
-export const ROLE_LABELS: Record<ConfigRoleName, string> = {
-  authoring: "Authoring Model",
-  mechanic: "Mechanic Model",
-  primaryReviewer: "Primary Model",
-  auxiliaryReviewer: "Auxiliary Model",
-};
-
-/**
- * The command each model row is, one per role.
- *
- * Three ids and not one, because a `view/item/context` entry carries no
- * arguments: a single command would have to guess which of the three models
- * a right-click on *Reviewing AI* meant, and guessing on the operator's
- * behalf is how a control comes to do something other than what it says.
- */
-export const ROLE_COMMANDS: Record<ConfigRoleName, string> = {
-  authoring: "dabblerSolution.setAuthoringModel",
-  mechanic: "dabblerSolution.setMechanicModel",
-  primaryReviewer: "dabblerSolution.setPrimaryReviewerModel",
-  auxiliaryReviewer: "dabblerSolution.setAuxiliaryReviewerModel",
-};
-
-/** What each role IS, in one sentence, on the row that sets it. */
-export const ROLE_HELP: Record<ConfigRoleName, string> = {
-  authoring:
-    "The model the engine's own CLI is launched on. It is set here for the NEXT session; while a session is in flight this row reports what that session declared, because the ledger carries its identity from the moment it was registered.",
-  mechanic:
-    "The model the Mechanic is launched on, on the authoring engine's own CLI, when a stop is handed to it. Unset, it is the Authoring Model; it is never the Primary Reviewer's.",
-  primaryReviewer:
-    "The reviewer of record, never from the authoring model's vendor. A model from that vendor is still listed, marked as not usable while it authors, because the author is chosen at each Start. Its verdict blocks a close.",
-  auxiliaryReviewer:
-    "The third voice, reached only when the Primary Reviewer's findings are disputed. It is defined as not the author AND not a provider that has already reviewed this session, which is what makes an adjudication a third opinion rather than a repeat one.",
-};
-
-const ROLE_ICONS: Record<ConfigRoleName, string> = {
-  authoring: "edit",
-  mechanic: "tools",
-  primaryReviewer: "verified",
-  // The third voice at an impasse, which is a judgement and not a review.
-  auxiliaryReviewer: "law",
-};
-
-/** The one line of help under a list of possible reviewers. */
-export const REVIEWER_HELP =
-  "A reviewer is never from the authoring model's vendor, so it cannot share the author's blind spots.";
-
-/** One model as a row reads it: the id that is dispatched, and whose it is. */
-/**
- * What a model row says it is, or why it says nothing.
- *
- * **"Nothing resolves" and "nobody has chosen" are different facts**, and
- * only one of them is a problem. A reviewing role with no chosen model
- * really has nothing: its preference order ran and picked none. The
- * AUTHORING row has no preference order -- a model there is chosen or it is
- * not -- so a machine holding four models it could author with read
- * "nothing resolves" until this told the two apart, which is the pane
- * reporting a fault where there is a choice waiting to be made.
- */
-function modelText(
-  model: ConfigurationModel | null | undefined,
-  offered = 0,
-): string {
-  if (model) return `${model.model} (${model.provider})`;
-  return offered > 0 ? "not chosen" : "nothing resolves";
-}
-
-/** What the word "vehicle" is for, on the kind of vehicle this role has. */
-const VEHICLE_MEANS: Record<string, string> = {
-  engine: "the engine CLI the work is authored in",
-  transport: "the transport the router dispatches this role over",
-};
-
-/**
- * What carries this role, said on the row.
- *
- * The alternatives are only what this machine can reach: a vehicle nothing
- * can reach is a way to fail rather than a choice. An absent one is still
- * NAMED, with the reason and the remedy, because a list that silently
- * dropped a transport an operator expects to see reads as a broken pane.
- */
-function vehicleText(vehicle: ConfigurationVehicle | null | undefined): string {
-  if (!vehicle) return "";
-  const kind = VEHICLE_MEANS[vehicle.kind] ?? vehicle.kind;
-  const others = vehicle.options.filter((option) => option.id !== vehicle.chosen);
-  const withheld = (vehicle.withheld ?? []).filter((entry) => entry.note !== null);
-  return [
-    `Vehicle: ${vehicle.chosen ?? "nothing chosen"} — ${kind}${
-      vehicle.decidedBy ? `, decided by ${vehicle.decidedBy}` : ""
-    }. It is the default for the NEXT session; a session in flight keeps what its record says.`,
-    others.length > 0
-      ? `This machine could also reach: ${others.map((option) => `${option.id} (${option.means})`).join("; ")}.`
-      : "Nothing else here can carry it.",
-    ...withheld.map((entry) => `${entry.id} is not offered: ${entry.note}.`),
-  ].join(" ");
 }
 
 function externals(p: Projection): ProjectionExternal[] {
@@ -738,46 +319,14 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       if (members(p).length > 1) own.push({ kind: "memberGroup" });
       return own;
     }
-    case "configuration": {
-      const config = configuration(p);
-      // One node per participant. Only what the projection carries: a
-      // section that invented a row for an absent field would be saying
-      // something the router never read, and a projection written by an
-      // older router is exactly that case.
-      const own: SolutionNode[] = [];
-      if (config.authoring) own.push({ kind: "configParticipant", who: "authoring" });
-      if (config.primaryReviewer || config.auxiliaryReviewer) {
-        own.push({ kind: "configParticipant", who: "reviewing" });
-      }
-      if ((config.credentials ?? []).length > 0) own.push({ kind: "configKeys" });
-      return own;
-    }
+    case "configuration":
     case "configKeys":
-      return (configuration(p).credentials ?? []).map((credential) => ({
-        kind: "configCredential" as const,
-        provider: credential.provider,
-      }));
-    case "configParticipant": {
-      const config = configuration(p);
-      const own: SolutionNode[] = [];
-      if (configVehicle(p, node.who)) own.push({ kind: "configVehicle", who: node.who });
-      if (node.who === "authoring") {
-        if (config.authoring) {
-          own.push({ kind: "configRole", role: "authoring" });
-          // The Mechanic is launched on the authoring engine, so it sits here.
-          own.push({ kind: "configRole", role: "mechanic" }, { kind: "configMechanic" });
-        }
-        return own;
-      }
-      if (config.primaryReviewer) own.push({ kind: "configRole", role: "primaryReviewer" });
-      if (config.auxiliaryReviewer) own.push({ kind: "configRole", role: "auxiliaryReviewer" });
-      return own;
-    }
+    case "configParticipant":
     case "configVehicle":
     case "configRole":
     case "configMechanic":
     case "configCredential":
-      return [];
+      return configurationChildren(node, p.configuration ?? {});
     case "externalGroup":
       return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
     case "memberGroup":
@@ -844,34 +393,8 @@ const KIND_ICONS: Record<string, string> = {
   library: "package",
 };
 
-/** What the extension knows that the solution projection does not. */
-export interface SolutionContext {
-  /**
-   * The engine the operator chose for the next session, which is a setting
-   * of this extension rather than of the router: `session start` takes the
-   * engine as an argument, so the default belongs to whoever offers to start
-   * one. Null when nobody has chosen and the machine's own reading stands.
-   */
-  readonly chosenEngine?: string | null;
-  /** `dabbler.mechanic` as the router reads it, or null where it could not. */
-  readonly mechanic?: string | null;
-  /** The Mechanic Model someone chose, or null where it is the Authoring Model's. */
-  readonly mechanicModel?: string | null;
-  /** No folder is open, so the Configuration is this machine's defaults and nothing else. */
-  readonly machineOnly?: boolean;
-}
-
-/** What a machine default is, said once for the pane's label and the toast after a write. */
-export const MACHINE_DEFAULT_MEANS =
-  "A machine default applies wherever a repository has no choice of its own, " +
-  "and it does not replace a choice already saved in one.";
-
-/** What each Mechanic delegation means, on its row and in its pick. */
-export const MECHANIC_MODES: ReadonlyArray<{ mode: string; means: string }> = [
-  { mode: "unattended", means: "the framework calls in the Mechanic on a stop without you" },
-  { mode: "attended", means: "a stop names the Mechanic among its ways on, and you open it" },
-  { mode: "off", means: "no Mechanic is named or called in" },
-];
+/** What the Configuration rows need beside the reading: the router's own reading of them. */
+export type SolutionContext = ConfigurationContext;
 
 export function descriptorFor(
   node: SolutionNode,
@@ -1068,351 +591,15 @@ export function descriptorFor(
         expandable: false,
       };
     }
-    case "configuration": {
-      const config = configuration(p);
-      const bits: string[] = [];
-      if (config.engines?.chosen) bits.push(config.engines.chosen);
-      // The reviewing vehicle, not the machine's: no row beneath this one is
-      // decided by the machine's, so naming it here named nothing that runs.
-      const reviewing = configVehicle(p, "reviewing")?.chosen;
-      if (reviewing) bits.push(reviewing);
-      const stale = (config.records ?? []).filter((row) => row.stale).length;
-      return {
-        id: "configuration",
-        label: context.machineOnly ? "Configuration: this machine's defaults" : "Configuration",
-        description: config.unavailable
-          ? "cannot be read"
-          : bits.length > 0
-            ? bits.join(" · ")
-            : "what the next session runs with",
-        tooltip:
-          config.unavailable ??
-          [
-            // With no folder open there is no repository to choose for, so
-            // every row here is the machine's, and the label says so.
-            ...(context.machineOnly ? [`No folder is open, so these are this machine's defaults. ${MACHINE_DEFAULT_MEANS}`] : []),
-            "What a session is run with, read from files. Nothing here is " +
-              "probed: the model catalog is a dated record, and refreshing " +
-              "it is something you ask for.",
-            // The catalog's own row is gone, so its words live here: how old
-            // this machine's reading is, where it lives, and what asking for
-            // a new one costs -- which is nothing, said before anybody
-            // clicks, because that question has been answered wrongly often
-            // enough to be worth pre-empting.
-            ...(config.records ?? []).map((row) =>
-              [
-                `${row.record}: ${row.present ? agePhrase(row.ageHours) : "not read yet"}`,
-                row.present
-                  ? `last updated ${row.datedAt}, read as stale past ${Math.round(row.thresholdHours)}h`
-                  : "this machine has not read its model catalog yet",
-                `it lives at ${row.path}`,
-              ].join("; "),
-            ),
-            ...(config.records ?? []).map((row) =>
-              `Update the catalog runs \`${row.command}\`. ${row.cost ?? ""}`.trim(),
-            ),
-          ].join("\n\n"),
-        icon: {
-          id: "settings-gear",
-          ...(config.unavailable || stale > 0 ? { tone: "attention" as const } : {}),
-        },
-        expandable: childrenOf(node, p).length > 0,
-        contextValue: "dabblerConfiguration",
-      };
-    }
-    case "configParticipant": {
-      const config = configuration(p);
-      const authoring = node.who === "authoring";
-      const vehicle = configVehicle(p, node.who);
-      const model = authoring ? config.authoring?.chosen : config.primaryReviewer?.chosen;
-      // What this participant is, at a glance: what carries it and what
-      // answers. The leaves say the rest, so a reader who only wants to know
-      // what the next session runs with never has to open one.
-      const bits = [vehicle?.chosen ?? null, model?.model ?? null].filter(
-        (bit): bit is string => bit !== null && bit !== "",
-      );
-      return {
-        id: `config:${node.who}`,
-        label: authoring ? "Authoring AI" : "Reviewing AI",
-        description: bits.length > 0 ? bits.join(" · ") : "not read",
-        tooltip: authoring
-          ? "The AI that writes the work: it runs inside an engine CLI, and the model it authors with is declared when the session is registered."
-          : `The AI that reviews the work, and is never its author. ${REVIEWER_HELP}`,
-        icon: { id: authoring ? "edit" : "verified" },
-        expandable: childrenOf(node, p).length > 0,
-        contextValue: `dabblerConfigParticipant;${node.who}`,
-      };
-    }
-    case "configVehicle": {
-      const authoring = node.who === "authoring";
-      const vehicle = configVehicle(p, node.who);
-      // The tooltip names every layer the choice overrides, so a setting that
-      // is not in force never reads as one that is. It is not a fault: one
-      // layer overriding the next is how the layers work, and the reviewing
-      // vehicle always has the shipped default beneath it, so the row marks
-      // nothing for it.
-      const shadowed = (vehicle?.layers ?? []).slice(1);
-      const engines = configuration(p).engines;
-      // What the OPERATOR chose outranks what the machine leaves to choose:
-      // one installed CLI is a default, and a person picking one is a
-      // decision, and a row that showed the first while the second stood
-      // would be reporting something that is not what happens.
-      const chosen = authoring
-        ? (context.chosenEngine ?? vehicle?.chosen ?? null)
-        : (vehicle?.chosen ?? null);
-      // An overridden layer says BY WHAT, whichever layer that is: a row that
-      // only explained a role's own config left the editor setting -- the
-      // operator's case -- reading as a warning with no cause.
-      const overrider = !authoring && vehicle?.decidedBy ? ` by ${vehicle.decidedBy}` : "";
-      // No engine chosen is two different facts: the router declines to
-      // default when two CLIs are on PATH and waits for a person, or the
-      // machine has none. The developer's machine -- claude and copilot both
-      // installed -- read "none installed" until session 162.
-      const installed = (engines?.installed ?? []).filter((entry) => entry.path !== null).length;
-      // The npm package's `copilot.cmd`, first on PATH where WinGet's
-      // `copilot.exe` should be: `cmd.exe` cuts a prompt at its first
-      // newline, and until this row said so the first anyone learned of it
-      // was a seat that answered nothing.
-      const shim = authoring && (engines?.installed ?? []).some((entry) => entry.engine === "copilot" && entry.shim === true);
-      const whose = whoseChoice(vehicle?.decidedLayer);
-      const said = chosen
-        ? `${chosen}${whose === "" ? "" : ` · ${whose}`}`
-        : authoring
-          ? installed > 0
-            ? `${installed} installed, none chosen`
-            : "no engine CLI on PATH"
-          : "not read";
-      return {
-        id: `config:vehicle:${node.who}`,
-        label: "Vehicle",
-        description: shim ? `${said} · copilot is the npm shim ⚠` : said,
-        tooltip: [
-          vehicleText(vehicle),
-          authoring
-            ? "Start Session uses this engine and asks for none; `dabbler session start` typed in a terminal reads the same choice. It reaches the NEXT session: the engine is recorded per session at `session start` and never changes one in flight."
-            : "This sets the reviewing vehicle, dabbler.reviewerTransport in this checkout's settings -- the one this row shows.",
-          chosen ? whoseSentence(vehicle?.decidedLayer) : "",
-          ...shadowed.map((layer) => `${layer.source} says '${layer.value}' and is overridden${overrider}.`),
-          authoring && (context.chosenEngine ?? null) === null ? (engines?.reason ?? "") : "",
-          authoring && installed === 0
-            ? "Install Claude Code or the GitHub Copilot CLI (`winget install GitHub.Copilot`); the extension installs nothing."
-            : "",
-          shim
-            ? "The copilot on PATH is the npm package's `copilot.cmd` shim, and cmd.exe cuts a prompt at its first newline. Replace it with WinGet's: `npm uninstall -g @github/copilot`, then `winget install GitHub.Copilot`."
-            : "",
-        ]
-          .filter((line) => line !== "")
-          .join("\n\n"),
-        icon: {
-          // ONE icon on both Vehicle rows. They answer one question -- what
-          // carries this participant -- and two glyphs made them read as two
-          // different kinds of setting, which is exactly the reading this
-          // section was reorganised to stop.
-          id: "plug",
-          ...(shim
-            ? { tone: "attention" as const }
-            : chosen
-              ? {}
-              : { tone: "muted" as const }),
-        },
-        expandable: false,
-        contextValue: `dabblerConfigVehicle;${node.who}`,
-        command: authoring ? "dabblerSolution.setEngine" : "dabblerSolution.setReviewerTransport",
-      };
-    }
-    case "configMechanic": {
-      const mode = context.mechanic ?? null;
-      const means = MECHANIC_MODES.find((entry) => entry.mode === mode)?.means;
-      return {
-        id: "config:mechanic",
-        label: "Mechanic",
-        description: mode ?? "not read",
-        tooltip: [
-          "Whether the framework may call in the Mechanic -- a fresh engine on the Mechanic Model -- when a session stops. It is this repository's choice, written to its .vscode/settings.json.",
-          means ? `${mode}: ${means}.` : "",
-        ]
-          .filter((line) => line !== "")
-          .join("\n\n"),
-        icon: { id: "shield", ...(mode === null ? { tone: "muted" as const } : {}) },
-        expandable: false,
-        contextValue: "dabblerConfigMechanic",
-        command: "dabblerSolution.setMechanic",
-      };
-    }
-    case "configRole": {
-      if (node.role === "mechanic") {
-        // Not in the projection: the router reads it on demand, and unset it
-        // is the Authoring Model's, which is the one thing this row says then.
-        return {
-          id: "config:role:mechanic",
-          label: ROLE_LABELS.mechanic,
-          description: context.mechanicModel ?? "same as Authoring Model",
-          tooltip: ROLE_HELP.mechanic,
-          icon: { id: ROLE_ICONS.mechanic },
-          expandable: false,
-          contextValue: "dabblerConfigRole;mechanic",
-          command: ROLE_COMMANDS.mechanic,
-        };
-      }
-      const role = configRole(p, node.role);
-      const authoring = node.role === "authoring";
-      const unlistedModel = role?.notListedBy ? (role.selected ?? role.chosen?.model ?? "") : null;
-      return {
-        id: `config:role:${node.role}`,
-        label: ROLE_LABELS[node.role],
-        description:
-          unlistedModel !== null
-            ? // Whose it is matters MOST here: the row is telling a person to
-              // change a choice, and they have to know which file holds it.
-              `${unlistedModel}${whoseChoice(role?.decidedLayer) === "" ? "" : ` · ${whoseChoice(role?.decidedLayer)}`} — not listed by ${role?.notListedBy} ⚠`
-            : `${modelText(
-                role?.chosen,
-                // Only the authoring row: a reviewing role resolves its own head
-                // from the preference order, so a null chosen there really is
-                // nothing resolving rather than nobody having picked.
-                authoring ? (role?.candidates.length ?? 0) : 0,
-              )}${role?.chosen && whoseChoice(role?.decidedLayer) !== "" ? ` · ${whoseChoice(role?.decidedLayer)}` : ""}${role?.fellThrough || role?.conflict ? " ⚠" : ""}`,
-        tooltip: [
-          ROLE_HELP[node.role],
-          // Kept, never cleared or substituted: the stop is where it always
-          // was, and this row announces it before anyone presses Start.
-          unlistedModel !== null
-            ? `You chose ${unlistedModel}, which ${role?.notListedBy} does not list. ${
-                node.role === "auxiliaryReviewer" ? "The first dispute" : "The next session"
-              } will stop on it until you choose another. ${whoseSentence(role?.decidedLayer)}`.trim()
-            : "",
-          // What narrows this role at the round, in the router's own words
-          // rather than a second copy of them here. Only the Auxiliary
-          // Reviewer carries one: what makes it a third voice is read from
-          // the session's record at the adjudication, so a list drawn
-          // between sessions cannot be narrowed by it.
-          role?.narrowedAtDispatch ?? "",
-          // The label, in the row, in the same words the pick uses --
-          // DERIVED here from two providers the reading already carries,
-          // because a comparison of two fields is not a third field.
-          !authoring && role?.chosen
-            ? `This one is on a ${providerRelationWord(configuration(p).authoring?.provider, role.chosen.provider)}.`
-            : "",
-          role?.conflict
-            ? `'${role.selected}' is ${role.conflict}: a reviewer is never from the authoring model's vendor, so a session with this author would not start.`
-            : "",
-          role?.chosen?.priceCategory
-            ? `Its source states a '${role.chosen.priceCategory}' price category. That is a PRICE and not a capability: this framework does not grade models.`
-            : "",
-          // Two fields and no third: what the operator CHOSE, and the
-          // order tried where they chose nothing. A selection is used and
-          // never silently substituted, and it NARROWS -- a selection this
-          // call cannot reach is a stop that names it, not a fall to the
-          // next model.
-          unlistedModel !== null
-            ? ""
-            : role?.selected
-            ? `You chose ${role.selected}. ${whoseSentence(role.decidedLayer)} It is what the round dispatches to, and nothing is substituted for it: if this call cannot reach it, the round stops and says so.`
-            : authoring
-              ? // A REPORT and a CHOICE look identical on a row that does not
-                // say which it is, and only one of the two can be changed.
-                role?.declaredAtStart
-                  ? "This session declared it at `session start`, so the row reports it. Setting one here reaches the NEXT session."
-                  : ""
-              : "Nobody has chosen a model here, so the preference order decides and a stale entry in it costs a slightly newer model, never a candidate.",
-          role?.fellThrough
-            ? "It fell past its own preference order, so what answers is a model nobody named. That is what billed one session 364 premium requests."
-            : "",
-          // Which record was read, said plainly: the seat's catalog is the
-          // enumeration on a seat, and the vendors' own lists on the API path.
-          `${role?.candidates.length ?? 0} model(s) qualify${
-            role?.enumeration ? `, from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}` : ""
-          }${role?.vehicle?.chosen ? `, read on \`${role.vehicle.chosen}\`` : ""}.`,
-          (role?.withheld ?? []).length > 0
-            ? `Withheld, because the record says the vendor stopped serving them: ${(role?.withheld ?? [])
-                .map(
-                  (model) =>
-                    `${model.model} (last seen ${model.retired?.lastSeenAt ?? "unknown"}, gone since ${model.retired?.since ?? "unknown"})`,
-                )
-                .join(", ")}. The entry is kept, so a model that comes back is offered again.`
-            : "",
-          // What the reading says about its own list, in the router's words.
-          // The authoring row's is the sentence that has to travel with every
-          // authoring list -- a suggestion, with the CLI the authority --
-          // and it is RENDERED rather than restated here, because a second
-          // copy of it is a second thing to go stale.
-          role?.note ?? "",
-          // What carries this role is the Vehicle row's to say, and saying
-          // it here too is the second copy of a vocabulary that drifts.
-          role?.unavailable ? `Nothing can be offered here: ${role.unavailable}.` : "",
-        ]
-          .filter((line) => line !== "")
-          .join("\n\n"),
-        icon: {
-          id: ROLE_ICONS[node.role],
-          // Two things here are worth a colour: falling past the preference
-          // order, where what answers is a model nobody named (which billed
-          // one session 364 premium requests), and a chosen reviewer from
-          // today's authoring vendor, which a Start would refuse.
-          ...(role?.fellThrough || role?.conflict || unlistedModel !== null
-            ? { tone: "attention" as const }
-            : {}),
-        },
-        expandable: false,
-        contextValue: `dabblerConfigRole;${node.role}`,
-        command: ROLE_COMMANDS[node.role],
-      };
-    }
-    case "configKeys": {
-      const credentials = configuration(p).credentials ?? [];
-      const available = credentials.filter((row) => row.fromEnvironment || row.held).length;
-      // Collapsed, so the row that needs acting on must still be visible
-      // from here.
-      const stopped = credentials.some((row) => row.stop);
-      return {
-        id: "config:keys",
-        label: "API Keys",
-        description: `${available} of ${credentials.length} available`,
-        tooltip:
-          "Which key each provider is reached with. A credential this checkout or you named decides; the provider's environment variable supplies the key only where none is named.",
-        icon: { id: "key", ...(stopped ? { tone: "attention" as const } : {}) },
-        expandable: true,
-      };
-    }
-    case "configCredential": {
-      const credential = (configuration(p).credentials ?? []).find(
-        (row) => row.provider === node.provider,
-      );
-      const label = `${credential?.displayLabel ?? node.provider} key`;
-      // What is in force. `fromEnvironment` is only ever true where no
-      // credential is named, because a named one outranks the variable.
-      const description = !credential
-        ? "not read"
-        : credential.fromEnvironment
-          ? `${credential.variable ?? "the environment"} is set`
-          : !credential.reference
-            ? "nothing resolves"
-            : credential.held
-              ? credential.reference
-              : `${credential.reference} — not on this machine`;
-      return {
-        id: `config:credential:${node.provider}`,
-        label,
-        description,
-        tooltip: [
-          "Which credential this provider is reached with. The value is in this machine's own store; what travels in a setting is the NAME.",
-          credential?.stop ??
-            (credential?.fromEnvironment
-              ? `Nothing names a credential, so ${credential.variable}, set in the environment, supplies the key. A credential named here would outrank it.`
-              : credential?.reference
-                ? `'${credential.reference}' was named by ${credential.decidedBy ?? "a configured layer"}.`
-                : `Nothing names a credential, so ${credential?.variable ?? "the provider's environment variable"} is what supplies the key.`),
-          `Clicking opens a terminal on \`${credential?.store ?? "dabbler auth set"}\`, which asks for the key with the echo off. It is never typed into this window: what goes into an input box lives in the editor's own buffers.`,
-        ].join("\n\n"),
-        icon: {
-          id: "key",
-          ...(credential?.stop ? { tone: "attention" as const } : {}),
-        },
-        expandable: false,
-        contextValue: `dabblerConfigCredential;${node.provider}`,
-        command: "dabblerSolution.storeCredential",
-      };
-    }
+    case "configuration":
+    case "configParticipant":
+    case "configVehicle":
+    case "configMechanic":
+    case "configRole":
+    case "configKeys":
+    case "configCredential":
+      // The router's rows, worked out once there for every interface.
+      return configurationDescriptor(node, p.configuration ?? {}, context);
     case "memberGroup": {
       const rows = members(p);
       const away = rows.filter((m) => !m.root).length;

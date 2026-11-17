@@ -33,6 +33,8 @@ import {
   TRANSCRIPTS_DIRNAME,
   UNDO_CHANGES_FLAG,
   checkStopConfirmation,
+  mechanicChoicesOf,
+  modelChoiceWords,
   preflightRefusedModel,
   releaseSessionToStart,
   reportStopConfirmation,
@@ -47,9 +49,21 @@ import { launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
-import { mechanicChoicesIn, modelItems } from "./configurationCommands";
 import { closeFinishedTerminals, rememberEngineTerminal } from "./engineTerminals";
 import type { ConfigurationModel, ConfigurationRole } from "../providers/solutionTreeModel";
+
+/** The models to offer, each in the router's words for it -- the same words the Configuration rows use. */
+function modelItems(
+  models: readonly ConfigurationModel[],
+  authorProvider: string | null | undefined,
+  selected: string | null | undefined = null,
+): vscode.QuickPickItem[] {
+  return modelChoiceWords(models, authorProvider, selected).map((words) => ({
+    label: words.label,
+    description: words.description,
+    detail: words.detail ?? undefined,
+  }));
+}
 
 /**
  * The repository a clicked row belongs to, whichever row kind it is.
@@ -1313,7 +1327,7 @@ export async function runOpenTranscript(
 export async function runOpenMechanic(
   repository: SessionsRepository,
   ui: SessionRunUi,
-  mechanicModel: (root: string) => string | null = (root) => mechanicChoicesIn(root).mechanicModel,
+  mechanicModel: (root: string) => string | null = (root) => mechanicChoicesOf(root).mechanicModel,
 ): Promise<boolean> {
   const authoring = (
     (ui.configurationFor ?? solutionConfiguration)(repository.root, {}) as {

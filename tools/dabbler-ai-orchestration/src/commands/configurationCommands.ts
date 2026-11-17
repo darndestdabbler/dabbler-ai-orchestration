@@ -26,59 +26,22 @@
 
 import * as os from "os";
 import * as vscode from "vscode";
-import { explainMechanic, explainMechanicModel, type Router } from "dabbler-ai-router";
+import {
+  MACHINE_DEFAULT_MEANS,
+  ROLE_COMMANDS,
+  configurationSetAction,
+  keepAsMachineDefaultAction,
+  parseConfigureArgs,
+  type Router,
+} from "dabbler-ai-router";
 
 import { resolveRouterCli } from "../router/terminalShim";
 
-import {
-  ENUMERATION_WORDS,
-  MACHINE_DEFAULT_MEANS,
-  MECHANIC_MODES,
-  providerRelationWord,
-  REVIEWER_HELP,
-} from "../providers/solutionTreeModel";
-import type {
-  ConfigRoleName,
-  ConfigurationModel,
-  Projection,
-  SolutionNode,
-} from "../providers/solutionTreeModel";
+import type { ConfigRoleName, Projection, SolutionNode } from "../providers/solutionTreeModel";
 
-/**
- * The engine the next session is offered, as the router projects it.
- *
- * It lived in a VS Code setting until this read replaced it. A setting is
- * invisible to `dabbler session start` typed in a terminal, so half a
- * machine own configuration could not be seen by the one command that needs
- * it; the choice is a file beside the catalog now, and both surfaces read it
- * through the router.
- */
-export function chosenEngineIn(projection: Projection | null | undefined): string | null {
-  const chosen = projection?.configuration?.engines?.chosen;
-  return chosen === undefined || chosen === null || chosen === "" ? null : chosen;
-}
-
-/**
- * The Mechanic's delegation and the model someone chose for it, through the
- * router's own reading. The model is null where no Mechanic layer named one,
- * which is the Authoring Model's -- the reading falls to it, and the row says
- * so rather than repeating it. Either is null where the reading refused.
- * A null root is no folder open, and reads this machine's defaults alone.
- */
-export function mechanicChoicesIn(root: string | null): { mechanic: string | null; mechanicModel: string | null } {
-  const read = <T>(reading: () => T): T | null => {
-    try {
-      return reading();
-    } catch {
-      return null;
-    }
-  };
-  const model = read(() => explainMechanicModel(root));
-  return {
-    mechanic: read(() => explainMechanic(root))?.transport ?? null,
-    mechanicModel: model !== null && (model.decidedBy ?? "").includes("mechanic") ? model.transport : null,
-  };
-}
+// The control's name and the Mechanic's clearing choice are the router's
+// words, shared with every interface that shows the same pickers.
+export { KEEP_AS_MACHINE_DEFAULT, SAME_AS_AUTHORING } from "dabbler-ai-router";
 
 /** What a control needs of the editor, so the suite can drive one. */
 export interface ConfigurationUi {
@@ -153,138 +116,33 @@ export function defaultConfigurationUi(): ConfigurationUi {
   };
 }
 
-const NEXT_SESSION = "This is the default for the NEXT session; a session in flight keeps what its record says.";
-
-/**
- * The engines a row may offer, with what the machine found beside each.
- *
- * `launchable` is what Start Session can actually open, and an engine
- * outside it is not offered here. The pane sets the default Start Session
- * is given, so persisting a name Start Session has no launch for would be a
- * setting that silently does nothing -- which is worse than the machine
- * simply not being able to run that engine yet. `codex` is the live case:
- * the router recognises it and its CLI's argv has never been measured, so
- * Start Session does not offer it and neither does this.
- */
-function engineItems(
-  projection: Projection | null,
-  launchable: readonly string[],
-): vscode.QuickPickItem[] {
-  const installed = projection?.configuration?.engines?.installed ?? [];
-  return installed
-    .filter((entry) => launchable.includes(entry.engine))
-    .map((entry) => ({
-      label: entry.engine,
-      description: entry.path === null ? `\`${entry.program}\` is not on PATH` : entry.program,
-      detail: entry.path ?? undefined,
-    }));
-}
-
-/**
- * The models to offer, each carrying what the record says about it.
- *
- * The list is where the choice is actually made, so it is where the answer
- * has to be: offering a model the record says nothing about beside one a
- * provider has vouched for, with nothing to tell them apart, is the promise
- * session 144 exists to stop this surface making. The wording is the row's
- * own -- one vocabulary, so the pick and the row cannot come to disagree.
- */
-export function modelItems(
-  models: readonly ConfigurationModel[],
-  /** The provider the work is authored by, so each option can be labelled against it. */
-  authorProvider: string | null | undefined,
-  selected: string | null | undefined = null,
-): vscode.QuickPickItem[] {
-  return models.map((model) => ({
-    label: model.model,
-    // The row's own words, not a second set: one vocabulary means the pick
-    // and the row cannot come to say different things about one model.
-    description: [
-      model.provider,
-      // Derived from the author's provider and this one, which is what the
-      // row does too -- the comparison is not a field on the model.
-      authorProvider ? providerRelationWord(authorProvider, model.provider) : null,
-      // What the source said it costs, in the source's own word, and
-      // nothing at all where the source said nothing.
-      model.priceCategory ? `${model.priceCategory} price` : null,
-      // The router's words for a reviewer from today's authoring vendor:
-      // still choosable, because the author is chosen at each Start.
-      model.conflict ?? null,
-    ]
-      .filter((part) => part !== null && part !== "")
-      .join(" · "),
-    // Which one they already chose, so the list is a place to CHANGE a
-    // choice rather than a place to make one over again.
-    detail: model.model === selected ? "what you chose" : undefined,
-  }));
-}
-
 export interface ConfigurationTarget {
   readonly node?: SolutionNode;
   readonly projection?: Projection | null;
 }
 
 /**
- * Which engine the next session is offered.
+ * Run one `dabbler configure` command a row's choice named, through the
+ * router, with whatever it said handed straight back.
  *
- * A CLI that is not installed is still offered, and says it is not: a
- * machine that is about to have Codex on it is a normal thing, and hiding
- * the row would make the pane's list a claim about what may be chosen rather
- * than a report of what is here.
+ * The command is the ROUTER's: which flag a choice writes, and whether it is
+ * this repository's or this machine's default, is decided where the choice
+ * is, for every interface alike. With no folder open it is this machine's
+ * default, and the toast says in one sentence what a machine default is.
  */
-export async function setEngine(
-  router: Pick<Router, "configure">,
-  target: ConfigurationTarget,
-  launchable: readonly string[],
-  refreshed: () => void,
-  ui: ConfigurationUi = defaultConfigurationUi(),
-): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  const items = engineItems(target.projection ?? null, launchable);
-  if (items.length === 0) {
-    ui.showWarningMessage(
-      "There is no engine here that Start Session can open. It offers the CLIs whose launch has been measured, and this machine has none of them on PATH.",
-    );
-    return;
-  }
-  const picked = await ui.pick(items, {
-    title: "Which engine runs the next session?",
-    placeHolder: NEXT_SESSION,
-  });
-  if (!picked) return;
-  // Through the ROUTER, into the user-level preferences beside the catalog.
-  // It was an editor setting, which `dabbler session start` typed in a
-  // terminal could not read -- so a machine could be configured in a way the
-  // one command that needs it could not see.
-  await write(router, root, { engine: picked.label }, ui, refreshed);
-}
-
-/**
- * One router write, with whatever it said handed straight back.
- *
- * With no folder open there is no repository to choose for, so the write is
- * this machine's default -- `mine`, naming no repository -- and the toast
- * says in one sentence what a machine default is.
- */
-async function write(
+async function runConfigure(
   router: Pick<Router, "configure">,
   root: string | null,
-  choice: {
-    engine?: string;
-    transport?: string;
-    reviewerTransport?: string;
-    authoringModel?: string;
-    reviewerModel?: string;
-    auxiliaryModel?: string;
-    mechanic?: string;
-    mechanicModel?: string;
-    /** Keep it as this person's default rather than this checkout's. */
-    mine?: boolean;
-  },
+  argv: readonly string[],
   ui: ConfigurationUi,
   refreshed: () => void,
 ): Promise<void> {
-  const result = await router.configure({ repoRoot: root, ...choice, ...(root === null ? { mine: true } : {}) });
+  const options = parseConfigureArgs(argv.slice(2));
+  if (typeof options === "string") {
+    ui.showWarningMessage(`Dabbler refused that: ${options}.`);
+    return;
+  }
+  const result = await router.configure(options);
   if (!result.ok) {
     // The router's own words. A refusal reworded here would be a second
     // statement of a rule selection owns -- and the rule is the reason the
@@ -298,11 +156,65 @@ async function write(
 }
 
 /**
+ * One set action, as the router offers it on its row: the list it carries,
+ * or the router's words for why there is nothing to list -- then the command
+ * the chosen one names.
+ *
+ * Nothing here decides what may be chosen. A list is the router's, read off
+ * the same reading the rows were painted from, so the pick and the row
+ * cannot come to say different things.
+ */
+async function choose(
+  router: Pick<Router, "configure">,
+  target: ConfigurationTarget,
+  id: string,
+  refreshed: () => void,
+  ui: ConfigurationUi,
+): Promise<void> {
+  const root = ui.workspaceRoot() ?? null;
+  const offered = configurationSetAction(id, root, target.projection?.configuration ?? {});
+  if (offered?.unavailable) {
+    ui.showWarningMessage(offered.unavailable);
+    return;
+  }
+  const pick = offered?.pick;
+  if (!pick) return;
+  const picked = await ui.pick(
+    pick.choices.map((choice) => ({
+      label: choice.label,
+      description: choice.description ?? undefined,
+      detail: choice.detail ?? undefined,
+    })),
+    { title: pick.title, placeHolder: pick.placeholder },
+  );
+  if (!picked) return;
+  const choice = pick.choices.find((entry) => entry.label === picked.label);
+  if (!choice) return;
+  await runConfigure(router, root, choice.argv, ui, refreshed);
+}
+
+/**
+ * Which engine the next session is offered.
+ *
+ * A CLI that is not installed is still offered, and says it is not: a
+ * machine that is about to have Codex on it is a normal thing, and hiding
+ * the row would make the pane's list a claim about what may be chosen rather
+ * than a report of what is here. Only an engine Start Session can open is
+ * offered, which is the router's list.
+ */
+export async function setEngine(
+  router: Pick<Router, "configure">,
+  target: ConfigurationTarget,
+  refreshed: () => void,
+  ui: ConfigurationUi = defaultConfigurationUi(),
+): Promise<void> {
+  await choose(router, target, "dabblerSolution.setEngine", refreshed, ui);
+}
+
+/**
  * The Reviewing AI's vehicle: the one the row SHOWS, which is the Primary
- * Reviewer's. Writing the machine's `dabbler.transport` from here left the
- * row unchanged whenever `dabbler.reviewerTransport` outranked it -- a toast
- * that said "written" over a row that said what it said before. The
- * machine's own vehicle is `dabbler configure --transport`, and no row sets it.
+ * Reviewer's. The machine's own vehicle is `dabbler configure --transport`,
+ * and no row sets it.
  */
 export async function setReviewerTransport(
   router: Pick<Router, "configure">,
@@ -310,30 +222,7 @@ export async function setReviewerTransport(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  const vehicle = target.projection?.configuration?.primaryReviewer?.vehicle;
-  const options = vehicle?.options ?? [];
-  if (options.length === 0) {
-    ui.showWarningMessage(
-      "Nothing on this machine can carry the Primary Reviewer, so there is no vehicle to choose.",
-    );
-    return;
-  }
-  const picked = await ui.pick(
-    options.map((option) => ({
-      label: option.id,
-      description: option.means,
-      detail: option.id === vehicle?.chosen ? "what carries it now" : undefined,
-    })),
-    {
-      title: "What carries the Reviewing AI?",
-      placeHolder: vehicle?.decidedBy
-        ? `${vehicle.chosen ?? "nothing"} now, decided by ${vehicle.decidedBy}. ${NEXT_SESSION}`
-        : NEXT_SESSION,
-    },
-  );
-  if (!picked) return;
-  await write(router, root, { reviewerTransport: picked.label }, ui, refreshed);
+  await choose(router, target, "dabblerSolution.setReviewerTransport", refreshed, ui);
 }
 
 /**
@@ -486,13 +375,9 @@ export async function refreshRecord(
  * Keep this row's choice as the MACHINE's default.
  *
  * Every choice is this repository's, and the machine's is only the default a
- * repository that names none falls back to. This makes the row's current
- * value that default, and nothing else: the repository's own choice is as it
- * was. Offered on every row that holds a choice -- both Vehicle rows, the
- * authoring Model row and both reviewers' -- because the rule is one rule.
- *
- * The confirmation says what it reaches: every repository on this machine
- * that names no choice of its own, and nobody else's machine.
+ * repository that names none falls back to. Offered on every row that holds
+ * a choice -- both Vehicle rows, the authoring Model row and both reviewers'
+ * -- and the command, the confirmation and the refusal are the router's.
  */
 export async function setAsMyDefault(
   router: Pick<Router, "configure">,
@@ -503,110 +388,21 @@ export async function setAsMyDefault(
   const root = ui.workspaceRoot() ?? null;
   const node = target.node;
   if (!node) return;
-  const configuration = target.projection?.configuration;
-  const kept = ((): readonly [string, string | null, Record<string, string>] | null => {
-    if (node.kind === "configVehicle") {
-      return node.who === "authoring"
-        ? ["the engine", configuration?.engines?.chosen ?? null, { engine: "" }]
-        : ["the reviewing vehicle", configuration?.primaryReviewer?.vehicle?.chosen ?? null, { reviewerTransport: "" }];
-    }
-    if (node.kind !== "configRole") return null;
-    if (node.role === "authoring") {
-      return ["the authoring model", configuration?.authoring?.chosen?.model ?? null, { authoringModel: "" }];
-    }
-    return node.role === "primaryReviewer"
-      ? ["the Primary Reviewer's model", configuration?.primaryReviewer?.chosen?.model ?? null, { reviewerModel: "" }]
-      : ["the Auxiliary Reviewer's model", configuration?.auxiliaryReviewer?.chosen?.model ?? null, { auxiliaryModel: "" }];
-  })();
-  const value = kept?.[1] ?? null;
-  if (kept === null || value === null || value === "") {
-    ui.showWarningMessage(
-      "There is nothing on this row to keep: choose a value first, and then keep it as the machine's default.",
-    );
+  if (node.kind !== "configVehicle" && node.kind !== "configRole") return;
+  const offered = keepAsMachineDefaultAction(node, root, target.projection?.configuration ?? {});
+  if (offered.unavailable || !offered.argv) {
+    ui.showWarningMessage(offered.unavailable ?? "There is nothing on this row to keep.");
     return;
   }
-  const agreed = await ui.confirm(
-    [
-      `Keep '${value}' as this machine's default for ${kept[0]}?`,
-      "",
-      "It is written to this machine's own preferences, beside your model catalog, and applies in " +
-        "every repository here that names no choice of its own -- including one you open for the " +
-        "first time. This repository's own choice is left as it is. It is not committed and reaches " +
-        "nobody else.",
-    ].join("\n"),
-    KEEP_AS_MACHINE_DEFAULT,
-  );
-  if (!agreed) return;
-  // The machine's default and only that, for every row alike: without `mine`
-  // the same write is this repository's, which is what the row's own control does.
-  const [key] = Object.keys(kept[2]) as [string];
-  await write(router, root, { [key]: value, mine: true }, ui, refreshed);
-}
-
-/** The control's name, which is also the button that confirms it. */
-export const KEEP_AS_MACHINE_DEFAULT = "Keep as Machine Default";
-
-/**
- * The model the engine's own CLI is launched on.
- *
- * It answered with a sentence telling the operator to go and type a command,
- * because `dabbler configure` had no `--authoring-model` and never had --
- * a control that reports nothing and changes nothing, on the one row an
- * operator most expects to be able to set. The verb exists now and this
- * calls it.
- *
- * **A session in flight is REPORTED, never offered.** `session start`
- * records the identity and the ledger carries it from that moment, so
- * offering to change it would be offering something the record will not
- * honour. The refusal says which session declared it and that a change
- * reaches the next one.
- */
-export async function setAuthoringModel(
-  router: Pick<Router, "configure">,
-  target: ConfigurationTarget,
-  refreshed: () => void,
-  ui: ConfigurationUi = defaultConfigurationUi(),
-): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  const role = target.projection?.configuration?.authoring;
-  if (role?.declaredAtStart) {
-    ui.showWarningMessage(
-      `The session in flight declared '${role.chosen?.model ?? "its model"}' at ` +
-        "`session start`, and the ledger has carried it since. This row reports " +
-        "that. Close the session to choose what the next one authors with.",
+  const confirm = offered.confirm;
+  if (confirm) {
+    const agreed = await ui.confirm(
+      confirm.detail ? `${confirm.title}\n\n${confirm.detail}` : confirm.title,
+      confirm.accept,
     );
-    return;
+    if (!agreed) return;
   }
-  const items = modelItems(
-    role?.candidates ?? [],
-    role?.provider,
-    role?.chosen?.model,
-  );
-  if (items.length === 0) {
-    // The same three-part answer the reviewing rows give: which record was
-    // read, and why it offered nothing. "No model qualifies" alone is what a
-    // seat with eighteen working models was once told.
-    const read = role?.enumeration
-      ? `The list was read from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}. `
-      : "";
-    ui.showWarningMessage(
-      `No model is offered for the authoring AI here. ${read}${
-        role?.unavailable
-          ? `${role.unavailable}.`
-          : "The engine's own list could not be read on this machine."
-      }`,
-    );
-    return;
-  }
-  const picked = await ui.pick(items, {
-    title: "Which model authors the next session?",
-    // The router's own sentence about the list, not a second one written
-    // here: what a list IS -- a reading, against a CLI that is the authority
-    // -- is the reading's fact, and two statements of it drift.
-    placeHolder: `${role?.note ? `${role.note} ` : ""}${NEXT_SESSION}`,
-  });
-  if (!picked) return;
-  await write(router, root, { authoringModel: picked.label }, ui, refreshed);
+  await runConfigure(router, root, offered.argv, ui, refreshed);
 }
 
 /**
@@ -614,7 +410,8 @@ export async function setAuthoringModel(
  *
  * The candidates offered are the ones the router already resolved, and the
  * refusals still come from the router: a list is an offer, and the rule is
- * what decides.
+ * what decides. A session in flight is REPORTED, never offered: the router
+ * says so in place of a list.
  *
  * **The role is an argument and is never read off the clicked row.** A
  * `view/item/context` entry carries no arguments, so the participant rows --
@@ -629,93 +426,7 @@ export async function setRoleModel(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  if (which === "authoring") {
-    await setAuthoringModel(router, target, refreshed, ui);
-    return;
-  }
-  if (which === "mechanic") {
-    await setMechanicModel(router, target, refreshed, ui);
-    return;
-  }
-  const primary = which === "primaryReviewer";
-  const role = target.projection?.configuration?.[which];
-  // No vehicle question here: the Reviewing AI's Vehicle row is the one
-  // control for that, and the models offered are the ones read for whatever
-  // it decided.
-  const items = modelItems(
-    role?.candidates ?? [],
-    target.projection?.configuration?.authoring?.provider,
-    role?.selected,
-  );
-  if (items.length === 0) {
-    // Which record was read, and why it offered nothing. "No model
-    // qualifies" on its own is what a Copilot seat with eighteen working
-    // models was told while the pane read the direct-API registry.
-    const read = role?.enumeration
-      ? `The list was read from the ${ENUMERATION_WORDS[role.enumeration] ?? role.enumeration}. `
-      : "";
-    ui.showWarningMessage(
-      `No model qualifies for that role here. ${read}${
-        role?.unavailable
-          ? `${role.unavailable}.`
-          : role?.enumeration === "seat-catalog"
-            ? "The seat's catalog lists no model for this role."
-            : "A provider with no key resolves to no candidate at all."
-      }`,
-    );
-    return;
-  }
-  const picked = await ui.pick(items, {
-    title: primary
-      ? "Which model reviews the next session?"
-      : "Which model adjudicates a disputed finding?",
-    placeHolder:
-      (primary
-        ? REVIEWER_HELP
-        : "It is reached only at an impasse, and never from a provider that has already reviewed the session.") +
-      " " +
-      NEXT_SESSION,
-  });
-  if (!picked) return;
-  await write(
-    router,
-    root,
-    primary ? { reviewerModel: picked.label } : { auxiliaryModel: picked.label },
-    ui,
-    refreshed,
-  );
-}
-
-/** The pick item that clears the Mechanic's own model. */
-export const SAME_AS_AUTHORING = "same as Authoring Model";
-
-/**
- * The Mechanic Model: one of the authoring engine's own models, because the
- * Mechanic is launched on that engine's CLI, or the Authoring Model's by
- * clearing it.
- */
-export async function setMechanicModel(
-  router: Pick<Router, "configure">,
-  target: ConfigurationTarget,
-  refreshed: () => void,
-  ui: ConfigurationUi = defaultConfigurationUi(),
-): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  const role = target.projection?.configuration?.authoring;
-  const chosen = mechanicChoicesIn(root).mechanicModel;
-  const picked = await ui.pick(
-    [
-      { label: SAME_AS_AUTHORING, detail: chosen === null ? "what you chose" : undefined },
-      ...modelItems(role?.candidates ?? [], role?.provider, chosen),
-    ],
-    {
-      title: "Which model is the Mechanic launched on?",
-      placeHolder: "From the authoring engine's own list. Never the Primary Reviewer's model.",
-    },
-  );
-  if (!picked) return;
-  await write(router, root, { mechanicModel: picked.label === SAME_AS_AUTHORING ? "" : picked.label }, ui, refreshed);
+  await choose(router, target, ROLE_COMMANDS[which], refreshed, ui);
 }
 
 /** Whether the framework may call in the Mechanic: `dabbler.mechanic`, this checkout's. */
@@ -724,18 +435,7 @@ export async function setMechanic(
   refreshed: () => void,
   ui: ConfigurationUi = defaultConfigurationUi(),
 ): Promise<void> {
-  const root = ui.workspaceRoot() ?? null;
-  const chosen = mechanicChoicesIn(root).mechanic;
-  const picked = await ui.pick(
-    MECHANIC_MODES.map((entry) => ({
-      label: entry.mode,
-      description: entry.means,
-      detail: entry.mode === chosen ? "what you chose" : undefined,
-    })),
-    { title: "May the framework call in the Mechanic on a stop?", placeHolder: root === null ? "This machine's default." : "This repository's choice, committed with its settings." },
-  );
-  if (!picked) return;
-  await write(router, root, { mechanic: picked.label }, ui, refreshed);
+  await choose(router, {}, "dabblerSolution.setMechanic", refreshed, ui);
 }
 
 /**

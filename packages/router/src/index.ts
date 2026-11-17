@@ -250,3 +250,51 @@ export {
   type SessionsSource,
   type WorkExplorerNode,
 } from "./views/workExplorer.ts";
+// A choice's `dabbler configure` command, read back as what it writes: the
+// extension runs a chosen one through the in-process router.
+export { parseConfigureArgs } from "./cli/configure.ts";
+// The Configuration section's rows: its nodes and children, each row's
+// descriptor, the words the rows and the pickers share, and the readings the
+// rows need beside the configuration itself.
+export {
+  CONFIGURATION_ACTION_TITLES,
+  ENUMERATION_WORDS,
+  KEEP_AS_MACHINE_DEFAULT,
+  LAUNCHABLE_ENGINES,
+  MACHINE_DEFAULT_MEANS,
+  MECHANIC_MODES,
+  REVIEWER_HELP,
+  ROLE_COMMANDS,
+  ROLE_HELP,
+  ROLE_LABELS,
+  chosenEngineOf,
+  configurationChildren,
+  configurationContext,
+  configurationDescriptor,
+  configurationSetAction,
+  configurationView,
+  keepAsMachineDefaultAction,
+  configureScope,
+  mechanicChoicesOf,
+  modelChoiceWords,
+  readConfiguration,
+  SAME_AS_AUTHORING,
+  settableRows,
+  providerRelationWord,
+  whoseChoice,
+  type ConfigParticipant,
+  type ConfigRoleName,
+  type ConfigurationContext,
+  type ConfigurationCredential,
+  type ConfigurationEngines,
+  type ConfigurationIcon,
+  type ConfigurationModel,
+  type ConfigurationNode,
+  type ConfigurationRecord,
+  type ConfigurationRole,
+  type ConfigurationRowDescriptor,
+  type ConfigurationTransport,
+  type ConfigurationVehicle,
+  type DecidedLayer,
+  type ProjectionConfiguration,
+} from "./views/configuration.ts";

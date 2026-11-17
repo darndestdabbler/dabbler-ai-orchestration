@@ -934,11 +934,13 @@ function firstLine(text: string): string {
   return text.trim().split(/\r?\n/)[0] ?? "";
 }
 
-export async function configureVerb(argv: string[]): Promise<number> {
-  if (argv.includes("-h") || argv.includes("--help")) {
-    writeOut(usage());
-    return EXIT_OK;
-  }
+/**
+ * `configure`'s arguments as the options it writes, or the one sentence
+ * saying why they are not arguments. The configure command a row's choice
+ * names is held to this, so a choice can never name a command the verb
+ * would refuse to read.
+ */
+export function parseConfigureArgs(argv: readonly string[]): ConfigureOptions | string {
   const values = new Map<string, string>();
   const flags = [
     "--engine",
@@ -967,30 +969,20 @@ export async function configureVerb(argv: string[]): Promise<number> {
     mine = true;
     return false;
   });
-  argv = argvWithoutScope;
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index] as string;
-    if (!flags.includes(flag)) {
-      writeErr(`dabbler configure: unexpected argument '${flag}'\n\n${usage()}`);
-      return EXIT_USAGE;
-    }
-    const value = argv[index + 1];
-    if (value === undefined) {
-      writeErr(`dabbler configure: ${flag} needs a value\n\n${usage()}`);
-      return EXIT_USAGE;
-    }
+  for (let index = 0; index < argvWithoutScope.length; index += 1) {
+    const flag = argvWithoutScope[index] as string;
+    if (!flags.includes(flag)) return `unexpected argument '${flag}'`;
+    const value = argvWithoutScope[index + 1];
+    if (value === undefined) return `${flag} needs a value`;
     values.set(flag, value);
     index += 1;
   }
   // The repository when this is one, and otherwise where we stand: a
   // configuration is a fact about a checkout, and a checkout that is not a
   // git repository still has one.
-  if (noRepo && values.has("--repo-root")) {
-    writeErr(`dabbler configure: --repo-root and ${NO_REPO_FLAG} name opposite things\n\n${usage()}`);
-    return EXIT_USAGE;
-  }
+  if (noRepo && values.has("--repo-root")) return `--repo-root and ${NO_REPO_FLAG} name opposite things`;
   const here = workingDirectory();
-  const options: ConfigureOptions = {
+  return {
     repoRoot: noRepo ? null : (values.get("--repo-root") ?? repoRootFor(here) ?? here),
     ...(values.has("--engine") ? { engine: values.get("--engine") as string } : {}),
     ...(values.has("--transport") ? { transport: values.get("--transport") as string } : {}),
@@ -1015,6 +1007,18 @@ export async function configureVerb(argv: string[]): Promise<number> {
       : {}),
     ...(mine ? { mine: true } : {}),
   };
+}
+
+export async function configureVerb(argv: string[]): Promise<number> {
+  if (argv.includes("-h") || argv.includes("--help")) {
+    writeOut(usage());
+    return EXIT_OK;
+  }
+  const options = parseConfigureArgs(argv);
+  if (typeof options === "string") {
+    writeErr(`dabbler configure: ${options}\n\n${usage()}`);
+    return EXIT_USAGE;
+  }
   let outcome: ConfigureOutcome;
   try {
     outcome = configure(options);

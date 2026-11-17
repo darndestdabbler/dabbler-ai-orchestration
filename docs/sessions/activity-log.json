@@ -13454,6 +13454,21 @@
       "what": "step 'extension-reads-it': its files",
       "reason": "The extension's scan now asks the router which folder holds a sessions root (hasSessionsRoot, moved beside the assembly in view-verb), so the router's package entry exports it",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 345,
+      "dateTime": "2026-11-17T15:41:17.132000-05:00",
+      "task": "Move the Solution Explorer's Configuration section out of the VS Code extension into the router, so that a second interface gets the same rows and the same lists of choices rather than working them out again. The Configuration half of `tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts` -- the configuration reading's types, the node kinds `configuration`, `configParticipant`, `configVehicle`, `configRole`, `configMechanic`, `configKeys` and `configCredential`, their children, labels, descriptions, tooltips, icons and click commands, and the words the pickers share with the rows (`ENUMERATION_WORDS`, `providerRelationWord`, `ROLE_LABELS`, `ROLE_COMMANDS`, `REVIEWER_HELP`, `MACHINE_DEFAULT_MEANS`, `MECHANIC_MODES`, `whoseChoice`) -- moves unchanged in behaviour to a new `packages/router/src/views/configuration.ts`, together with the Mechanic's two readings that the extension takes today through `mechanicChoicesIn` and `chosenEngineIn` in `configurationCommands.ts`. A new view `dabbler view configuration --repo-root <path>` prints the section as JSON rows in the shape session 344 gave the Work Explorer's: the Configuration root with the catalog's age on its tooltip, Authoring AI, Reviewing AI and API Keys and their children, each row's id, label, description, tooltip, icon by name, value and the layer that decided it, the command a click runs, and its actions; its shape is `packages/router/schemas/configuration-view.schema.json` with the TypeScript type generated from it. Each row that can be set carries its choices -- each one's label, detail, whether this machine can reach it and why not, and the `dabbler configure` argv that sets it for this repository and as the machine's default -- worked out by the rules the pickers in `configurationCommands.ts` use today (engine items, vehicle options, model items with their relation, price and conflict words, the Mechanic's modes, the 'same as Authoring Model' entry), and a model row says when its model is typed rather than picked. `dabbler configuration options --json` prints those same lists. Last, the extension's `SolutionTreeProvider.ts` joins the router's rows under its Configuration node, and each picker lists the choices its row carries and runs the command the chosen one names, so nothing a person sees changes. The Configuration tests of `solutionTreeModel.test.ts` move to `packages/router/test/configurationView.test.ts` rewritten for `node --test`, none dropped, plus one new test that every choice on a row names a command the `configure` parser accepts and that `options --json` prints the same lists.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 345,
+      "dateTime": "2026-11-17T15:57:17.303000-05:00",
+      "what": "step 'extension-reads-it': its files",
+      "reason": "Start Session's model pick in sessionCommands.ts uses modelItems, whose rule moved to the router; the router has to export that one rule (the model choice words) for it, so views/configuration.ts changes too.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

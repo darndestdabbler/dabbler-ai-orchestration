@@ -26,7 +26,7 @@ import {
   solutionConfiguration,
   userConfigurationDirs,
 } from "../router/host";
-import { chosenEngineIn, mechanicChoicesIn } from "../commands/configurationCommands";
+import { configurationContext } from "dabbler-ai-router";
 import { hasSessionsRoot } from "../utils/fileSystem";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
@@ -304,14 +304,12 @@ export class SolutionTreeProvider
     const p = this.projection();
     if (!p) return new vscode.TreeItem("");
     if (element.kind === "configuration") this.onConfigurationPainted?.(p);
-    const d = descriptorFor(element, p, {
-      // Read at paint time rather than cached: it is a setting, and a
-      // setting changed in the settings editor must not need a window
-      // reload to reach the row that reports it.
-      chosenEngine: chosenEngineIn(this.currentProjection()),
-      ...mechanicChoicesIn(this.workspaceRoot ?? null),
-      machineOnly: !this.workspaceRoot,
-    });
+    // The Configuration rows are the router's, with what they need beside
+    // the reading -- the Mechanic's two choices, and whether a folder is
+    // open -- read by the router at paint time rather than cached: a setting
+    // changed in the settings editor must not need a window reload to reach
+    // the row that reports it.
+    const d = descriptorFor(element, p, configurationContext(this.workspaceRoot ?? null, p.configuration));
 
     const item = new vscode.TreeItem(
       d.label,

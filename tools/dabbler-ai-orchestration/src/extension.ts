@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { chosenEngineOf } from "dabbler-ai-router";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import {
-  ENGINES,
   defaultSessionRunUi,
   registerSessionCommands,
 } from "./commands/sessionCommands";
@@ -52,7 +52,6 @@ import {
 import {
   refreshRecord,
   storeCredential,
-  chosenEngineIn,
   setAsMyDefault,
   setMechanic,
   setEngine,
@@ -328,10 +327,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // tree, because the row the operator just set is the one they are
     // looking at.
     vscode.commands.registerCommand("dabblerSolution.setEngine", async (node?: SolutionNode) => {
-      // What Start Session can open is passed IN rather than imported by the
-      // command: the pick reads this extension's setting and Start Session
-      // reads it back, and a module that imported the other's list would
-      // close the loop between the two.
+      // What Start Session can open is the router's list, which the pick
+      // offers from.
       await setEngine(
         productionRouter(),
         // `freshProjection` and not the painted one: what a machine can
@@ -340,7 +337,6 @@ export function activate(context: vscode.ExtensionContext): void {
         // reuse window, which is a reuse window and not freshness anybody
         // may choose from.
         { node, projection: solutionProvider.freshProjection() },
-        ENGINES.map((entry) => entry.engine),
         () => solutionProvider.refresh(),
       );
       solutionProvider.refresh();
@@ -451,7 +447,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // the pick opens rather than at registration: the projection moves
       // whenever a declaration does, and a default captured once would go
       // stale the first time the operator changed it.
-      defaultSessionRunUi(() => chosenEngineIn(solutionProvider.currentProjection())),
+      defaultSessionRunUi(() => chosenEngineOf(solutionProvider.currentProjection()?.configuration)),
     );
   });
   safeRegister("cancelLifecycleCommands", () =>

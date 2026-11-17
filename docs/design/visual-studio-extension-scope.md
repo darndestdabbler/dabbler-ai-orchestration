@@ -93,88 +93,107 @@ against the older SDK or the documented mix of the two. One package
 installs on Visual Studio 2022 (17.14) and 2026 (18.x). *(From the
 documentation; not built here.)*
 
-## The one real unknown: the engine's terminal
+## Where the engine runs: Windows Terminal, beside Visual Studio
 
 Claude Code and the Copilot CLI are full-screen terminal programs. VS Code
 gives an extension a terminal to run them in. Visual Studio has a built-in
 terminal, and no documented way was found for an extension to open a tab
-in it and start a program. Three routes exist, in order of preference:
+in it and start a program.
 
-1. **The built-in terminal, through its undocumented service.** The
-   open-source predecessor of that terminal exposes a call that takes a
-   name, a program, a working directory, arguments and an environment,
-   which is exactly what Start Session needs. Whether today's Visual
-   Studio still answers it is not known, and Microsoft does not promise it.
-2. **A terminal embedded in a tool window.** Other people's Claude Code
-   extensions for Visual Studio 2022 and 2026 do this today, on the
-   Windows pseudo-console, so it is known to work. The control Visual
-   Studio itself uses is not published as a supported package.
-3. **Windows Terminal, opened beside Visual Studio.** Always works, and is
-   a second window, which is the thing being avoided.
+The operator's decision, 2026-11-17: the engine does not run inside Visual
+Studio. The extension opens it in Windows Terminal, as a new tab in a
+window named for Dabbler, with the repository as its folder and `claude`
+or `copilot` as its program; where that window is already open, the tab
+is added to it. Windows Terminal takes all of this on its command line.
 
-The operator's words were "a chat interface". A chat pane in place of a
-terminal means speaking each engine's own protocol, one for Claude Code
-and another for the Copilot CLI, and keeping up with both. A terminal
-speaks neither and shows the engine exactly as its maker ships it. This
-scope assumes a terminal and leaves the chat pane out.
+What that gains:
 
-If the Dabbler Terminal becomes a router verb that prints its lines, then
-whichever route wins shows it too: it is one more program in one more tab.
+- **No undocumented service and no embedded terminal to maintain.**
+- **A session outlives Visual Studio.** Closed, restarted for an update or
+  crashed, the engine carries on. Inside Visual Studio it would end with
+  it.
+- **The engines appear as their makers ship them,** in the terminal they
+  are tested against.
+- **The same call serves Visual Studio 2022 and 2026,** and any other
+  editor later.
+
+What it costs:
+
+- **The engine's tab is not docked in Visual Studio.** Everything needed
+  to answer a stop is: the Work Explorer, the Dabbler Terminal's output,
+  Configuration and the stop's actions. The tab is where a developer
+  talks to the AI.
+- **The extension cannot close a finished session's tab.** The developer
+  does, or it idles.
+- **Windows Terminal must be there.** It ships with Windows 11. Without
+  it the engine opens in a plain console window.
+- **The environment is to be checked.** A tab added to a window that is
+  already open may not inherit the caller's environment, and Start
+  Session sets one variable and needs `dabbler` on PATH. If so, the
+  command the tab runs sets them itself. *(Not tried here.)*
+
+Two routes are set aside and stay possible later, since the router prints
+the engine's launch line and where it runs is then a contained change:
+the built-in terminal through its undocumented service, and a terminal
+embedded in a tool window, which other people's Claude Code extensions
+for Visual Studio do today.
+
+The operator's first words were "a chat interface". A chat pane in place
+of a terminal means speaking each engine's own protocol, one for Claude
+Code and another for the Copilot CLI, and keeping up with both. It is
+left out.
+
+The Dabbler Terminal's output stays inside Visual Studio, as a window of
+its own. It takes no input, and it is what a developer looks at when a
+session stops.
 
 ## The work, as sessions
 
 Counted in sessions of three to six steps, not in time. Release sessions
 are extra.
 
-**First, find out (1).**
-
-1. A trial extension, outside the plan's later commitments, that does
-   only this: installs on Visual Studio 2026 and 2022, finds Node, starts
-   the router, and runs Claude Code and the Copilot CLI by each of the
-   three terminal routes. It ends with the route chosen and everything
-   that surprised.
-
 **The router prints what an interface shows (5).** Each is releasable on
 its own, and after each the VS Code extension is smaller.
 
-2. The Dabbler Terminal's lines as a verb that follows a session.
-3. The Work Explorer's rows and actions as JSON.
-4. The Configuration rows and the values on offer as JSON.
-5. The engine's launch line from the router; results the extension now
+1. The Dabbler Terminal's lines as a verb that follows a session.
+2. The Work Explorer's rows and actions as JSON.
+3. The Configuration rows and the values on offer as JSON.
+4. The engine's launch line from the router; results the extension now
    reads out of printed text returned as data.
-6. A follow mode that prints the rows again when a record changes, so no
+5. A follow mode that prints the rows again when a record changes, so no
    interface keeps its own list of files to watch.
 
-**The Visual Studio extension (11).**
+**The Visual Studio extension (10).**
 
-7. The package: the Node check with a plain sentence when it fails, the
-   router process, a pane that echoes each command run, the C# test
-   project, the build in CI.
-8. The Work Explorer window: rows, icons, tooltips, refresh.
-9. Opening the plan at a session, the logs and a transcript; Start
-   Session with the configured engine and models.
-10. The engine terminal by the chosen route, for a session, a consult and
-    a Mechanic; closing the terminals of finished sessions.
-11. The Dabbler Terminal window.
-12. Stop, Continue, Close, Cancel and Restore, with their dialogs.
-13. Rollback, Check this stop, Review exception and Report this stop.
-14. The Configuration window: the rows, the pickers, keep as machine
+6. The package, installing on Visual Studio 2026 and 2022: the Node check
+   with a plain sentence when it fails, the router process, a pane that
+   echoes each command run, the C# test project, the build in CI. It also
+   settles the Windows Terminal questions above: a tab in a named window,
+   the environment, the fallback.
+7. The Work Explorer window: rows, icons, tooltips, refresh.
+8. Opening the plan at a session, the logs and a transcript; Start
+   Session with the configured engine and models, and the engine opened
+   in Windows Terminal for a session, a consult and a Mechanic.
+9. The Dabbler Terminal window.
+10. Stop, Continue, Close, Cancel and Restore, with their dialogs.
+11. Rollback, Check this stop, Review exception and Report this stop.
+12. The Configuration window: the rows, the pickers, keep as machine
     default.
-15. Update the catalog, store a key, Start Session with Different Models.
-16. Set up Dabbler in the solution that is open.
-17. A notice when a session stops, is overdue or ends; light, dark and
+13. Update the catalog, store a key, Start Session with Different Models.
+14. Set up Dabbler in the solution that is open.
+15. A notice when a session stops, is overdue or ends; light, dark and
     blue themes; the keyboard.
 
 **Working beside the IDE, and shipping (3).**
 
-18. Before a session starts, say what is in its way: unsaved files, a
+16. Before a session starts, say what is in its way: unsaved files, a
     running debugger, a build. After it, open the comparison between the
     session's first and last commits, since Git Changes is empty by then.
-19. A walk on the non-SDK ContosoUniversity fork in both Visual Studio
+17. A walk on the non-SDK ContosoUniversity fork in both Visual Studio
     versions, with a developer's eyes, and what it finds.
-20. The guide page, the Marketplace listing and the first publication.
+18. The guide page, the Marketplace listing and the first publication.
 
-That is twenty, which is the operator's own figure.
+That is eighteen. The operator's own figure was about twenty.
 
 ## What is left out
 
@@ -182,15 +201,15 @@ That is twenty, which is the operator's own figure.
   has a Solution Explorer.
 - Set Up New Project, cloning and creating repositories, the solution
   workspace file, the troubleshooter and the walkthrough.
-- A chat pane.
-- Anything for IntelliJ or Eclipse. Sessions 2 to 6 are what either would
+- A chat pane, and an engine terminal inside Visual Studio.
+- Anything for IntelliJ or Eclipse. Sessions 1 to 5 are what either would
   start from.
 
 ## What it changes in this repository
 
 - **A second language.** `AGENTS.md` says there is no Python here; there
   would be C#. The rule that matters is "one implementation of any rule",
-  and it holds only if the C# never decides. Sessions 2 to 6 are what
+  and it holds only if the C# never decides. Sessions 1 to 5 are what
   make that possible, which is why they come first.
 - **A second test suite.** C# view code can be tested without Visual
   Studio. Tests that run inside Visual Studio need it installed, so they
@@ -200,16 +219,17 @@ That is twenty, which is the operator's own figure.
   about how a thing looks, and in one where it is about what is shown.
 - **The checkout still has two writers.** An extension inside Visual
   Studio does not stop project reloads, locked `bin` and `obj` folders or
-  an open designer colliding with a session. Session 18 says so before a
+  an open designer colliding with a session. Session 16 says so before a
   session starts; nothing here removes it.
 
 ## Decisions that are the operator's
 
-1. A terminal, as scoped, or a chat pane.
+1. Decided 2026-11-17: the engine runs in Windows Terminal, not inside
+   Visual Studio, and there is no chat pane.
 2. Whether the extension lives in this repository and takes the same
    version number as the router and the VS Code extension.
 3. Whether Visual Studio 2022 is supported from the start, which depends
    on what the developers run.
 4. Whether the list under "What is left out" is right.
-5. Whether sessions 2 to 6 go ahead whatever session 1 finds. They serve
-   the terminal-only developer and any later editor too.
+5. Whether sessions 1 to 5 go ahead ahead of any decision to build the
+   rest. They serve the terminal-only developer and any later editor too.

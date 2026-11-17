@@ -53,6 +53,8 @@ import {
   type Router,
   type RouterResult,
   type RouterText,
+  type WorkspaceWritten,
+  type RollbackFacts,
   type SessionCancelOptions,
   type SessionCloseOptions,
   type SessionDecisionOptions,
@@ -243,6 +245,27 @@ export class InProcessRouter implements Router {
     };
   }
 
+  /** A verb run with `--json`: its one JSON object, turned into the typed answer. */
+  private async json<T>(
+    verb: string,
+    args: string[],
+    cwd: string,
+    typed: (said: Record<string, unknown>) => T,
+  ): Promise<RouterResult<T>> {
+    const run = await this.runVerb(verb, args, cwd);
+    if (run.exitCode !== EXIT_OK) return this.refusalOf(run);
+    try {
+      return { ok: true, outcome: "ok", value: typed(JSON.parse(run.stdout) as Record<string, unknown>) };
+    } catch (error) {
+      return {
+        ok: false,
+        outcome: "failed",
+        exitCode: run.exitCode,
+        message: `${verb} answered with no JSON to read: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
   /** The common case: a verb whose answer is what it printed. */
   private async text(
     verb: string,
@@ -311,6 +334,21 @@ export class InProcessRouter implements Router {
         ],
         o.repoRoot,
       ),
+    // The dry run answers JSON already; its facts are typed here, once.
+    rollbackPreview: (o: Omit<SessionRollbackOptions, "dryRun" | "asOf">) =>
+      this.json(
+        "session",
+        [
+          "rollback",
+          ...(o.sessionNumber === undefined ? [] : [String(o.sessionNumber)]),
+          "--reason",
+          o.reason,
+          "--dry-run",
+          ...targetArgs(o),
+        ],
+        o.repoRoot,
+        (said) => said as unknown as RollbackFacts,
+      ),
     decision: (o: SessionDecisionOptions) => {
       const args = ["decision", "--decider", o.decider, "--headline", o.headline];
       // The verb takes exactly one of the two, so the file wins when both
@@ -336,10 +374,14 @@ export class InProcessRouter implements Router {
     },
     // A person's click, after they were told it is one provider call.
     defectReport: (o: SessionDefectReportOptions) => {
-      const args = ["defect-report"];
+      const args = ["defect-report", "--json"];
       optional(args, "--session", o.session?.toString());
       if (o.rollingBack === true) args.push("--rolling-back");
-      return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
+      return this.json("session", [...args, ...targetArgs(o)], o.repoRoot, (said) => ({
+        file: String(said["file"]),
+        reportsTo: typeof said["reports_to"] === "string" ? said["reports_to"] : null,
+        said: String(said["said"] ?? ""),
+      }));
     },
   };
 
@@ -550,8 +592,11 @@ export class InProcessRouter implements Router {
    * derived from the graph, it carries paths only this machine has, and it
    * lives under `.dabbler/` where it cannot be committed by accident.
    */
-  public workspace(o: RepositoryTarget): Promise<RouterResult<RouterText>> {
-    return this.text("workspace", targetArgs(o), o.repoRoot);
+  public workspace(o: RepositoryTarget): Promise<RouterResult<WorkspaceWritten>> {
+    return this.json("workspace", ["--json", ...targetArgs(o)], o.repoRoot, (said) => ({
+      file: typeof said["file"] === "string" ? said["file"] : null,
+      said: String(said["said"] ?? ""),
+    }));
   }
 
   public configure(o: ConfigureOptions): Promise<RouterResult<RouterText>> {

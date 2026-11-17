@@ -130,13 +130,14 @@ export async function openSolutionWorkspace(
     );
     return;
   }
-  const file = workspaceFileIn(result.value.stdout ?? "");
+  // The path is the router's own answer and is never recomputed here: a
+  // second derivation would eventually disagree with the first.
+  const { file, said } = result.value;
   if (file === null) {
     // The router says what it did, including "there is nothing to build
     // here". Passing its own sentence through is better than inventing one.
     void vscode.window.showInformationMessage(
-      (result.value.stdout ?? "").trim() ||
-        "Nothing to open: this repository reaches no other repository here.",
+      said.trim() || "Nothing to open: this repository reaches no other repository here.",
     );
     return;
   }
@@ -302,19 +303,6 @@ export async function createRepository(
     () => router.deps.scaffold({ repoRoot: target.repoRoot, repository: target.repository }),
     refresh,
   );
-}
-
-/**
- * The workspace file the router reported writing, or null when it wrote none.
- *
- * The path comes from the router's own answer and is never recomputed here.
- * A second derivation would eventually disagree with the first, and opening a
- * workspace other than the one just written is the kind of near-miss nobody
- * debugs quickly.
- */
-export function workspaceFileIn(stdout: string): string | null {
-  const found = /^wrote (.+\.code-workspace)\s*$/m.exec(stdout);
-  return found ? found[1].trim() : null;
 }
 
 /** The two answers Open Existing Folder or Repository offers. */

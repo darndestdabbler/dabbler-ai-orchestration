@@ -13,10 +13,13 @@ import { shlexSplit } from "../checks.ts";
 import { WAIT_IN_CALL_MS, driveSession, reportAndNext, runWholeSession, sessionNext, sessionWait } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
+  LAUNCH_PURPOSES,
   type Engine,
   type EngineOutput,
+  type LaunchPurpose,
   builtInEngine,
   commandEngine,
+  launchLine,
 } from "../engines.ts";
 import { SessionsRootNotFoundError, repoRootFromSessionsDir, resolveSessionsDir } from "../evidence.ts";
 import { explainEngine } from "../config.ts";
@@ -44,13 +47,16 @@ import {
   personIsPresent,
   releaseSessionToStart,
   RELEASE_ENGINE,
+  type DefectReportAnswer,
+  type StartAnswer,
 } from "../session.ts";
 import { readInstruction } from "../driver.ts";
-import { writeErr, writeOut } from "./output.ts";
+import { divertOut, writeErr, writeOut } from "./output.ts";
 
 /** Every subcommand, in the order the usage text lists them. */
 const SUMMARY: Record<string, string> = {
   start: "register a session start",
+  launch: "print, as JSON, how to start an engine's own CLI for a session, a consult or a Mechanic; starts nothing",
   decision: "append a decision to decisions-log.md",
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
@@ -111,6 +117,9 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --undo-changes           copy those changes outside the repository, undo them",
     "                           in the tree, and start. A person's answer, refused to",
     "                           an engine",
+    "  --json                   answer with one JSON object on stdout: registered, the",
+    "                           refusal, and each way on it offers as the arguments",
+    "                           that take it; everything else said goes to stderr",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -251,11 +260,24 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  three times, a test run, a verification and a close are waived; a release",
     "  session is not.",
   ],
+  launch: [
+    "  --for PURPOSE            required: session | consult | mechanic",
+    "  --engine ENGINE          claude-code | copilot | codex; this checkout's or this",
+    "                           machine's choice when absent, as `start` reads it",
+    "  --model MODEL            passed to the CLI as chosen; required for a Copilot seat",
+    "  --session N              the session a consult is about",
+    "",
+    "  Prints the program, its arguments with the opening sentence in place, the",
+    "  working directory, the environment to add, the title, and the sentence to",
+    "  type where the CLI's argv has no place for it. Nothing is started.",
+  ],
   "defect-report": [
     "  --session N              report the last stop session N met; omitted, the stop",
     "                           the session in flight stands at",
     "  --rolling-back           the report says you chose to roll the session back",
     "                           rather than go on, and nothing else of the rollback",
+    "  --json                   answer with one JSON object on stdout: the report's",
+    "                           path, the address reports go to, and what was said",
     "",
     "  Writes one markdown file under .dabbler/reports/ and prints its path: where the",
     "  stop is in the framework (versions, engine, vehicles, platform, the stop's kind,",
@@ -356,6 +378,7 @@ const SWITCHES = new Set([
   "--commit-changes",
   "--dry-run",
   "--force",
+  "--json",
   "--mailbox",
   "--merge-origin",
   "--next",
@@ -577,13 +600,54 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     return waiveStop(sessionsDir, { reason, engine: !personIsPresent() });
   }
 
+  if (subcommand === "launch") {
+    const purpose = values.get("--for");
+    if (purpose === undefined || !(LAUNCH_PURPOSES as readonly string[]).includes(purpose)) {
+      writeErr(`dabbler session launch: argument --for: expected one of ${LAUNCH_PURPOSES.join(", ")}\n`);
+      return EXIT_USAGE;
+    }
+    const about = integer(values.get("--session"), "--session");
+    if (typeof about === "string") {
+      writeErr(`dabbler session launch: ${about}\n`);
+      return EXIT_USAGE;
+    }
+    const repoRoot = repoRootFromSessionsDir(sessionsDir);
+    const engine = explainEngine(values.get("--engine") ?? null, repoRoot).transport;
+    if (!engine) {
+      writeErr(
+        "dabbler session launch: the following arguments are required: --engine\n" +
+          "  Neither this checkout nor this machine has chosen an engine.\n",
+      );
+      return EXIT_USAGE;
+    }
+    const line = launchLine({
+      purpose: purpose as LaunchPurpose,
+      engine,
+      model: values.get("--model") ?? "",
+      ...(about === null ? {} : { session: about }),
+      repoRoot,
+      sessionsDir,
+    });
+    if (typeof line === "string") {
+      writeErr(`launch: refused -- ${line}\n`);
+      return EXIT_USAGE;
+    }
+    writeOut(`${JSON.stringify(line, null, 2)}\n`);
+    return 0;
+  }
+
   if (subcommand === "defect-report") {
     const named = integer(values.get("--session"), "--session");
     if (typeof named === "string") {
       writeErr(`dabbler session defect-report: ${named}\n`);
       return EXIT_USAGE;
     }
-    return defectReport(sessionsDir, { sessionNumber: named ?? sessionNumber, rollingBack: switches.has("--rolling-back") });
+    const options = { sessionNumber: named ?? sessionNumber, rollingBack: switches.has("--rolling-back") };
+    if (!switches.has("--json")) return defectReport(sessionsDir, options);
+    const answer: DefectReportAnswer = { file: null, reportsTo: null, said: "" };
+    const code = await divertOut(() => defectReport(sessionsDir, { ...options, answer }));
+    if (code === 0) writeOut(`${JSON.stringify({ file: answer.file, reports_to: answer.reportsTo, said: answer.said })}\n`);
+    return code;
   }
 
   if (subcommand === "rollback") {
@@ -646,53 +710,22 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   }
 
   if (subcommand === "start") {
-    // The flag, then this checkout's choice, then this machine's default --
-    // the layers every choice is read through, from files this router reads
-    // for itself, so a start typed at a shell sees what the editor's pane set.
-    // The flag still wins, because a person who typed one meant it.
-    // A release session is the framework's alone: no engine is asked for,
-    // and the start drives it through the publish to its close.
-    const releasing = releaseSessionToStart(sessionsDir, sessionNumber ?? null);
-    const engine =
-      explainEngine(values.get("--engine") ?? null, repoRootFromSessionsDir(sessionsDir)).transport ||
-      (releasing !== null ? RELEASE_ENGINE : undefined);
-    if (engine === undefined) {
-      writeErr(
-        "dabbler session start: the following arguments are required: --engine\n" +
-          "  Neither this checkout nor this machine has chosen an engine. Set one\n" +
-          "  once, and every start here uses it:\n" +
-          "    dabbler configure --engine <claude-code|copilot|codex>\n",
-      );
-      return EXIT_USAGE;
-    }
-    const totalSessions = integer(values.get("--total-sessions"), "--total-sessions");
-    if (typeof totalSessions === "string") {
-      writeErr(`dabbler session start: ${totalSessions}\n`);
-      return EXIT_USAGE;
-    }
-    const started = await start(sessionsDir, {
-      engine,
-      provider: values.get("--provider") ?? null,
-      model: values.get("--model") ?? null,
-      effort: values.get("--effort") ?? null,
-      reviewerTransport: values.get("--reviewer-transport") ?? null,
-      reviewerModel: values.get("--reviewer-model") ?? null,
-      auxiliaryModel: values.get("--auxiliary-model") ?? null,
-      sessionNumber,
-      totalSessions,
-      mergeOrigin: switches.has("--merge-origin"),
-      commitChanges: switches.has("--commit-changes"),
-      undoChanges: switches.has("--undo-changes"),
-      byEngine: !personIsPresent(),
-    });
-    if (started !== 0 || releasing === null) return started;
-    // Driven here, one call after another, until the instruction on the
-    // record is not a wait: the release's `done`, or a stop.
-    const repoRoot = repoRootFromSessionsDir(sessionsDir);
-    for (;;) {
-      const code = await sessionNext(sessionsDir, { waitInCallMs: WAIT_IN_CALL_MS });
-      if (code !== 0 || readInstruction(repoRoot, releasing.number)?.kind !== "wait") return code;
-    }
+    if (!switches.has("--json")) return startCommand(sessionsDir, values, switches, sessionNumber);
+    // One JSON object on stdout and nothing else: what the start said on the
+    // way goes to stderr, and the refusal and its ways on are fields.
+    const answer: StartAnswer = { registered: false, refusal: null, waysOn: [], startingPoint: false };
+    const code = await divertOut(() => startCommand(sessionsDir, values, switches, sessionNumber, answer));
+    writeOut(
+      `${JSON.stringify({
+        // The start's own answer, not the exit code: a release session is
+        // registered and then driven, and a drive that stops leaves it registered.
+        registered: answer.registered,
+        refusal: answer.refusal,
+        starting_point: answer.startingPoint,
+        ways_on: answer.waysOn.map((on) => ({ way: on.way, args: ["session", ...argv, on.flag] })),
+      })}\n`,
+    );
+    return code;
   }
 
   if (subcommand === "next") {
@@ -907,3 +940,62 @@ export async function sessionVerb(argv: string[]): Promise<number> {
 }
 
 export { EXIT_BOUNDARY };
+
+/** `dabbler session start`: register the session, and drive a release session to its close. */
+async function startCommand(
+  sessionsDir: string,
+  values: ReadonlyMap<string, string>,
+  switches: ReadonlySet<string>,
+  sessionNumber: number | null,
+  answer?: StartAnswer,
+): Promise<number> {
+  // The flag, then this checkout's choice, then this machine's default --
+  // the layers every choice is read through, from files this router reads
+  // for itself, so a start typed at a shell sees what the editor's pane set.
+  // The flag still wins, because a person who typed one meant it.
+  // A release session is the framework's alone: no engine is asked for,
+  // and the start drives it through the publish to its close.
+  const releasing = releaseSessionToStart(sessionsDir, sessionNumber ?? null);
+  const engine =
+    explainEngine(values.get("--engine") ?? null, repoRootFromSessionsDir(sessionsDir)).transport ||
+    (releasing !== null ? RELEASE_ENGINE : undefined);
+  if (engine === undefined) {
+    writeErr(
+      "dabbler session start: the following arguments are required: --engine\n" +
+        "  Neither this checkout nor this machine has chosen an engine. Set one\n" +
+        "  once, and every start here uses it:\n" +
+        "    dabbler configure --engine <claude-code|copilot|codex>\n",
+    );
+    return EXIT_USAGE;
+  }
+  const totalSessions = integer(values.get("--total-sessions"), "--total-sessions");
+  if (typeof totalSessions === "string") {
+    writeErr(`dabbler session start: ${totalSessions}\n`);
+    return EXIT_USAGE;
+  }
+  const started = await start(sessionsDir, {
+    engine,
+    provider: values.get("--provider") ?? null,
+    model: values.get("--model") ?? null,
+    effort: values.get("--effort") ?? null,
+    reviewerTransport: values.get("--reviewer-transport") ?? null,
+    reviewerModel: values.get("--reviewer-model") ?? null,
+    auxiliaryModel: values.get("--auxiliary-model") ?? null,
+    sessionNumber,
+    totalSessions,
+    mergeOrigin: switches.has("--merge-origin"),
+    commitChanges: switches.has("--commit-changes"),
+    undoChanges: switches.has("--undo-changes"),
+    byEngine: !personIsPresent(),
+    ...(answer === undefined ? {} : { answer }),
+  });
+  if (answer) answer.registered = started === 0;
+  if (started !== 0 || releasing === null) return started;
+  // Driven here, one call after another, until the instruction on the
+  // record is not a wait: the release's `done`, or a stop.
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  for (;;) {
+    const code = await sessionNext(sessionsDir, { waitInCallMs: WAIT_IN_CALL_MS });
+    if (code !== 0 || readInstruction(repoRoot, releasing.number)?.kind !== "wait") return code;
+  }
+}

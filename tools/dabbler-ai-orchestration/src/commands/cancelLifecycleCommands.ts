@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import type { RollbackFacts, Router } from "dabbler-ai-router";
+import type { Router } from "dabbler-ai-router";
 import {
   ROLLBACK_REASON,
   RouterUnavailableError,
@@ -229,11 +229,10 @@ export async function runRollbackSessionFlow(
   actions?: ReportStopActions,
 ): Promise<boolean> {
   const preview = await call(ui, () =>
-    router.session.rollback({
+    router.session.rollbackPreview({
       repoRoot: session.root,
       sessionNumber: session.number,
       reason: ROLLBACK_REASON,
-      dryRun: true,
     }),
   );
   if (!preview || !preview.ok) {
@@ -242,13 +241,7 @@ export async function runRollbackSessionFlow(
     }
     return false;
   }
-  let facts: RollbackFacts;
-  try {
-    facts = JSON.parse(preview.value.stdout) as RollbackFacts;
-  } catch {
-    ui.showErrorMessage(`Rolling back "${session.name}": the router's answer could not be read. Nothing was written.`);
-    return false;
-  }
+  const facts = preview.value;
 
   const words = rollbackConfirmation(session.number, session.name);
   const keep = words.keep ?? "Keep";
@@ -264,22 +257,17 @@ export async function runRollbackSessionFlow(
     : await ui.confirm(words.title, rollbackDetail(facts), words.accept, keep);
   if (choice !== words.accept && choice !== REPORT_FIRST) return false;
 
-  let report: { file: string; said: string } | null = null;
+  let report: { file: string; reportsTo: string | null } | null = null;
   if (choice === REPORT_FIRST) {
     const written = await call(ui, () => router.session.defectReport({ repoRoot: session.root, rollingBack: true }));
-    const file = written?.ok ? /written to (\S+)/.exec(written.value.stdout)?.[1] : undefined;
-    if (written?.ok && file !== undefined) {
-      report = { file: path.join(session.root, file), said: written.value.stdout };
+    if (written?.ok) {
+      report = { file: path.join(session.root, written.value.file), reportsTo: written.value.reportsTo };
     } else {
       // Asked once, and the default keeps the session: rolling back is what
       // makes the report impossible. An unreachable router has said its own
       // words already.
       const words =
-        written === null
-          ? "the router could not be reached."
-          : written.ok
-            ? written.value.stdout.trim()
-            : written.message.trim() || `exit ${written.exitCode}`;
+        written === null ? "the router could not be reached." : written.message.trim() || `exit ${written.exitCode}`;
       const anyway = await ui.confirm(
         `No report was written for session ${session.number}'s stop — ${words}`,
         "Once it is rolled back, this stop cannot be reported. Roll back anyway?",
@@ -308,7 +296,7 @@ export async function runRollbackSessionFlow(
     );
   }
   // Written is written: the report opens whether or not the rollback went through.
-  if (report !== null) await openReport(report.file, report.said, (message, items) => ui.choose(message, items), actions);
+  if (report !== null) await openReport(report.file, report.reportsTo, (message, items) => ui.choose(message, items), actions);
   return rolledBack;
 }
 

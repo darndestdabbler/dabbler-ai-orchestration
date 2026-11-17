@@ -25,6 +25,8 @@ import {
   enginePrompt,
   engineShape,
   installedEngines,
+  launchLine,
+  LAUNCH_PURPOSES,
   mailboxEngine,
   renderClaudeCodeEvent,
   renderCodexEvent,
@@ -289,6 +291,46 @@ describe("the argv each engine is measured to take", () => {
       enginePrompt("D:/repo/.dabbler/runs/s1/driver/instruction.json"),
       /^Read D:\/repo.*answer_command.*stop\.$/s,
     );
+  });
+});
+
+describe("launchLine", () => {
+  const repoRoot = join("D:", "repos", "csv-app");
+
+  it("carries the model and the sentence where each engine takes them, for each purpose", () => {
+    const sentences = { session: /dabbler session next --sessions-dir docs\/sessions/, consult: /dabbler consult --sessions-dir docs\/sessions --session 7/, mechanic: /--mechanic/ };
+    for (const purpose of LAUNCH_PURPOSES) {
+      const request = { purpose, repoRoot, session: 7 };
+      const claude = launchLine({ ...request, engine: "claude-code", model: "claude-opus-5-20260901" });
+      const copilot = launchLine({ ...request, engine: "copilot", model: "gpt-5.6-luna" });
+      const codex = launchLine({ ...request, engine: "codex", model: "anything" });
+      if (typeof claude === "string" || typeof copilot === "string" || typeof codex === "string") {
+        throw new Error("a launch was refused");
+      }
+      // The flag before the prompt: Claude Code's prompt is a positional.
+      assert.deepEqual(claude.args.slice(0, 2), ["--model", "claude-opus-5-20260901"]);
+      assert.match(claude.args[2] ?? "", sentences[purpose]);
+      assert.deepEqual(copilot.args.slice(0, 3), ["--model", "gpt-5.6-luna", "-i"]);
+      assert.match(copilot.args[3] ?? "", sentences[purpose]);
+      // Codex's help was never read: no argv it may not take, and the sentence is typed.
+      assert.deepEqual(codex.args, []);
+      assert.match(codex.typed ?? "", sentences[purpose]);
+      for (const line of [claude, copilot, codex]) {
+        assert.equal(line.cwd, repoRoot);
+        assert.deepEqual(line.env, { [ENGINE_PLACE_MARKER]: "1" });
+      }
+      assert.equal(claude.program, "claude");
+      assert.equal(claude.typed, null);
+      assert.match(copilot.title, purpose === "session" ? /^GitHub Copilot$/ : purpose === "consult" ? /^Consult — GitHub Copilot — csv-app \(session 7\)$/ : /^Mechanic — GitHub Copilot — csv-app$/);
+    }
+  });
+
+  it("refuses a seat with no model, and passes no flag for the engine's default", () => {
+    assert.match(String(launchLine({ purpose: "session", engine: "copilot", model: " ", repoRoot })), /needs a model/);
+    const bare = launchLine({ purpose: "session", engine: "claude-code", model: "", repoRoot });
+    if (typeof bare === "string") throw new Error(bare);
+    assert.ok(!bare.args.includes("--model"));
+    assert.match(String(launchLine({ purpose: "session", engine: "aider", model: "", repoRoot })), /no known CLI/);
   });
 });
 

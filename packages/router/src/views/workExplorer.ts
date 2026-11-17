@@ -36,6 +36,7 @@ import type {
   WorkExplorerReason,
   WorkExplorerRow,
 } from "../generated/work-explorer.ts";
+import type { RollbackFacts } from "../contracts/router.ts";
 import { TRANSCRIPTS_DIRNAME } from "../journal.ts";
 import { EXCEPTIONS_ANCHOR, humanizeStepKey, sessionTranscriptName } from "../transcript.ts";
 import { type Activity, currentActivity, uncollectedWords } from "./terminalLines.ts";
@@ -339,17 +340,7 @@ export function rollbackConfirmation(sessionNumber: number, name: string): Actio
   };
 }
 
-/** What the router's rollback dry run answers: the facts the dialog states. */
-export interface RollbackFacts {
-  session: number;
-  through: number;
-  /** The HEAD the facts were read at; the confirm is bound to it. */
-  head: string;
-  commits: number;
-  authors: string[];
-  oldest: string | null;
-  uncommitted: number;
-}
+export type { RollbackFacts };
 
 /**
  * The rollback dialog's detail, from the facts and nothing else: the sessions

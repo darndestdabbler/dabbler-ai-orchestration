@@ -383,7 +383,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 343 | The router prints the Dabbler Terminal's lines | no | 2026-11-17 |
 | 344 | The router prints the Work Explorer's rows | no | 2026-11-17 |
 | 345 | The router prints the Configuration rows and what may be chosen | no | 2026-11-17 |
-| 346 | The router says how an engine is started, and answers with data | — | not declared |
+| 346 | The router says how an engine is started, and answers with data | no | 2026-11-17 |
 | 347 | The views follow the records | — | not declared |
 | 348 | Release 3.36.0 (release: 3.36.0) | — | not declared |
 | 349 | A Visual Studio extension that installs and finds the router | — | not declared |
@@ -3905,3 +3905,13 @@ Move the Solution Explorer's Configuration section out of the VS Code extension 
 **Amended after acceptance:**
 
 - 2026-11-17 — step 'extension-reads-it': its files: Start Session's model pick in sessionCommands.ts uses modelItems, whose rule moved to the router; the router has to export that one rule (the model choice words) for it, so views/configuration.ts changes too. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 346 — The router says how an engine is started, and answers with data
+
+**Releasable: no.**
+
+Move how an engine's own CLI is started out of the VS Code extension and into the router, and let the router answer four questions as data rather than as printed text the extension reads by pattern. `engines.ts` gains the launch line -- for a session, a consult or a Mechanic, with the engine, model and (for a consult) session: the program, its arguments with the opening sentence in place (the three sentences move from sessionCommands.ts unchanged), the working directory, the environment to add (DABBLER_ENGINE_TERMINAL), the title, and the sentence to type for an engine whose argv has no prompt slot -- exposed as `dabbler session launch --for session|consult|mechanic` printing it as JSON and starting nothing. `session start --json` prints one JSON object on stdout (everything else diverted to stderr): whether the session is registered, what the refusal said, and the ways on it offers (commit the changes, undo them, merge origin) each with the start arguments that take it and whether the changes are the project's starting point. `session defect-report --json` and `workspace --json` return the report's path, the address reports go to, and the workspace file written, as fields; the in-process router's typed contract returns those fields and gains a typed rollback preview from the dry run's JSON. Finally the extension builds its engine terminals from the router's launch line and drops its own copy (ENGINE_CLI, the sentences), reads start's JSON instead of searching its output for flags, and reads the typed fields instead of the `written to`, `Reports go to` and `wrote ...code-workspace` patterns. Nothing a person sees changes.
+
+**Amended after acceptance:**
+
+- 2026-11-17 — step 'typed-results': its files: RollbackFacts is declared in views/workExplorer.ts; importing it into contracts/router.ts makes an import cycle the boundary check refuses, so the type moves to the contract and workExplorer re-exports it (claude-code (anthropic, claude-opus-5-5))

@@ -143,9 +143,13 @@ suite("cancel/restore flows", () => {
     const calls: Record<string, unknown>[] = [];
     const router = {
       session: {
+        rollbackPreview: async (options: Record<string, unknown>) => {
+          calls.push({ ...options, dryRun: true });
+          return { ok: true, outcome: "ok", value: facts };
+        },
         rollback: async (options: Record<string, unknown>) => {
           calls.push(options);
-          return { ok: true, outcome: "ok", value: { stdout: `${JSON.stringify(facts)}\n` } };
+          return { ok: true, outcome: "ok", value: { stdout: "" } };
         },
       },
     } as unknown as Parameters<typeof runRollbackSessionFlow>[2];
@@ -219,14 +223,18 @@ suite("cancel/restore flows", () => {
           calls.push("defect-report");
           reported.push(o);
           return options.reportRefused === undefined
-            ? { ok: true, outcome: "ok", value: { stdout: WRITTEN } }
+            ? { ok: true, outcome: "ok", value: { file: ".dabbler/reports/s3-x.md", reportsTo: "https://example.com/issues", said: WRITTEN } }
             : { ok: false, outcome: "refused", exitCode: 3, message: options.reportRefused };
         },
+        rollbackPreview: async () => {
+          calls.push("rollback --dry-run");
+          return { ok: true, outcome: "ok", value: FACTS };
+        },
         rollback: async (o: Record<string, unknown>) => {
-          calls.push(o.dryRun ? "rollback --dry-run" : `rollback --as-of ${String(o.asOf)}`);
-          return !o.dryRun && options.rollbackFails
+          calls.push(`rollback --as-of ${String(o.asOf)}`);
+          return options.rollbackFails
             ? { ok: false, outcome: "failed", exitCode: 1, message: "git revert failed" }
-            : { ok: true, outcome: "ok", value: { stdout: `${JSON.stringify(FACTS)}\n` } };
+            : { ok: true, outcome: "ok", value: { stdout: "" } };
         },
       },
     } as unknown as Parameters<typeof runRollbackSessionFlow>[2];
@@ -737,6 +745,26 @@ function registrarOf(code: number | null = 0, output = ""): SessionRegistrar & {
   return register;
 }
 
+/** A start refused with ways on, as `session start --json` answers: each way is the same start plus its flag. */
+function refusedWith(
+  args: readonly string[],
+  refusal: string,
+  ways: ReadonlyArray<"commit" | "undo" | "merge">,
+  startingPoint = false,
+): Awaited<ReturnType<SessionRegistrar>> {
+  const flags = { commit: "--commit-changes", undo: "--undo-changes", merge: "--merge-origin" } as const;
+  return {
+    code: 2,
+    output: `start: refused -- ${refusal}`,
+    answer: {
+      registered: false,
+      refusal,
+      starting_point: startingPoint,
+      ways_on: ways.map((way) => ({ way, args: [...args, flags[way]] })),
+    },
+  };
+}
+
 /** What the stub records of one `window.createTerminal` call. */
 interface FakeTerminal {
   options: {
@@ -852,11 +880,11 @@ suite("Start opens the person's own CLI", () => {
 
   test("asks before a start merges origin's unrelated work, and starts with the merge only on yes", async () => {
     const refusal =
-      "start: refused -- origin/main shares no history with this checkout and holds 2 file(s) it has never had: " +
+      "origin/main shares no history with this checkout and holds 2 file(s) it has never had: " +
       "src/app.ts, README.md. ... run the same start with --merge-origin.";
     const register = (async (_root: string, args: readonly string[]) => {
       register.calls.push([...args]);
-      return args.includes("--merge-origin") ? { code: 0, output: "" } : { code: 3, output: refusal };
+      return args.includes("--merge-origin") ? { code: 0, output: "" } : refusedWith(args, refusal, ["merge"]);
     }) as SessionRegistrar & { calls: string[][] };
     register.calls = [];
 
@@ -875,12 +903,11 @@ suite("Start opens the person's own CLI", () => {
 
   test("asks what to do with uncommitted changes, and starts with the flag for the answer chosen", async () => {
     const refusal =
-      "start: refused -- You can't start a session while there are new or changed files that haven't been " +
-      "committed: docs/sessions/session-plan.md. Next: commit them, or undo the changes.\n" +
-      "start: next -- run the same start with --commit-changes to commit and push them, or with --undo-changes to undo them.";
+      "You can't start a session while there are new or changed files that haven't been " +
+      "committed: docs/sessions/session-plan.md. Next: commit them, or undo the changes.";
     const register = (async (_root: string, args: readonly string[]) => {
       register.calls.push([...args]);
-      return args.some((arg) => arg.endsWith("-changes")) ? { code: 0, output: "" } : { code: 2, output: refusal };
+      return args.some((arg) => arg.endsWith("-changes")) ? { code: 0, output: "" } : refusedWith(args, refusal, ["commit", "undo"]);
     }) as SessionRegistrar & { calls: string[][] };
     register.calls = [];
 
@@ -901,13 +928,12 @@ suite("Start opens the person's own CLI", () => {
   });
 
   test("at session 1 the files already there are offered as the starting point first, and choosing it deletes nothing", async () => {
-    const refusal =
-      "start: refused -- You can't start a session while there are new or changed files that haven't been committed: notes.txt.\n" +
-      "start: next -- these are likely the project's starting point: a person runs the same start with --commit-changes " +
-      "to commit them as the project's starting point, or with --undo-changes to undo them.";
+    const refusal = "You can't start a session while there are new or changed files that haven't been committed: notes.txt.";
     const register = (async (_root: string, args: readonly string[]) => {
       register.calls.push([...args]);
-      return args.some((arg) => arg.endsWith("-changes")) ? { code: 0, output: "" } : { code: 2, output: refusal };
+      return args.some((arg) => arg.endsWith("-changes"))
+        ? { code: 0, output: "" }
+        : refusedWith(args, refusal, ["commit", "undo"], true);
     }) as SessionRegistrar & { calls: string[][] };
     register.calls = [];
     const offered: string[][] = [];
@@ -1000,6 +1026,7 @@ suite("Start opens the person's own CLI", () => {
       const said =
         "defect-report: session 002's 'tests' stop, written to .dabbler/reports/s2-x.md\n" +
         "Reports go to https://example.com/issues -- read the report, then send it yourself if you choose. Nothing has been sent.\n";
+      const written = { defectReport: { file: ".dabbler/reports/s2-x.md", reportsTo: "https://example.com/issues", said } };
       const done: string[] = [];
       const actions = {
         open: async (file: string) => { done.push(`open ${path.basename(file)}`); },
@@ -1008,20 +1035,20 @@ suite("Start opens the person's own CLI", () => {
       };
       // Declined: no call is made.
       const asked: string[] = [];
-      const declined = fakeRouter(0, said);
+      const declined = fakeRouter(0, said, written);
       const no = driveUi({ confirm: async (message) => { asked.push(message); return false; } });
       assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), no.ui, declined.router, actions), false);
       assert.match(asked[0], /This is one provider call/);
       assert.match(asked[0], /nothing is sent/);
       assert.ok(!declined.asked.includes("session defect-report"));
       // Accepted, then not sent: the report opens and nothing is copied.
-      const kept = fakeRouter(0, said);
+      const kept = fakeRouter(0, said, written);
       const read = driveUi({ confirm: async () => true, choose: async () => undefined });
       assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), read.ui, kept.router, actions), true);
       assert.deepStrictEqual(done, ["open s2-x.md"]);
       // Sent by the person: copied, and their browser opened at the manifest's address.
       const sent = driveUi({ confirm: async () => true, choose: async () => "Copy and open" });
-      assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), sent.ui, fakeRouter(0, said).router, actions), true);
+      assert.strictEqual(await runReportStop(makeRepository({ root, currentSession: 2 }), sent.ui, fakeRouter(0, said, written).router, actions), true);
       assert.deepStrictEqual(done.slice(1), ["open s2-x.md", "copy # Dabbler defect report", "browse https://example.com/issues"]);
     } finally {
       rmrf(root);

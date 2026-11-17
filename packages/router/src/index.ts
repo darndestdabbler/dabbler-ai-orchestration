@@ -120,6 +120,10 @@ export { ENUMERATION_CLI_ALIASES } from "./projection.ts";
 // one Claude Code's exit code cannot protect: it exits 0 when it rejects a
 // --model and carries on with something else.
 export { preflightRefusedModel } from "./engines.ts";
+// How an engine's own CLI is started for a person -- for a session, a consult
+// or a Mechanic -- so every interface opens the same program the same way
+// and none of them writes the rule again. It starts nothing.
+export { launchLine, type EngineLaunch, type LaunchPurpose, type LaunchRequest } from "./engines.ts";
 // Start Session asks the person before a start merges an origin branch that
 // shares no history with the checkout, and re-runs the start with this.
 export { COMMIT_CHANGES_FLAG, MERGE_ORIGIN_FLAG, STARTING_POINT, UNDO_CHANGES_FLAG } from "./session.ts";

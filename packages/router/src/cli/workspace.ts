@@ -26,13 +26,15 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
-    "usage: dabbler workspace [-h] [--sessions-dir SESSIONS_DIR] [--show]",
+    "usage: dabbler workspace [-h] [--sessions-dir SESSIONS_DIR] [--show] [--json]",
     "",
     "  Writes a VS Code workspace over every repository in this solution that",
     "  is on this machine, and prints its path.",
     "",
     "options:",
     "  --show                   print the folders and write nothing",
+    "  --json                   answer with one JSON object: the file written (or",
+    "                           null), the folders, and what was said",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
     "",
@@ -50,6 +52,7 @@ function run(argv: string[]): number {
   }
   let sessionsDirArg: string | undefined;
   let show = false;
+  let json = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--sessions-dir") {
@@ -59,6 +62,10 @@ function run(argv: string[]): number {
     }
     if (token === "--show") {
       show = true;
+      continue;
+    }
+    if (token === "--json") {
+      json = true;
       continue;
     }
     writeErr(`${usage()}dabbler workspace: unrecognized arguments: ${token}\n`);
@@ -87,32 +94,41 @@ function run(argv: string[]): number {
     return EXIT_REFUSED;
   }
 
+  // What is said, said once: as the lines a person reads, or under --json as
+  // fields beside them, so a caller never reads a path out of prose.
+  const answer = (said: string, file: string | null): number => {
+    if (!json) {
+      writeOut(said);
+      return EXIT_OK;
+    }
+    const shown = folders.map((folder) => ({ name: folder.name, path: folder.path }));
+    writeOut(`${JSON.stringify({ file, folders: shown, said })}\n`);
+    return EXIT_OK;
+  };
+
   if (folders.length === 1) {
     // One folder is the window the developer already has. Writing a
     // workspace for it would be a button that appears to do nothing.
-    writeOut(
+    return answer(
       "workspace: this repository reaches no other repository on this " +
         "machine, so a workspace over the solution would be the window you " +
         "already have. Declare an edge, or clone a sibling beside this one.\n",
+      null,
     );
-    return EXIT_OK;
   }
 
-  for (const folder of folders) {
-    writeOut(`  ${folder.name.padEnd(24)} ${folder.path}\n`);
-  }
+  const rows = folders.map((folder) => `  ${folder.name.padEnd(24)} ${folder.path}\n`).join("");
   if (show) {
-    writeOut(`\n(nothing written; it would go to ${workspaceFilePath(root)})\n`);
-    return EXIT_OK;
+    return answer(`${rows}\n(nothing written; it would go to ${workspaceFilePath(root)})\n`, null);
   }
 
   const path = writeWorkspaceFile(root);
-  writeOut(
-    `\nwrote ${path}\n` +
+  return answer(
+    `${rows}\nwrote ${path}\n` +
       "It is derived from the graph and lives under `.dabbler/`, which is " +
       "not tracked: it carries the paths THIS machine has, and a shared copy " +
       "would point at folders somebody else does not have. Regenerate it " +
       "whenever the solution changes.\n",
+    path,
   );
-  return EXIT_OK;
 }

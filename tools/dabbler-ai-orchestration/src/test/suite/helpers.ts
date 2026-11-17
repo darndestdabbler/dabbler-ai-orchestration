@@ -10,9 +10,12 @@ import type {
   BootstrapOptions,
   ConfigureOptions,
   AffectedOptions,
+  DefectReportWritten,
   DepsRepositoryOptions,
+  RollbackFacts,
   Router,
   RouterResult,
+  WorkspaceWritten,
   SessionInterruptOptions,
   SessionWaiveOptions,
   ProgressProjection as ProjectionPayload,
@@ -199,6 +202,7 @@ export function rmrf(dir: string): void {
 export function fakeRouter(
   exitCode: number,
   message = "",
+  typed: { defectReport?: DefectReportWritten; workspace?: WorkspaceWritten; rollbackFacts?: RollbackFacts } = {},
 ): {
   router: Router;
   asked: string[];
@@ -248,6 +252,11 @@ export function fakeRouter(
         cancel: text("session cancel"),
         restore: text("session restore"),
         rollback: text("session rollback"),
+        rollbackPreview: () =>
+          answer(
+            "session rollback --dry-run",
+            typed.rollbackFacts ?? { session: 1, through: 1, head: "0".repeat(40), commits: 0, authors: [], oldest: null, uncommitted: 0 },
+          ),
         decision: text("session decision"),
         interrupt: (options: SessionInterruptOptions) => {
           interruptOptions.push(options);
@@ -257,7 +266,8 @@ export function fakeRouter(
           waiveOptions.push(options);
           return answer("session waive", { stdout: message });
         },
-        defectReport: text("session defect-report"),
+        defectReport: () =>
+          answer("session defect-report", typed.defectReport ?? { file: ".dabbler/reports/report.md", reportsTo: null, said: message }),
       },
       verify: {
         round: text("verify"),
@@ -290,7 +300,7 @@ export function fakeRouter(
         read: () => answer("approved-plan read", {} as never),
       },
       progress: () => answer("progress", makeProjection()),
-      workspace: text("workspace"),
+      workspace: () => answer("workspace", typed.workspace ?? { file: null, said: message }),
       bootstrap: (options: BootstrapOptions) => {
         bootstrapOptions.push(options);
         return answer("bootstrap", { stdout: message });

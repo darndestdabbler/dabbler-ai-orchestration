@@ -25,14 +25,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
-  COMMIT_CHANGES_FLAG,
   ENUMERATION_CLI_ALIASES,
   EXCEPTIONS_ANCHOR,
-  MERGE_ORIGIN_FLAG,
-  STARTING_POINT,
   TRANSCRIPTS_DIRNAME,
-  UNDO_CHANGES_FLAG,
   checkStopConfirmation,
+  launchLine,
+  type LaunchPurpose,
   mechanicChoicesOf,
   modelChoiceWords,
   preflightRefusedModel,
@@ -130,52 +128,12 @@ export function engineOrder(preferred: string | null): readonly EngineChoice[] {
 }
 
 /**
- * How each engine's own CLI is launched interactively, and whether it has
- * an argv slot for the opening sentence.
- *
- * **Measured against the installed CLIs' own `--help` on 2026-08-31, not
- * assumed.**
- *
- * - `claude`: `Usage: claude [options] [command] [prompt]`, and "starts an
- *   interactive session by default, use -p/--print for non-interactive
- *   output". The positional IS the opening prompt, so it goes in argv.
- * - `copilot`: `Usage: copilot [options] [command]` -- no positional, but
- *   `-i, --interactive <prompt>` is "Start interactive mode and automatically
- *   execute this prompt" (measured on 1.0.83, 2026-09-15). `-p, --prompt` is
- *   the non-interactive one and is not what Start wants. The sentence used to
- *   be typed at the prompt and left for the person's Enter, which is a
- *   deterministic keypress on every Copilot start.
- * - `codex`: NOT installed on the machine this was written on, so its help
- *   was not read and nothing here claims to know it. It opens with no
- *   prompt: an argv a CLI does not take is a launch that fails in front of
- *   the person, and the sentence costs them one keypress instead. The
- *   entry stays because a session already registered under the name is
- *   still resumable; ENGINES no longer offers it, which is the difference
- *   between resuming what exists and proposing it to someone new.
- *
- * **`modelFlag` is how the chosen model reaches the engine**, and it was
- * missing entirely. `args` was `carriesPrompt ? [sentence] : []`, so the
- * `--model` an operator typed was an argument to `dabbler session start` --
- * which records identity on the ledger -- and never reached the CLI: a seat
- * was RECORDED on one model while `copilot` ran on `auto`, and under Claude
- * Code no model was asked for, recorded or passed at all. The router's own
- * unattended driver has always done this correctly (`engineShape`); only the
- * interactive launch was missing it. Both flags were measured on 2026-09-12:
- * `claude --model` accepted 14 of 14 ids offered, and `copilot --model`
- * refuses an unknown id with exit 1 before any billed call. `codex` carries
- * null for the same reason its prompt slot is null -- its help has never been
- * read here, and a flag a CLI may not take is a launch that fails in front of
- * the person.
+ * What Start asks the editor to open: one CLI, interactively, in one
+ * repository. Built from the router's launch line (`launchLine`), which says
+ * how each engine is started -- the program, where the model and the opening
+ * sentence go, the environment and the title -- so no interface writes that
+ * rule a second time. Where the terminal opens is this extension's own.
  */
-const ENGINE_CLI: Readonly<
-  Record<string, { program: string; promptArgs: ((sentence: string) => string[]) | null; modelFlag: string | null }>
-> = {
-  "claude-code": { program: "claude", promptArgs: (sentence) => [sentence], modelFlag: "--model" },
-  copilot: { program: "copilot", promptArgs: (sentence) => ["-i", sentence], modelFlag: "--model" },
-  codex: { program: "codex", promptArgs: null, modelFlag: null },
-};
-
-/** What Start asks the editor to open: one CLI, interactively, in one repository. */
 export interface EngineTerminal {
   readonly name: string;
   readonly cwd: string;
@@ -191,40 +149,55 @@ export interface EngineTerminal {
   readonly env?: Readonly<Record<string, string>>;
 }
 
-/**
- * The whole instruction an engine needs, as the guide states it.
- *
- * Start has already registered the session, so the sentence carries no
- * identity and asks for no `start`. It asks for one `next`, and never for
- * another: each `answer_command` chains, so an AI that answers has asked.
- * The answer runs in the background so the chat stays free for the person.
- * The sessions root is repository-relative because the terminal opens at the
- * repository root.
- */
-export function openingSentence(): string {
-  const dir = SESSIONS_REL.replace(/\\/g, "/");
-  return (
-    `Run \`dabbler session next --sessions-dir ${dir}\` once. Do what the instruction's \`ask\` says, then start ` +
-    "its `answer_command` as a background command, so this chat stays free: what it prints when it exits is " +
-    "your next instruction. Stop when one says `done`."
-  );
+/** What `session start --json` answers: whether it registered, its refusal, and each way on as the arguments that take it. */
+export interface StartAnswer {
+  readonly registered: boolean;
+  readonly refusal: string | null;
+  /** At session 1 the uncommitted files are most likely what the project began from. */
+  readonly starting_point: boolean;
+  readonly ways_on: ReadonlyArray<{ readonly way: "commit" | "undo" | "merge"; readonly args: readonly string[] }>;
 }
 
-/** Registers a session through the bundled router and waits for it: its exit code and what it printed. */
+/**
+ * Registers a session through the bundled router and waits for it: its exit
+ * code, what it said, and its answer as data -- null where none came back.
+ */
 export type SessionRegistrar = (
   root: string,
   args: readonly string[],
-) => Promise<{ readonly code: number | null; readonly output: string }>;
+) => Promise<{ readonly code: number | null; readonly output: string; readonly answer?: StartAnswer | null }>;
 
-/** `dabbler session start` on the editor's own Node, waited for. */
+/** The arguments that take one way on a refused start offers, or null where it offers none. */
+function wayOn(answer: StartAnswer | null | undefined, way: "commit" | "undo" | "merge"): readonly string[] | null {
+  return answer?.ways_on.find((on) => on.way === way)?.args ?? null;
+}
+
+/** `dabbler session start --json` on the editor's own Node, waited for. */
 export function defaultSessionRegistrar(cli: string | null = resolveRouterCli()): SessionRegistrar {
   return async (root, args) => {
     if (cli === null) {
       return { code: null, output: "The bundled `dabbler` command was not found beside the extension." };
     }
     const lines: string[] = [];
-    const handle = launchDriver({ execPath: process.execPath, cli, cwd: root, args }, (line) => lines.push(line));
-    return { code: await handle.exited, output: lines.join("\n") };
+    const asked = args.includes("--json") ? [...args] : [...args, "--json"];
+    const handle = launchDriver({ execPath: process.execPath, cli, cwd: root, args: asked }, (line) => lines.push(line));
+    const code = await handle.exited;
+    // Its stdout is the one JSON object; everything else it said went to
+    // stderr, and is what a person is shown.
+    let answer: StartAnswer | null = null;
+    const said: string[] = [];
+    for (const line of lines) {
+      if (answer === null && line.startsWith("{")) {
+        try {
+          answer = JSON.parse(line) as StartAnswer;
+          continue;
+        } catch {
+          // A line of prose that happens to open with a brace.
+        }
+      }
+      said.push(line);
+    }
+    return { code, output: said.join("\n"), answer };
   };
 }
 
@@ -524,57 +497,40 @@ export function modelPickItems(root: string, choice: EngineChoice, chosen: strin
   return items;
 }
 
-/** The terminal Start opens for a choice, or the refusal when a seat has no model. */
-export function engineTerminalFor(
+/**
+ * The terminal for a choice, from the router's launch line, or the refusal
+ * when there is none to open (a seat with no model).
+ *
+ * The model is passed spelled as it was chosen; the router never normalises
+ * it, because the date suffix is what makes a pin a pin.
+ */
+function terminalFor(
   repository: SessionsRepository,
   choice: EngineChoice,
   model: string,
-  sentence: string = openingSentence(),
-  name: string = choice.label,
+  purpose: LaunchPurpose,
+  session?: number,
 ): EngineTerminal | string {
-  const cli = ENGINE_CLI[choice.engine];
-  if (!cli) return `${choice.label} has no known CLI to open; nothing was launched.`;
-  if (choice.modelRequired && model.trim() === "") {
-    return `${choice.label} is a seat and needs a model; nothing was launched.`;
-  }
-  // The value the operator chose, spelled as they chose it. NOT normalised:
-  // `normalizeModelToken` drops the date suffix, and the date suffix is what
-  // makes a pin a pin -- a launch that quietly generalised `claude-opus-5-
-  // 20260901` to `claude-opus-5` would be answering with a model nobody
-  // named. The CLI is the authority on whether it knows the id, and it says
-  // so plainly when it does not.
-  const wanted = model.trim();
-  const modelArgs = cli.modelFlag !== null && wanted !== "" ? [cli.modelFlag, wanted] : [];
-  return {
-    name,
-    cwd: repository.root,
-    program: cli.program,
-    // The flag first and the prompt last: `claude`'s prompt is a POSITIONAL,
-    // so anything after it is read as part of it.
-    args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
-    typed: cli.promptArgs !== null ? null : sentence,
-    // Inherited by every command the AI spawns, so the router can tell an
-    // engine from a person whichever engine this is and whatever its vendor
-    // names its own variables. Set here and on no other terminal.
-    env: { DABBLER_ENGINE_TERMINAL: "1" },
-  };
+  const line = launchLine({
+    purpose,
+    engine: choice.engine,
+    model,
+    ...(session === undefined ? {} : { session }),
+    repoRoot: repository.root,
+    sessionsDir: path.join(repository.root, SESSIONS_REL),
+    repositoryLabel: repository.label,
+  });
+  if (typeof line === "string") return line;
+  return { name: line.title, cwd: line.cwd, program: line.program, args: line.args, typed: line.typed, env: line.env };
+}
+
+/** The terminal Start opens for a choice, or the refusal when a seat has no model. */
+export function engineTerminalFor(repository: SessionsRepository, choice: EngineChoice, model: string): EngineTerminal | string {
+  return terminalFor(repository, choice, model, "session");
 }
 
 /** How the engine and model boxes are titled for a consult. */
 export const CONSULT_PURPOSE = "Consult with AI";
-
-/**
- * What an AI opened to consult is asked first: read the brief, then the
- * operator. It names no waiter, because a consult drives nothing.
- */
-export function consultSentence(session?: number): string {
-  const dir = SESSIONS_REL.replace(/\\/g, "/");
-  const about = session === undefined ? "" : ` --session ${session}`;
-  return (
-    `Run \`dabbler consult --sessions-dir ${dir}${about}\` and read what it prints before anything else. ` +
-    "Then ask me what I need."
-  );
-}
 
 /** The CLI Consult with AI opens: Start's construction, the consult sentence, and a name of its own. */
 export function consultTerminalFor(
@@ -583,14 +539,7 @@ export function consultTerminalFor(
   model: string,
   session?: number,
 ): EngineTerminal | string {
-  const about = session === undefined ? "" : ` (session ${session})`;
-  return engineTerminalFor(
-    repository,
-    choice,
-    model,
-    consultSentence(session),
-    `Consult — ${choice.label} — ${repository.label}${about}`,
-  );
+  return terminalFor(repository, choice, model, "consult", session);
 }
 
 /** How the model box is titled when a person opens a Mechanic. */
@@ -606,14 +555,7 @@ export function mechanicTerminalFor(
   choice: EngineChoice,
   model: string,
 ): EngineTerminal | string {
-  const dir = SESSIONS_REL.replace(/\\/g, "/");
-  return engineTerminalFor(
-    repository,
-    choice,
-    model,
-    `Run \`dabbler consult --sessions-dir ${dir} --mechanic\` and do what the brief it prints says.`,
-    `Mechanic — ${choice.label} — ${repository.label}`,
-  );
+  return terminalFor(repository, choice, model, "mechanic");
 }
 
 export interface SessionRunUi {
@@ -1086,29 +1028,33 @@ export async function runStartSession(
   const args = startArguments(picked, model, reviewers);
   let registered = await register(repository.root, args);
   // Uncommitted changes: committing them or undoing them is the framework's
-  // to do, once the person has said which.
-  if (registered.code !== 0 && registered.output.includes(COMMIT_CHANGES_FLAG)) {
-    const refusal = registered.output.split("\n").find((line) => line.startsWith("start: refused -- ")) ?? "";
+  // to do, once the person has said which. The ways on are the start's own
+  // answer, each as the arguments that take it.
+  const commitWay = wayOn(registered.answer, "commit");
+  const undoWay = wayOn(registered.answer, "undo");
+  if (registered.code !== 0 && commitWay !== null && undoWay !== null) {
     // At session 1 they are most likely what the project began from.
-    const commit = registered.output.includes(STARTING_POINT) ? "Commit them as the starting point" : "Commit and Push";
+    const commit = registered.answer?.starting_point ? "Commit them as the starting point" : "Commit and Push";
     const undo = "Undo the Changes";
     const answer = await ui.choose(
-      `${refusal.replace(/^start: refused -- /, "")}\n\n${commit} commits these files and pushes them. ` +
+      `${registered.answer?.refusal ?? ""}\n\n${commit} commits these files and pushes them. ` +
         `${undo} restores the changed files and removes the new ones, keeping a copy of each ` +
         "outside the repository, in this machine's per-user dabbler data folder.",
       [commit, undo],
     );
     if (answer !== commit && answer !== undo) return false;
-    registered = await register(repository.root, [...args, answer === commit ? COMMIT_CHANGES_FLAG : UNDO_CHANGES_FLAG]);
+    registered = await register(repository.root, answer === commit ? commitWay : undoWay);
   }
   // Origin holds files this checkout has never had, on a history it does not
   // share: whether they belong in this branch is the person's to say.
-  if (registered.code !== 0 && registered.output.includes(MERGE_ORIGIN_FLAG)) {
-    const said = registered.output.trim().split("\n").filter((line) => line.includes(MERGE_ORIGIN_FLAG)).join(" ");
-    if (!(await ui.confirm(said.replace(/^start: refused -- /, ""), "Merge and Start"))) return false;
-    registered = await register(repository.root, [...args, MERGE_ORIGIN_FLAG]);
+  const mergeWay = wayOn(registered.answer, "merge");
+  if (registered.code !== 0 && mergeWay !== null) {
+    if (!(await ui.confirm(registered.answer?.refusal ?? "", "Merge and Start"))) return false;
+    registered = await register(repository.root, mergeWay);
   }
-  if (registered.code !== 0) {
+  // Whether the session is on the record is the start's own answer where it
+  // gave one; the exit code says only whether the command succeeded.
+  if (!(registered.answer?.registered ?? registered.code === 0)) {
     const said = registered.output.trim();
     ui.showErrorMessage(`The session was not registered, so nothing was opened.${said === "" ? "" : ` ${said}`}`);
     return false;
@@ -1259,28 +1205,23 @@ export async function runReportStop(
     ui.showErrorMessage(`No report was written for session ${number}'s stop — ${result.message.trim() || `exit ${result.exitCode}`}`);
     return false;
   }
-  const written = /written to (\S+)/.exec(result.value.stdout)?.[1];
-  if (written === undefined) {
-    ui.report(`Report this stop — session ${number}`, result.value.stdout);
-    return false;
-  }
-  await openReport(path.join(repository.root, written), result.value.stdout, (message, items) => ui.choose(message, items), actions);
+  const { file, reportsTo } = result.value;
+  await openReport(path.join(repository.root, file), reportsTo, (message, items) => ui.choose(message, items), actions);
   return true;
 }
 
 /**
  * A written report, opened for reading; only when the person says so is it
- * copied and the address `defect-report` printed opened in their browser.
+ * copied and the address `defect-report` named opened in their browser.
  */
 export async function openReport(
   file: string,
-  said: string,
+  address: string | null,
   choose: (message: string, items: readonly string[]) => Thenable<string | undefined>,
   actions: ReportStopActions = REPORT_STOP_ACTIONS,
 ): Promise<void> {
   await actions.open(file);
-  const address = /^Reports go to (\S+) -- /m.exec(said)?.[1];
-  if (address === undefined) return;
+  if (address === null) return;
   const send = await choose(
     `When you have read the report: copy it and open ${address} in your browser, to send it yourself? ` +
       "Its key stays with you.",

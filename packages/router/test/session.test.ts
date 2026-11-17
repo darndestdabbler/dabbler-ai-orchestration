@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { capture } from "../src/output.ts";
+import { sessionVerb } from "../src/cli/session.ts";
 import { changedPathsBetween, platformNewlines, snapshotWorktreeTree } from "../src/journal.ts";
 import { checkPublishedWhenReleasable } from "../src/gates.ts";
 import { appendAdvice, appendPackaging, readExceptions } from "../src/ledger.ts";
@@ -310,6 +311,49 @@ describe("what a start refuses before a session exists", () => {
       assert.equal(readRawSessionState(state.sessionsDir), null);
     } finally {
       dirty();
+      state.restore();
+    }
+  });
+
+  it("answers a start refused over uncommitted changes with both ways on as data, under --json", async () => {
+    // An interface offers the ways on from fields, never by searching what
+    // the start printed for a flag.
+    const state = stateDir();
+    const dirty = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: state.repo.split("\\").join("/") }],
+      [["status", "--porcelain"], { stdout: "?? .vscode/launch.json\n" }],
+    ]);
+    try {
+      const argv = ["start", "--engine", "claude-code", "--provider", "anthropic", "--sessions-dir", state.sessionsDir, "--json"];
+      const refused = await run(() => sessionVerb(argv));
+      assert.notEqual(refused.code, EXIT_OK);
+      assert.deepEqual(JSON.parse(refused.out), {
+        registered: false,
+        refusal: workBegunRefusal(1, [".vscode/launch.json"]),
+        starting_point: true,
+        ways_on: [
+          { way: "commit", args: ["session", ...argv, "--commit-changes"] },
+          { way: "undo", args: ["session", ...argv, "--undo-changes"] },
+        ],
+      });
+      // The person reading a terminal is told what they always were.
+      assert.match(refused.err, /start: refused -- /);
+      assert.equal(readRawSessionState(state.sessionsDir), null);
+    } finally {
+      dirty();
+      state.restore();
+    }
+  });
+
+  it("says a start that wrote its record is registered, under --json, with nothing else on stdout", async () => {
+    const state = stateDir();
+    try {
+      const argv = ["start", "--engine", "claude-code", "--provider", "anthropic", "--sessions-dir", state.sessionsDir, "--json"];
+      const started = await run(() => sessionVerb(argv));
+      assert.equal(started.code, EXIT_OK, started.err);
+      assert.deepEqual(JSON.parse(started.out), { registered: true, refusal: null, starting_point: false, ways_on: [] });
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+    } finally {
       state.restore();
     }
   });

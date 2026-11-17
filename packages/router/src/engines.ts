@@ -37,7 +37,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { basename, delimiter, join } from "node:path";
+import { basename, delimiter, join, relative } from "node:path";
 
 import { spawnProgram, terminateTree } from "./checks.ts";
 import type { DriverInstruction } from "./generated/index.ts";
@@ -209,6 +209,158 @@ const ENGINE_PROGRAM = {
 /** The program that engine is launched as, or null for one with no built-in shape. */
 export function engineProgram(engine: string): string | null {
   return (ENGINE_PROGRAM as Record<string, string | undefined>)[engine] ?? null;
+}
+
+// --- The interactive launch --------------------------------------------------
+
+/**
+ * How each engine's own CLI is opened for a PERSON to talk to, beside the
+ * unattended shape `engineShape` gives the driver.
+ *
+ * Measured against the installed CLIs' own `--help`, not assumed:
+ *
+ * - `claude`: `Usage: claude [options] [command] [prompt]`, interactive by
+ *   default. The positional IS the opening prompt, so it goes in argv -- and
+ *   last, because anything after a positional is read as part of it.
+ * - `copilot`: no positional, but `-i, --interactive <prompt>` is "Start
+ *   interactive mode and automatically execute this prompt" (1.0.83,
+ *   2026-09-15). `-p` is the non-interactive one and is not what this wants.
+ * - `codex`: its help has never been read here. It opens with no prompt and
+ *   no model flag, and the sentence is typed for the person's Enter: an argv
+ *   a CLI does not take is a launch that fails in front of the person.
+ *
+ * `--model` was measured on 2026-09-12: `claude --model` accepted 14 of 14
+ * ids offered, and `copilot --model` refuses an unknown id with exit 1
+ * before any billed call. A seat needs one: Copilot without it runs `auto`
+ * while the ledger records whatever the person named.
+ */
+const ENGINE_LAUNCH: Readonly<
+  Record<
+    string,
+    {
+      readonly label: string;
+      readonly promptArgs: ((sentence: string) => string[]) | null;
+      readonly modelFlag: string | null;
+      readonly modelRequired: boolean;
+    }
+  >
+> = {
+  "claude-code": { label: "Claude Code", promptArgs: (sentence) => [sentence], modelFlag: "--model", modelRequired: false },
+  copilot: { label: "GitHub Copilot", promptArgs: (sentence) => ["-i", sentence], modelFlag: "--model", modelRequired: true },
+  codex: { label: "Codex", promptArgs: null, modelFlag: null, modelRequired: false },
+};
+
+/** What an engine's CLI is opened for: a session's author, a consult, or a Mechanic. */
+export const LAUNCH_PURPOSES = ["session", "consult", "mechanic"] as const;
+export type LaunchPurpose = (typeof LAUNCH_PURPOSES)[number];
+
+export interface LaunchRequest {
+  readonly purpose: LaunchPurpose;
+  readonly engine: string;
+  /** The id the person chose, spelled as they chose it; empty for the engine's default. */
+  readonly model: string;
+  /** The session a consult is about, when it is about one. */
+  readonly session?: number;
+  readonly repoRoot: string;
+  /** The sessions root; `docs/sessions` under the repository when absent. */
+  readonly sessionsDir?: string;
+  /** How the repository is named in a title; the root folder's name when absent. */
+  readonly repositoryLabel?: string;
+}
+
+/** What to start: one CLI, interactively, in one repository. Nothing is started here. */
+export interface EngineLaunch {
+  readonly program: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  /** Added to the environment the program inherits. */
+  readonly env: Readonly<Record<string, string>>;
+  readonly title: string;
+  /**
+   * Typed at the CLI's prompt and NOT sent, for a CLI whose argv has no slot
+   * for the sentence: the person presses Enter. Null where the argv carries it.
+   */
+  readonly typed: string | null;
+}
+
+/**
+ * The opening sentence for a session's author.
+ *
+ * Start has already registered the session, so the sentence carries no
+ * identity and asks for no `start`. It asks for one `next`, and never for
+ * another: each `answer_command` chains, so an AI that answers has asked.
+ * The answer runs in the background so the chat stays free for the person.
+ * The sessions root is repository-relative because the CLI opens at the
+ * repository root.
+ */
+export function openingSentence(sessionsRel = "docs/sessions"): string {
+  return (
+    `Run \`dabbler session next --sessions-dir ${sessionsRel}\` once. Do what the instruction's \`ask\` says, then start ` +
+    "its `answer_command` as a background command, so this chat stays free: what it prints when it exits is " +
+    "your next instruction. Stop when one says `done`."
+  );
+}
+
+/**
+ * What an AI opened to consult is asked first: read the brief, then the
+ * person. It names no waiter, because a consult drives nothing.
+ */
+export function consultSentence(sessionsRel = "docs/sessions", session?: number): string {
+  const about = session === undefined ? "" : ` --session ${session}`;
+  return (
+    `Run \`dabbler consult --sessions-dir ${sessionsRel}${about}\` and read what it prints before anything else. ` +
+    "Then ask me what I need."
+  );
+}
+
+/** A Mechanic is briefed with `dabbler consult --mechanic`, in a CLI of its own. */
+export function mechanicSentence(sessionsRel = "docs/sessions"): string {
+  return `Run \`dabbler consult --sessions-dir ${sessionsRel} --mechanic\` and do what the brief it prints says.`;
+}
+
+/**
+ * The launch line for an engine's own CLI, or the refusal when there is none.
+ *
+ * The model is passed spelled as it was chosen, NOT normalised: dropping a
+ * date suffix would answer with a model nobody named, and the CLI is the
+ * authority on whether it knows the id.
+ */
+export function launchLine(request: LaunchRequest): EngineLaunch | string {
+  const cli = ENGINE_LAUNCH[request.engine];
+  const program = engineProgram(request.engine);
+  if (cli === undefined || program === null) {
+    return `${request.engine} has no known CLI to open; nothing was launched.`;
+  }
+  const wanted = request.model.trim();
+  if (cli.modelRequired && wanted === "") return `${cli.label} is a seat and needs a model; nothing was launched.`;
+  const sessionsRel =
+    request.sessionsDir === undefined
+      ? "docs/sessions"
+      : relative(request.repoRoot, request.sessionsDir).split("\\").join("/");
+  const repository = request.repositoryLabel ?? basename(request.repoRoot);
+  const sentence =
+    request.purpose === "session"
+      ? openingSentence(sessionsRel)
+      : request.purpose === "consult"
+        ? consultSentence(sessionsRel, request.session)
+        : mechanicSentence(sessionsRel);
+  const title =
+    request.purpose === "session"
+      ? cli.label
+      : request.purpose === "consult"
+        ? `Consult — ${cli.label} — ${repository}${request.session === undefined ? "" : ` (session ${request.session})`}`
+        : `Mechanic — ${cli.label} — ${repository}`;
+  const modelArgs = cli.modelFlag !== null && wanted !== "" ? [cli.modelFlag, wanted] : [];
+  return {
+    program,
+    args: [...modelArgs, ...(cli.promptArgs !== null ? cli.promptArgs(sentence) : [])],
+    cwd: request.repoRoot,
+    // Inherited by every command the AI spawns, so the router tells an
+    // engine from a person whichever engine this is.
+    env: { [ENGINE_PLACE_MARKER]: "1" },
+    title,
+    typed: cli.promptArgs !== null ? null : sentence,
+  };
 }
 
 /** One engine's CLI, and where this machine has it. */

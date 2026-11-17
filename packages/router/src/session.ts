@@ -731,6 +731,32 @@ export interface StartOptions {
    * a cancelled session's leavings, and whether they land or go is theirs.
    */
   readonly byEngine?: boolean;
+  /** Filled with the refusal and the ways on it offers, for a caller that answers with data. */
+  readonly answer?: StartAnswer;
+}
+
+/** One way on a refused start offers: the same start, with this flag. */
+export interface StartWayOn {
+  readonly way: "commit" | "undo" | "merge";
+  readonly flag: string;
+}
+
+/** What a start said, as data: its refusal, and the ways on that refusal offers. */
+export interface StartAnswer {
+  /** Whether the session is on the record: set when the start returns, whatever drives it afterwards. */
+  registered: boolean;
+  refusal: string | null;
+  waysOn: readonly StartWayOn[];
+  /** At session 1 the uncommitted files are most likely what the project began from. */
+  startingPoint: boolean;
+}
+
+/** A start's refusal: said on stderr as it always was, and kept for an answer as data. */
+function refuseStart(words: string, answer: StartAnswer | undefined, waysOn: readonly StartWayOn[] = []): void {
+  writeErr(`start: refused -- ${words}\n`);
+  if (answer === undefined || answer.refusal !== null) return;
+  answer.refusal = words;
+  answer.waysOn = waysOn;
 }
 
 /** The first line of a git error, for a one-line message. */
@@ -758,6 +784,12 @@ export const MERGE_ORIGIN_FLAG = "--merge-origin";
 /** The switches a person answers uncommitted changes at a start with: keep them, or undo them. */
 export const COMMIT_CHANGES_FLAG = "--commit-changes";
 export const UNDO_CHANGES_FLAG = "--undo-changes";
+
+const CHANGES_WAYS_ON: readonly StartWayOn[] = [
+  { way: "commit", flag: COMMIT_CHANGES_FLAG },
+  { way: "undo", flag: UNDO_CHANGES_FLAG },
+];
+const MERGE_WAY_ON: readonly StartWayOn[] = [{ way: "merge", flag: MERGE_ORIGIN_FLAG }];
 
 /** What a start refused over uncommitted changes says next, naming both ways through -- a person's. */
 const UNCOMMITTED_CHANGES_NEXT =
@@ -1528,11 +1560,11 @@ function startRelease(
   if (fresh) {
     const begun = materialWorktreeChanges(sessionsDir, { beforeWork: true });
     if (begun.error) {
-      writeErr(`start: refused -- cannot tell whether the tree is clean: ${begun.error}\n`);
+      refuseStart(`cannot tell whether the tree is clean: ${begun.error}`, options.answer);
       return EXIT_USAGE;
     }
     if (begun.paths.length > 0) {
-      writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)} A release publishes what is committed.\n`);
+      refuseStart(`${workBegunRefusal(requested, begun.paths)} A release publishes what is committed.`, options.answer);
       return EXIT_USAGE;
     }
     const unanswered = remoteUnansweredLine(repoRoot);
@@ -1541,7 +1573,7 @@ function startRelease(
     } else {
       const pulled = pullBeforeStart(repoRoot, sessionsDir, options.mergeOrigin === true);
       if (pulled.held !== null) {
-        writeErr(`start: refused -- ${originHoldsWorkRefusal(pulled.held)}\n`);
+        refuseStart(originHoldsWorkRefusal(pulled.held), options.answer, MERGE_WAY_ON);
         return EXIT_BOUNDARY;
       }
       if (pulled.line !== null) writeOut(`start: ${pulled.line}\n`);
@@ -1551,15 +1583,16 @@ function startRelease(
   // record and the version file are read as origin left them.
   const pulledVersion = releaseSessionVersion(sessionsDir, requested);
   if (pulledVersion !== version) {
-    writeErr(
-      `start: refused -- the session plan pulled from origin ${pulledVersion === null ? "no longer makes" : `makes`} ` +
-        `session ${sessionDisplayNumber(requested)} ${pulledVersion === null ? "a release session" : `a release of ${pulledVersion}, not ${version}`}. Start it again.\n`,
+    refuseStart(
+      `the session plan pulled from origin ${pulledVersion === null ? "no longer makes" : `makes`} ` +
+        `session ${sessionDisplayNumber(requested)} ${pulledVersion === null ? "a release session" : `a release of ${pulledVersion}, not ${version}`}. Start it again.`,
+      options.answer,
     );
     return EXIT_USAGE;
   }
   const refused = releasePreflight(sessionsDir, requested, version);
   if (refused !== null) {
-    writeErr(`start: refused -- ${refused}\n`);
+    refuseStart(refused, options.answer);
     return EXIT_USAGE;
   }
   if (fresh) {
@@ -1584,7 +1617,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
   // Named at the flag or left in a machine's preferences from before, a
   // retired engine is refused before anything is read or written.
   if (options.engine === "gemini") {
-    writeErr(`start: refused -- ${GEMINI_RETIRED}\n`);
+    refuseStart(GEMINI_RETIRED, options.answer);
     return EXIT_USAGE;
   }
   if (!isDirectory(sessionsDir)) {
@@ -1596,7 +1629,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     return EXIT_BOUNDARY;
   }
   if (options.commitChanges === true && options.undoChanges === true) {
-    writeErr(`start: refused -- ${COMMIT_CHANGES_FLAG} and ${UNDO_CHANGES_FLAG} cannot both be given; choose one.\n`);
+    refuseStart(`${COMMIT_CHANGES_FLAG} and ${UNDO_CHANGES_FLAG} cannot both be given; choose one.`, options.answer);
     return EXIT_USAGE;
   }
   // Identity is resolved further down, AFTER the record has been read and
@@ -1614,7 +1647,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
     lock = acquireLockWithTimeout(sessionsDir, `start_session/${process.pid}`);
   } catch (error) {
     if (!(error instanceof LockContentionError)) throw error;
-    writeErr(`start: refused -- lifecycle lock contention: ${error.message}\n`);
+    refuseStart(`lifecycle lock contention: ${error.message}`, options.answer);
     return EXIT_LOCK_CONTENTION;
   }
   try {
@@ -1708,26 +1741,27 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         },
       });
       if (impossible !== null) {
-        writeErr(`start: refused -- ${impossible}\n`);
+        refuseStart(impossible, options.answer);
         return EXIT_USAGE;
       }
     } catch (error) {
       // A configuration this router cannot load is refused by every other
       // reader too, and with its own sentence. Starting a session over it
       // would put the refusal at the first round instead of here.
-      writeErr(`start: refused -- ${error instanceof Error ? error.message : String(error)}\n`);
+      refuseStart(error instanceof Error ? error.message : String(error), options.answer);
       return EXIT_USAGE;
     }
     if (current !== null && requested === current && normalized !== null) {
       const recorded = sessionRecord(normalized, current);
       const clash = identityClash(recorded, identity);
       if (clash !== null) {
-        writeErr(
-          `start: refused -- session ${sessionDisplayNumber(current)} is in ` +
+        refuseStart(
+          `session ${sessionDisplayNumber(current)} is in ` +
             `flight and ${clash}. Its identity is on the record and the work ` +
             "already done was done under it. Continue with the same identity, " +
             "or with none -- a session in flight needs none named -- or close " +
-            "this session before starting one under another.\n",
+            "this session before starting one under another.",
+          options.answer,
         );
         return EXIT_BOUNDARY;
       }
@@ -1756,7 +1790,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       ).effectiveProvider;
     } catch (error) {
       if (!(error instanceof IdentityResolutionError)) throw error;
-      writeErr(`start: refused -- ${error.message}\n`);
+      refuseStart(error.message, options.answer);
       return EXIT_USAGE;
     }
     // **What this session uses, and nothing else, before it exists.** A
@@ -1778,7 +1812,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         authorProvider,
       );
       if (use.refusal !== null) {
-        writeErr(`start: refused -- ${use.refusal} Nothing was started and nothing was billed.\n`);
+        refuseStart(`${use.refusal} Nothing was started and nothing was billed.`, options.answer);
         return EXIT_USAGE;
       }
       for (const warning of use.warnings) writeErr(`start: warning -- ${warning}\n`);
@@ -1788,12 +1822,12 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       if (postureOf(config) === "maintenance") {
         const toolchain = vsToolsRefusal(declaredCommands(config), frameworkVersions(checkout));
         if (toolchain !== null) {
-          writeErr(`start: refused -- ${toolchain} Nothing was started.\n`);
+          refuseStart(`${toolchain} Nothing was started.`, options.answer);
           return EXIT_USAGE;
         }
       }
     } catch (error) {
-      writeErr(`start: refused -- ${error instanceof Error ? error.message : String(error)}\n`);
+      refuseStart(error instanceof Error ? error.message : String(error), options.answer);
       return EXIT_USAGE;
     }
     // A fresh registration only: re-registering the session in flight is a
@@ -1806,7 +1840,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       // itself had put there. The same words, so the two never drift.
       const begun = materialWorktreeChanges(sessionsDir, { beforeWork: true });
       if (begun.error) {
-        writeErr(`start: refused -- cannot tell whether session ${sessionDisplayNumber(requested)}'s work has begun: ${begun.error}\n`);
+        refuseStart(`cannot tell whether session ${sessionDisplayNumber(requested)}'s work has begun: ${begun.error}`, options.answer);
         return EXIT_USAGE;
       }
       if (begun.paths.length > 0) {
@@ -1814,7 +1848,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
         if (options.commitChanges === true) {
           const refused = commitChangesBeforeStart(repoRoot, requested, begun.paths);
           if (refused !== null) {
-            writeErr(`start: refused -- ${refused}\n`);
+            refuseStart(refused, options.answer);
             return EXIT_USAGE;
           }
           writeOut(`start: committed ${begun.paths.length} file(s) made before session ${sessionDisplayNumber(requested)}.\n`);
@@ -1822,7 +1856,8 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
           const folder = undoChangesBeforeStart(repoRoot, begun.paths);
           writeOut(`start: undid ${begun.paths.length} change(s); a copy of each file is in ${folder}\n`);
         } else {
-          writeErr(`start: refused -- ${workBegunRefusal(requested, begun.paths)}\n`);
+          refuseStart(workBegunRefusal(requested, begun.paths), options.answer, CHANGES_WAYS_ON);
+          if (options.answer) options.answer.startingPoint = requested === 1;
           writeErr(`${requested === 1 ? STARTING_POINT_NEXT : UNCOMMITTED_CHANGES_NEXT}\n`);
           return EXIT_USAGE;
         }
@@ -1836,7 +1871,7 @@ export async function start(sessionsDir: string, options: StartOptions): Promise
       } else {
         const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir, options.mergeOrigin === true);
         if (pulled.held !== null) {
-          writeErr(`start: refused -- ${originHoldsWorkRefusal(pulled.held)}\n`);
+          refuseStart(originHoldsWorkRefusal(pulled.held), options.answer, MERGE_WAY_ON);
           return EXIT_BOUNDARY;
         }
         if (pulled.line !== null) writeOut(`start: ${pulled.line}\n`);
@@ -4572,6 +4607,15 @@ export interface DefectReportOptions {
   readonly packageRoot?: string;
   /** The person is rolling the session back from this stop: Where says so, and nothing else of the rollback. */
   readonly rollingBack?: boolean;
+  /** Filled with where the report was written and where reports go, for a caller that answers with data. */
+  readonly answer?: DefectReportAnswer;
+}
+
+/** A written report as data: its repository-relative path, the address reports go to, and what was said. */
+export interface DefectReportAnswer {
+  file: string | null;
+  reportsTo: string | null;
+  said: string;
 }
 
 /** A stop as the report reads it: the framework's values and its phase, never its reason's words. */
@@ -4762,15 +4806,19 @@ export async function defectReport(sessionsDir: string, options: DefectReportOpt
   writeFileSync(join(directory, `${name}.md`), `${text}\n`, "utf8");
   const key = `${name}-key.md`;
   writeFileSync(join(directory, key), keyText(`${name}.md`, holders), "utf8");
-  writeOut(
-    [
-      `defect-report: session ${shown}'s '${stop.kind}' stop, written to ${shownPath(`${name}.md`)}`,
-      `The key to its placeholders is ${shownPath(key)}: yours to keep, never to send.`,
-      ...(draft === null ? [] : [`The unchecked draft is ${shownPath(draft)}: not part of the report.`]),
-      sendToLine(extension),
-      "",
-    ].join("\n"),
-  );
+  const said = [
+    `defect-report: session ${shown}'s '${stop.kind}' stop, written to ${shownPath(`${name}.md`)}`,
+    `The key to its placeholders is ${shownPath(key)}: yours to keep, never to send.`,
+    ...(draft === null ? [] : [`The unchecked draft is ${shownPath(draft)}: not part of the report.`]),
+    sendToLine(extension),
+    "",
+  ].join("\n");
+  writeOut(said);
+  if (options.answer) {
+    options.answer.file = shownPath(`${name}.md`);
+    options.answer.reportsTo = extension?.bugs ?? null;
+    options.answer.said = said;
+  }
   return EXIT_OK;
 }
 

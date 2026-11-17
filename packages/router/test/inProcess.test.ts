@@ -19,7 +19,7 @@ import {
 } from "../src/inProcess.ts";
 import { capture, writeErr, writeOut } from "../src/output.ts";
 import { standIn, workingDirectory } from "../src/workdir.ts";
-import { makeAnsweredSandbox } from "./support/answers.ts";
+import { gitAnswers, makeAnsweredSandbox } from "./support/answers.ts";
 
 /** An echo that keeps what it was told, in order. */
 function recordingEcho(): { echo: RouterEcho; lines: string[] } {
@@ -188,6 +188,57 @@ describe("the in-process router", () => {
     });
     assert.equal(cannot.ok, false);
     assert.match(cannot.ok === false ? cannot.message : "", /declares no remote/);
+  });
+
+  it("answers the workspace with the file it wrote, as a field", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox({
+      "solution-dependencies.json": JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: "../csv-model" },
+            resolve: "feed",
+          },
+        ],
+      }),
+    });
+    const sibling = join(repo, "..", "csv-model");
+    mkdirSync(join(sibling, ".git"), { recursive: true });
+    writeFileSync(
+      join(sibling, "solution-dependencies.json"),
+      JSON.stringify({ schemaVersion: 1, solution: "csv-pipeline", repositoryId: "csv-model", consumes: [] }),
+    );
+    const result = await createInProcessRouter().workspace({ repoRoot: repo, sessionsDir });
+    assert.equal(result.ok, true, result.ok ? "" : result.message);
+    if (!result.ok) return;
+    assert.ok(result.value.file !== null && existsSync(result.value.file), JSON.stringify(result.value));
+    assert.match(result.value.said, /wrote /);
+  });
+
+  it("answers the rollback's preview as typed facts, and changes nothing", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    const router = createInProcessRouter();
+    const started = await router.session.start({ repoRoot: repo, sessionsDir, engine: "claude-code", provider: "anthropic" });
+    assert.equal(started.ok, true);
+    const before = readFileSync(join(sessionsDir, "sessions.json"), "utf8");
+    // The dry run reads history; nothing has been committed since the start.
+    const restore = gitAnswers([
+      [["rev-parse", "--show-toplevel"], { stdout: `${repo.split("\\").join("/")}\n` }],
+      [["rev-parse", "HEAD"], { stdout: `${"f".repeat(40)}\n` }],
+      [() => true, { stdout: "" }],
+    ]);
+    const preview = await router.session
+      .rollbackPreview({ repoRoot: repo, sessionsDir, sessionNumber: 1, reason: "x" })
+      .finally(restore);
+    assert.equal(preview.ok, true, preview.ok ? "" : preview.message);
+    if (!preview.ok) return;
+    assert.equal(preview.value.session, 1);
+    assert.equal(typeof preview.value.head, "string");
+    assert.equal(readFileSync(join(sessionsDir, "sessions.json"), "utf8"), before);
   });
 
   it("turns a verb's refusal into the contract's outcome, with its own words", async () => {

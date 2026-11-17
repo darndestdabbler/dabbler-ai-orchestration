@@ -63,6 +63,33 @@ export interface RouterText {
   readonly stdout: string;
 }
 
+/** A defect report the router wrote: where it is, where reports go, and what was said. */
+export interface DefectReportWritten {
+  /** Repository-relative. */
+  readonly file: string;
+  /** The address reports go to, or null where the extension's manifest names none. */
+  readonly reportsTo: string | null;
+  readonly said: string;
+}
+
+/** What the router's rollback dry run answers: the facts the dialog states. */
+export interface RollbackFacts {
+  session: number;
+  through: number;
+  /** The HEAD the facts were read at; the confirm is bound to it. */
+  head: string;
+  commits: number;
+  authors: string[];
+  oldest: string | null;
+  uncommitted: number;
+}
+
+/** The workspace the router wrote, or null where it wrote none, and what was said. */
+export interface WorkspaceWritten {
+  readonly file: string | null;
+  readonly said: string;
+}
+
 /**
  * The router could not be reached at all. Distinct from every
  * `RouterResult`: those are answers, and this is the absence of one.
@@ -196,11 +223,13 @@ export interface SessionVerbs {
   cancel(options: SessionCancelOptions): Promise<RouterResult<RouterText>>;
   restore(options: SessionRestoreOptions): Promise<RouterResult<RouterText>>;
   rollback(options: SessionRollbackOptions): Promise<RouterResult<RouterText>>;
+  /** The rollback's dry run: the facts its confirmation states. Changes nothing. */
+  rollbackPreview(options: Omit<SessionRollbackOptions, "dryRun" | "asOf">): Promise<RouterResult<RollbackFacts>>;
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
   interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
   waive(options: SessionWaiveOptions): Promise<RouterResult<RouterText>>;
-  /** One provider call; writes the report and prints its path. Sends nothing. */
-  defectReport(options: SessionDefectReportOptions): Promise<RouterResult<RouterText>>;
+  /** One provider call; writes the report and answers with its path. Sends nothing. */
+  defectReport(options: SessionDefectReportOptions): Promise<RouterResult<DefectReportWritten>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {
@@ -483,7 +512,7 @@ export interface Router {
    * it is written under `.dabbler/` where nothing tracks it. A shared copy
    * would point at folders somebody else does not have.
    */
-  workspace(options: RepositoryTarget): Promise<RouterResult<RouterText>>;
+  workspace(options: RepositoryTarget): Promise<RouterResult<WorkspaceWritten>>;
 
   /**
    * Set what the next session is run with, and re-derive the projection.

@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dabbler view configuration (the Configuration section's rows)",
+  "description": "The Configuration section as `dabbler view configuration` prints it: who authors, who reviews, the vehicle each is reached through, each model, the Mechanic and the keys, each with the value in force and the layer that decided it. It is a read, not a record: nothing on disk is written in this shape. Every rule that decides a row -- its words, its icon, which actions it offers and what each one runs -- is the router's, so an interface renders these rows and works none of them out again. Every level is present in the data, whatever starts collapsed on screen.",
+  "type": "object",
+  "required": ["schemaVersion", "machineOnly", "configuration"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "The shape this payload is written in."
+    },
+    "machineOnly": {
+      "type": "boolean",
+      "description": "No repository was named, so every row is this machine's default and every choice writes the machine's default."
+    },
+    "configuration": {
+      "$ref": "#/$defs/row",
+      "description": "The Configuration root. A reading that could not be taken is this row with no children, its tooltip saying why."
+    }
+  },
+  "$defs": {
+    "row": {
+      "description": "One row of the section, and the rows beneath it.",
+      "type": "object",
+      "required": ["id", "kind", "label", "description", "tooltip", "icon", "collapsible", "contextValue", "value", "decidedLayer", "click", "actions", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable across refreshes and unique across the section, so an interface keeps what was open and selected."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["configuration", "configParticipant", "configVehicle", "configRole", "configMechanic", "configKeys", "configCredential"]
+        },
+        "label": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "tooltip": {
+          "type": ["string", "null"],
+          "description": "Plain text, paragraphs separated by a blank line. The root's carries the model catalog's age, where it lives and what re-reading it costs."
+        },
+        "icon": {
+          "oneOf": [{ "$ref": "#/$defs/icon" }, { "type": "null" }]
+        },
+        "collapsible": {
+          "type": "string",
+          "enum": ["none", "collapsed"],
+          "description": "Whether the row has children. Nothing here starts open."
+        },
+        "contextValue": {
+          "type": ["string", "null"],
+          "description": "The VS Code extension's menu token for the row, or null where it has none."
+        },
+        "value": {
+          "type": ["string", "null"],
+          "description": "The value in force on a row that holds one: the engine, the vehicle, the model, the Mechanic's delegation, the credential's name. Null where the row holds none or nobody chose."
+        },
+        "decidedLayer": {
+          "description": "Where the value is kept: this repository's settings, this machine's default, what ships, or nowhere. Null where the reading does not say.",
+          "oneOf": [
+            { "type": "string", "enum": ["checkout", "machine", "shipped", "default"] },
+            { "type": "null" }
+          ]
+        },
+        "click": {
+          "description": "What activating the row does: one of its actions, or null where it does nothing.",
+          "oneOf": [{ "$ref": "#/$defs/action" }, { "type": "null" }]
+        },
+        "actions": {
+          "type": "array",
+          "description": "The actions the row offers, in menu order.",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/row" }
+        }
+      }
+    },
+    "icon": {
+      "description": "The editor's own glyph by name, and the tone it is drawn in where it has one.",
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tone": { "type": "string", "enum": ["attention", "done", "muted", "milestone"] }
+      }
+    },
+    "action": {
+      "description": "One action, as an interface shows and runs it: the Work Explorer's action, less the members no Configuration action uses. `argv` is the `dabbler` command it runs; an action that sets a value has none of its own and carries a `pick` instead, each of whose choices names its own command.",
+      "type": "object",
+      "required": ["id", "title", "argv", "pick", "confirm", "unavailable"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "argv": {
+          "oneOf": [{ "$ref": "#/$defs/dabblerCommand" }, { "type": "null" }]
+        },
+        "pick": {
+          "oneOf": [{ "$ref": "#/$defs/pick" }, { "type": "null" }]
+        },
+        "confirm": {
+          "oneOf": [{ "$ref": "#/$defs/confirmation" }, { "type": "null" }]
+        },
+        "unavailable": {
+          "type": ["string", "null"],
+          "description": "Why the action cannot run now, in words a person can act on; null where it can. An interface shows this rather than running anything."
+        }
+      }
+    },
+    "pick": {
+      "description": "What may be chosen for a value, as a list a person picks from: its title and placeholder, each choice it lists, what it does not list and why, and -- on a model whose reading lists nothing -- how a typed id is set instead.",
+      "type": "object",
+      "required": ["title", "placeholder", "choices", "withheld", "typed"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "placeholder": { "type": "string" },
+        "choices": {
+          "type": "array",
+          "description": "What the list offers, in order.",
+          "items": { "$ref": "#/$defs/choice" }
+        },
+        "withheld": {
+          "type": "array",
+          "description": "What the list does not offer, each with why: a vehicle nothing here can reach, a model the record says is no longer served.",
+          "items": {
+            "type": "object",
+            "required": ["label", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "typed": {
+          "description": "On a model whose reading lists nothing to pick: the model is TYPED, not picked, and this is how it is set. Null where there is a list.",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["prompt", "argv", "mineArgv"],
+              "additionalProperties": false,
+              "properties": {
+                "prompt": { "type": "string", "minLength": 1 },
+                "argv": { "$ref": "#/$defs/dabblerCommand", "description": "The command, with the typed id appended." },
+                "mineArgv": { "$ref": "#/$defs/dabblerCommand", "description": "The same, as the machine's default." }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "choice": {
+      "description": "One thing that may be chosen, and the `dabbler configure` command that sets it.",
+      "type": "object",
+      "required": ["label", "description", "detail", "value", "unreachable", "argv", "mineArgv"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": ["string", "null"] },
+        "detail": { "type": ["string", "null"], "description": "`what you chose` on the choice in force, or what the machine found beside it." },
+        "value": { "type": "string", "description": "What the command writes; empty clears the choice." },
+        "unreachable": {
+          "type": ["string", "null"],
+          "description": "Why this machine cannot reach it today, where it is still offered; null where it can."
+        },
+        "argv": { "$ref": "#/$defs/dabblerCommand", "description": "Sets it for this repository; with no repository, as this machine's default." },
+        "mineArgv": { "$ref": "#/$defs/dabblerCommand", "description": "Sets it as this machine's default." }
+      }
+    },
+    "dabblerCommand": {
+      "description": "A `dabbler` command as argv: the program, then its arguments.",
+      "type": "array",
+      "minItems": 1,
+      "prefixItems": [{ "const": "dabbler" }],
+      "items": { "type": "string" }
+    },
+    "confirmation": {
+      "description": "A confirmation a person gives before the action runs, in the words they are shown.",
+      "type": "object",
+      "required": ["title", "detail", "accept", "keep"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "detail": { "type": ["string", "null"] },
+        "accept": { "type": "string", "minLength": 1, "description": "The button that goes on." },
+        "keep": {
+          "type": ["string", "null"],
+          "description": "The button that keeps things as they are, or null where dismissing is the only way back."
+        }
+      }
+    }
+  }
+}

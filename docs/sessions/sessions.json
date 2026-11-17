@@ -6732,11 +6732,14 @@
     {
       "number": 340,
       "title": "A script repository is read as code and walked to a close",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "",
+      "cancelledAt": "2026-11-17T12:46:15-05:00"
     },
     {
       "number": 341,

@@ -20584,3 +20584,791 @@ check:version` checks the stamp.
 ### Session 342 of 342: Release 3.36.0 (release: 3.36.0)
 
 The framework publishes sessions 339 to 341 as 3.36.0 and nothing else.
+
+### Session 343 of 362: The router prints the Dabbler Terminal's lines
+
+Scope: `packages/router/src/views/terminalLines.ts` (new, moved from the
+extension), `packages/router/src/cli/terminal.ts` (new),
+`packages/router/src/cli/dabbler.ts`, `packages/router/src/index.ts`,
+`packages/router/test/terminalLines.test.ts` (new, moved),
+`tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts`
+
+**Why.** Some of the operator's developers work in Visual Studio and need
+it: .NET Framework MVC is debugged under IIS Express there, with designers
+and a project system VS Code does not have. Consult round 29
+(`docs/design/consults/round29-synthesis.md`) and the scope that followed
+(`docs/design/visual-studio-extension-scope.md`) came to a Dabbler
+extension for Visual Studio, and the operator approved it on 2026-11-17
+with these decisions, which hold for sessions 343 to 362:
+
+- **It is built on `master`, in a folder of its own, and is not published
+  until session 360's walk says it works.** That publication is the merge.
+  If it is given up, one session deletes the folder.
+- **The router computes and each interface renders.** What a person sees
+  is decided today inside the VS Code extension, in code that does not use
+  VS Code. It moves into the router, the router prints it, and the VS Code
+  extension reads it there. That is sessions 343 to 347, and each is worth
+  having with no Visual Studio extension at all: a person at a bare
+  terminal gets the same views, and so would any other editor.
+- **The engine runs in Windows Terminal, beside Visual Studio,** not in
+  it. There is no chat pane.
+- **Node is a prerequisite a developer installs,** as the engine CLIs are.
+- **Left out:** the repositories and modules of the Solution Explorer, Set
+  Up New Project, cloning and creating repositories, the solution
+  workspace file, the troubleshooter and the walkthrough.
+
+This session moves the first of the four parts. The Dabbler Terminal
+reads the records of a run under `.dabbler/runs/` every half second and
+turns them into lines. It takes no input from a person. Of its 2,285
+lines about a dozen touch VS Code, and all of it sits in the extension,
+where no other interface can reach it.
+
+**Step 1 -- the move.** The record readers, the formatting and the
+polling state machine move from `dabblerTerminal.ts` to
+`packages/router/src/views/terminalLines.ts`, as a class that is given a
+width, a theme (light or dark) and a place to write, and knows nothing of
+any editor. What stays in the extension is the VS Code terminal around
+it: creating it, where it opens, revealing it when a session starts,
+passing on its size and the colour theme.
+
+**Step 2 -- the verb.** `dabbler terminal --sessions-dir <dir>` prints the
+lines of the run in flight, or of the last one, and exits. `--follow`
+keeps printing as the run goes on, until it is interrupted. `--width` and
+`--theme` say how to lay the lines out; the defaults are the terminal's
+own width and dark.
+
+**Step 3 -- the lines as data.** `--json` prints one JSON object per line
+in place of coloured text: the time, the event, its fields, and for each
+piece of text the tone the router gives it, by name. A job's own output,
+which the terminal passes through as it is, is one object per line of it.
+The two notices the terminal raises today, a session paused and an
+instruction overdue, are objects of their own kind in the same stream, so
+an interface that shows a notice reads it there and decides nothing.
+
+**Step 4 -- the extension reads it.** The VS Code terminal is fed by the
+moved class, called in-process as the rest of the router is, and shows
+what it showed before, byte for byte. Its two warnings come from the
+notices of step 3.
+
+**Non-goals.** Any change to what a line says, its colours or its layout.
+A terminal a person types into. A verb that draws a dashboard or redraws
+in place. The Work Explorer, Configuration or the engine: sessions 344 to
+346. Anything in C#.
+
+**Tests.** The tests of the readers, the formatting and the state machine
+move with the code to `terminalLines.test.ts` and are rewritten for
+`node --test`; none is dropped and none is weakened. One new test: the
+`--json` form of a run carries the same events in the same order as the
+text form. `dabblerTerminal.test.ts` keeps the tests of the VS Code
+terminal around it.
+
+**Releasable.** Yes, as 3.36.0 in session 348.
+
+### Session 344 of 362: The router prints the Work Explorer's rows
+
+Scope: `packages/router/src/views/workExplorer.ts` (new, moved: the model,
+the rule for which actions a row offers, the labels and icons, the verdict
+words), `packages/router/src/cli/view.ts` (new),
+`packages/router/src/cli/dabbler.ts`, `packages/router/src/index.ts`,
+`packages/router/schemas/` (the rows' schema),
+`packages/router/test/workExplorer.test.ts` (new, moved),
+`tools/dabbler-ai-orchestration/src/providers/` (the five model files go;
+`WorkExplorerTreeProvider.ts` stays),
+`tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/`
+
+**Why.** The Work Explorer's model takes the router's reading of the
+sessions and returns plain rows: a label, a description, a tooltip, an
+icon, whether the row opens, and the actions it offers. It is 1,720 lines
+in five files, none of which uses VS Code, and it holds rules: Start
+Session is offered on the next session when nothing is in flight; Check
+this stop when a stop stands. A second interface must not work those out
+again.
+
+**Step 1 -- the move.** `workExplorerTreeModel.ts`, `ActionRegistry.ts`,
+`sessionsModel.ts`, `rowMenuHelpers.ts` and `verdictTokens.ts` move to
+`packages/router/src/views/workExplorer.ts`, with the part of
+`fileSystem.ts` that gathers what the model is given: the reading, the
+activity of the run in flight, a Mechanic's memo.
+
+**Step 2 -- the verb.** `dabbler view work-explorer --repo-root <path>`,
+which may be given more than once, prints the whole tree as JSON: each
+repository, its buckets, its sessions, and under a session its tasks,
+verification, findings and what needs attention. A row carries its id,
+its text, its icon by name, whether it starts open, the command a click
+runs, and its actions.
+
+**Step 3 -- an action is the verb a person would type.** Each action on a
+row carries its id, its title, and the `dabbler` command it stands for
+with its arguments filled in, and says what it needs from a person first:
+a confirmation with its words, a reason, or nothing. Whether Cancel is
+forced is in the command, not left to the interface. An action that opens
+a file names the file and the line.
+
+**Step 4 -- the schema.** The rows' shape is a schema under
+`packages/router/schemas/`, and the TypeScript type is generated from it
+as the progress reading's is. Session 350's C# types are written from the
+same file.
+
+**Step 5 -- the extension reads it.** `WorkExplorerTreeProvider.ts` turns
+the router's rows into tree items as it does today, in-process. Which
+menu item shows on which row still comes from the row's actions. Nothing a
+person sees changes.
+
+**Non-goals.** Any change to a row, a bucket, an icon or when an action
+is offered. Which folders are repositories: the interface says, since
+only it knows what is open. Refreshing: session 347. The Solution
+Explorer.
+
+**Tests.** The model's tests, the action rule's and the labels' move to
+`workExplorer.test.ts` and are rewritten for `node --test`; none is
+dropped. One new test: the JSON the verb prints for a fixture repository
+validates against the schema and offers the actions the model's own
+tests expect. `workExplorerTreeProvider.test.ts` stays.
+
+**Releasable.** Yes, as 3.36.0 in session 348.
+
+### Session 345 of 362: The router prints the Configuration rows and what may be chosen
+
+Scope: `packages/router/src/views/configuration.ts` (new, moved from
+`solutionTreeModel.ts`), `packages/router/src/cli/view.ts`,
+`packages/router/src/cli/configuration.ts` (`options --json`),
+`packages/router/schemas/`, `packages/router/test/configurationView.test.ts`
+(new, moved), `tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts`,
+`tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
+`tools/dabbler-ai-orchestration/src/commands/configurationCommands.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/`
+
+**Why.** The Configuration section shows who authors, who reviews, the
+vehicle each is reached through, each model, the Mechanic and the keys,
+with the layer that decided each value. About 870 lines of
+`solutionTreeModel.ts` build those rows, and the pickers in
+`configurationCommands.ts` work out what may be chosen. On the command
+line the reading has no JSON form at all: `dabbler configuration options`
+and `explain` print text.
+
+**Step 1 -- the move.** The Configuration half of `solutionTreeModel.ts`,
+its types, labels and row descriptions, moves to
+`packages/router/src/views/configuration.ts`, with the Mechanic's two
+rows, which the extension reads by a separate road today. The
+repositories and modules half stays where it is.
+
+**Step 2 -- the verb.** `dabbler view configuration --repo-root <path>`
+prints the section as JSON rows in the shape session 344 gave the Work
+Explorer's: Authoring AI, Reviewing AI and API Keys, their children, each
+row's value and the layer that decided it, the catalog's age on the
+root's tooltip, and each row's actions.
+
+**Step 3 -- what may be chosen.** A row that can be set carries its
+choices: each one's label, its detail, whether this machine can reach it
+and why not, and the `dabbler configure` command that sets it, for this
+repository and as the machine's default. `dabbler configuration options
+--json` prints the same lists for a person or a script. A model that is
+typed and not picked says so.
+
+**Step 4 -- the extension reads it.** The Solution Explorer joins the
+router's rows under its Configuration node, and each picker lists the
+choices its row carries and runs the command the chosen one names.
+Nothing a person sees changes.
+
+**Non-goals.** Any change to a row, a choice, a layer or what
+`configure` writes. The repositories and modules of the Solution
+Explorer. Update the Catalog and Store a Key, which run in a terminal and
+stay as they are.
+
+**Tests.** The Configuration tests in `solutionTreeModel.test.ts` move to
+`configurationView.test.ts`, rewritten for `node --test`; none is
+dropped. One new test: every choice on a row names a command the
+`configure` parser accepts.
+
+**Releasable.** Yes, as 3.36.0 in session 348.
+
+### Session 346 of 362: The router says how an engine is started, and answers with data
+
+Scope: `packages/router/src/engines.ts` (the launch line),
+`packages/router/src/cli/session.ts` (`session launch`, `--json` on
+`start`, `defect-report`), `packages/router/src/cli/workspace.ts`,
+`packages/router/src/contracts/router.ts`, `packages/router/src/inProcess.ts`,
+`packages/router/test/engines.test.ts`,
+`tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts`,
+`tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts`,
+`tools/dabbler-ai-orchestration/src/commands/openRepository.ts`,
+`tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts`
+
+**Why.** Start Session is two things any interface can do: run `dabbler
+session start`, then open a terminal whose program is `claude` or
+`copilot`. But how that program is started is written in the extension:
+the program's name, where the model goes, how the opening sentence is
+passed (differently for each engine), the sentence itself for a session,
+a consult and a Mechanic, the environment variable, the terminal's title.
+A second interface that wrote those again would be a second
+implementation of a rule.
+
+The extension also reads four results out of printed text by pattern: the
+ways on that a refused start offers, where a defect report was written
+and where reports go, and the workspace file `dabbler workspace` wrote.
+
+**Step 1 -- the launch line.** `dabbler session launch --for session`,
+`--for consult` or `--for mechanic`, with the engine, the model and the
+session where they apply, prints as JSON what to start: the program, its
+arguments with the opening sentence in place, the working directory, the
+environment to add, and the title. It starts nothing. The building of it
+moves from `sessionCommands.ts` to `engines.ts`.
+
+**Step 2 -- a start's result as data.** `session start --json` says
+whether the session is registered, and when it is refused, why, and which
+ways on it offers (commit the changes, undo them, merge origin) each as
+the command that takes it.
+
+**Step 3 -- the other three.** `session defect-report` and `workspace`
+return the paths and the address they print, as fields. The rollback's
+dry run is JSON already and gains its place in the typed result.
+
+**Step 4 -- the extension reads them.** It opens the engine from the
+launch line and drops its own copy, and drops the four patterns. Nothing
+a person sees changes.
+
+**Non-goals.** Where a terminal opens or what it is: each interface's own.
+Starting the engine from the router. Any change to the opening sentences.
+A fourth engine.
+
+**Tests.** In `engines.test.ts`: the launch line for each engine and each
+purpose carries the model and the sentence where that engine takes them.
+In `commandFlows.test.ts`: the tests of Start, Consult and Open a Mechanic
+assert the terminal the extension opens, as now, and pass unchanged in
+what they assert.
+
+**Releasable.** Yes, as 3.36.0 in session 348.
+
+### Session 347 of 362: The views follow the records
+
+Scope: `packages/router/src/views/follow.ts` (new),
+`packages/router/src/cli/view.ts` (`--follow`),
+`packages/router/src/cli/status.ts` (`--stalled-after-seconds`),
+`packages/router/test/follow.test.ts` (new),
+`tools/dabbler-ai-orchestration/src/extension.ts`,
+`tools/dabbler-ai-orchestration/src/utils/projection.ts`,
+`tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts`,
+`version.json` and the manifests `npm run stamp:version` writes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** A view is only right until a record changes. The VS Code
+extension knows which files to watch: the ledger, the plan, a run's
+records, the catalog and the preferences. That list is in `extension.ts`,
+in `SolutionTreeProvider.ts` and again in the key of the reading's cache.
+It is a rule about the router's own files, kept outside the router, in
+three places. A second interface would make it four.
+
+**Step 1 -- one list.** `packages/router/src/views/follow.ts` says which
+paths each view depends on, for a repository. The extension's watchers
+and its cache key are built from it, and their own lists go.
+
+**Step 2 -- `--follow`.** `dabbler view work-explorer --follow` and
+`dabbler view configuration --follow` print the view, then print it again
+whenever a path it depends on changes, one JSON document to a line, until
+interrupted. Changes close together make one printing. A document is
+whole each time: an interface replaces what it shows and compares nothing.
+
+**Step 3 -- the stalled threshold.** `dabbler status` and the views take
+`--stalled-after-seconds`, which only the in-process call could pass.
+
+**Step 4 -- the number.** `version.json` goes to 3.36.0 (a minor: new
+verbs), stamped with `npm run stamp:version`, and the changelog's 3.36.0
+section says what sessions 343 to 347 give a person: `dabbler terminal`
+and `dabbler view` at a bare terminal, and nothing changed in VS Code.
+
+**Non-goals.** Sending only what changed. A server, a port or a socket:
+an interface starts the verb and reads its output. Any change to how
+often VS Code refreshes.
+
+**Tests.** In `follow.test.ts`: a change to the ledger prints the Work
+Explorer again and a change to a preference file does not; two changes
+close together print once. `npm run check:version` checks the stamp.
+
+**Releasable.** Yes, as 3.36.0 in session 348.
+
+### Session 348 of 362: Release 3.36.0 (release: 3.36.0)
+
+The framework publishes sessions 343 to 347 as 3.36.0 and nothing else.
+
+### Session 349 of 362: A Visual Studio extension that installs and finds the router
+
+Scope: `tools/dabbler-visual-studio/` (new: the solution, the extension's
+project, a library with no Visual Studio in it, its test project),
+`dabbler.yaml` (a suite), `.github/workflows/test.yml`,
+`docs/uat/uat-visual-studio.md` (new)
+
+**Why.** The first of the Visual Studio sessions makes the smallest thing
+that can be installed, and settles what the later ones stand on: that one
+package installs on the Visual Studio versions the developers have, that
+it finds Node and starts the router, and that Windows Terminal does what
+session 351 needs of it.
+
+Nothing in this folder is published before session 362.
+
+**Step 1 -- the package.** An in-process extension in C#, with a manifest
+that installs on Visual Studio 2022 (17.14) and 2026. In-process because
+the later sessions need what the newer out-of-process model does not
+document: a file opened at a line, a comparison of two commits, an
+information bar, and whether a build or a debugger is running. It carries
+the router's built bundle as a file. Everything that does not need Visual
+Studio, which is starting the router, reading its JSON and the rows as C#
+types, goes in a library of its own so that it can be tested without
+Visual Studio.
+
+**Step 2 -- Node.** On first use the extension runs `node --version`.
+Where Node is missing or older than the router needs, it says so in one
+sentence that names the version to install and says to restart Visual
+Studio afterwards, since Visual Studio reads PATH when it starts. It
+does nothing else until that is put right.
+
+**Step 3 -- the router, and what was run.** One class runs `node` on the
+bundle with a verb and returns what it printed, and one keeps a
+`--follow` verb running and hands on each document. Every command run is
+echoed to a "Dabbler Commands" pane of the Output window, as the VS Code
+extension does. One menu command, Dabbler: Version, shows `dabbler
+version` to prove the road.
+
+**Step 4 -- Windows Terminal.** By hand, on this machine, and written
+into `docs/uat/uat-visual-studio.md`: that a tab can be added to a window
+named for Dabbler, opening the window when it is not there; whether a tab
+added to an open window gets the environment it was started with, and if
+not, the form of command that sets it; what happens with no Windows
+Terminal installed, where the engine opens in a plain console window.
+
+**Step 5 -- the suite.** The library's tests are a suite in
+`dabbler.yaml`, run whole at every close as this repository's others are,
+and a job in the test workflow builds the solution and runs them on a
+Windows runner.
+
+**Non-goals.** Any window. Tests that run inside Visual Studio: they need
+it installed and cannot run in CI. Carrying Node. Visual Studio before
+17.14. Publishing.
+
+**Tests.** In the library's test project: the Node check reads a version
+line and refuses one that is too old; the router class returns a verb's
+output and reports a failure with the router's own words.
+
+**Releasable.** No. The folder is not published before session 362.
+
+### Session 350 of 362: The Work Explorer in Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the row types, the tree's view
+model, the tool window)
+
+**Why.** The Work Explorer is where a developer sees the sessions and
+acts on them. Session 344 made the router print it.
+
+**Step 1 -- the rows as C# types,** written from the schema session 344
+added, in the library.
+
+**Step 2 -- the window.** A dockable tool window, Dabbler Work Explorer,
+with a tree bound to what `dabbler view work-explorer --follow` prints
+for the repository of the open solution. Buckets start open or closed as
+their rows say. Each row shows its label, description, icon and tooltip.
+
+**Step 3 -- staying put.** When a new document arrives the tree is
+replaced without losing which rows a developer had opened or which was
+selected, by the rows' ids.
+
+**Step 4 -- no repository, no sessions.** A solution that is not in a
+git repository, or one with no session plan, shows a sentence saying so
+and what to do, where VS Code shows its welcome text.
+
+**Non-goals.** Any action on a row: sessions 351, 353 and 354. More than
+one repository in a window. Icons drawn afresh: the VS Code extension's
+are used.
+
+**Tests.** In the library: a document becomes a tree with the buckets and
+sessions it names; a second document keeps the opened rows open.
+
+**Releasable.** No.
+
+### Session 351 of 362: Start Session from Visual Studio, with the engine in Windows Terminal
+
+Scope: `tools/dabbler-visual-studio/` (row actions, opening a file at a
+line, Start Session, the Windows Terminal launcher, the `dabbler` command
+for the tab)
+
+**Why.** This is the session after which a developer can run a Dabbler
+session without VS Code.
+
+**Step 1 -- a row's actions.** A row's context menu lists the actions the
+router gave it. An action whose session is not built yet is not shown.
+
+**Step 2 -- opening.** The plan opens at the session's heading, and the
+activity log, the change log and the ledger open, in Visual Studio's own
+editor. A transcript opens in the browser.
+
+**Step 3 -- Start Session.** The action runs `dabbler session start
+--json` with the configured engine and models. A refusal is shown in the
+router's words, with the ways on it offers as buttons. Where no engine or
+model is chosen yet, the sentence says so and names the Configuration
+window.
+
+**Step 4 -- the engine.** The extension asks `dabbler session launch`
+what to start and opens it as a tab in the Dabbler window of Windows
+Terminal, in the form session 349 found to work, with a `dabbler` command
+on that tab's PATH that runs the bundle the extension carries. Consult
+with AI and Open a Mechanic open the same way.
+
+**Non-goals.** A terminal inside Visual Studio. Closing a finished
+session's tab: the extension cannot, and the guide says so. Start Session
+with Different Models: session 356.
+
+**Tests.** In the library: the Windows Terminal command built from a
+launch line names the window, the folder and the program, and sets the
+environment in the form session 349 chose; a refused start yields the
+buttons its result names.
+
+**Releasable.** No.
+
+### Session 352 of 362: The Dabbler Terminal's output in Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the tool window and its view model)
+
+**Why.** While a session runs, this is what a developer glances at, and
+at a stop it is what says what happened.
+
+**Step 1 -- the window.** A dockable tool window, Dabbler Terminal, fed
+by `dabbler terminal --follow --json`: one row to a line, the time, the
+event and its fields, each piece coloured by the tone the router named,
+long lines wrapped under their first field as the terminal's are.
+
+**Step 2 -- a job's output** is shown in a fixed-width face, as it came.
+
+**Step 3 -- following.** The window stays at the newest line until a
+developer scrolls up, and returns to following when they scroll back to
+the end. Lines can be selected and copied.
+
+**Step 4 -- when it opens.** Start Session shows the window without
+taking the keyboard from the editor.
+
+**Non-goals.** Typing into it. Filtering or searching beyond what the
+list gives. The notices: session 358.
+
+**Tests.** In the library: a stream of line objects becomes rows in
+order, with a tone on each piece; a job's lines are marked as such.
+
+**Releasable.** No.
+
+### Session 353 of 362: Stop, Continue, Close, Cancel and Restore from Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the actions and their dialogs)
+
+**Why.** These are a person's verbs, and a developer in Visual Studio
+must be able to take each without a terminal.
+
+**Step 1 -- what an action asks first.** One piece of code reads what the
+router said an action needs: a confirmation with its words and its two
+buttons, a reason typed in, or nothing. No dialog's words are written in
+C#.
+
+**Step 2 -- Stop and Continue.** Stop asks for a reason and runs the
+interrupt; Continue is Start Session's road.
+
+**Step 3 -- Close.** Runs with a progress indication, and where a gate
+refuses, the gate's rows go to a Dabbler Session pane of the Output
+window and a sentence says to read it.
+
+**Step 4 -- Cancel and Restore,** each with its confirmation and its
+reason.
+
+**Step 5 -- the result** of each is shown in the router's words: an
+information bar on the window for success, a dialog for a refusal.
+
+**Non-goals.** Rollback and the three actions of a stop: session 354.
+
+**Tests.** In the library: an action that needs a confirmation and a
+reason runs its command only when both are given, and with the reason in
+it; a dismissed dialog runs nothing.
+
+**Releasable.** No.
+
+### Session 354 of 362: Rollback and the ways on from a stop, from Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the actions and their dialogs)
+
+**Why.** A stop is where going between two windows grated most in round
+29's reading: the stop is read in one place and the code in another. With
+these, a stop is read, checked and answered beside the code.
+
+**Step 1 -- Rollback.** The dry run's facts fill the confirmation: what
+is kept and where. Where a stop stands, the dialog offers the report
+first, as VS Code's does. The report, when written, opens in the editor.
+
+**Step 2 -- Check this stop.** After its confirmation, `dabbler triage`
+runs and its answer is shown in the Dabbler Session pane.
+
+**Step 3 -- Review exception.** The card `session waive` prints with no
+reason is shown, a reason is asked for, and the waiver is recorded with
+it. An empty reason records nothing.
+
+**Step 4 -- Report this stop to Dabbler.** The report is written and
+opened; the developer copies it and sends it themselves. The extension
+sends nothing.
+
+**Step 5 -- a transcript at its exceptions** opens in the browser.
+
+**Non-goals.** Any change to what a waiver, a triage or a report is.
+
+**Tests.** In the library: a rollback offered at a stop lists the report
+first; a waiver with an empty reason runs no command.
+
+**Releasable.** No.
+
+### Session 355 of 362: The Configuration window in Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the tool window, its view model,
+the picker dialog)
+
+**Why.** A session cannot start until an engine and its models are
+chosen, and a developer must be able to see why a value is what it is.
+
+**Step 1 -- the window.** A dockable tool window, Dabbler Configuration,
+with the rows `dabbler view configuration --follow` prints: Authoring AI,
+Reviewing AI and API Keys, each value with the layer that decided it, and
+the catalog's age.
+
+**Step 2 -- picking.** A row that can be set opens a dialog listing its
+choices as the router gave them, each with its detail, and one this
+machine cannot reach shown as such with the reason. Choosing one runs the
+command it names. A model that is typed is asked for in a box.
+
+**Step 3 -- Keep as Machine Default,** with its confirmation.
+
+**Step 4 -- the answer.** The router's sentence after a change, or its
+refusal, is shown on the window.
+
+**Non-goals.** Update the Catalog and Store a Key: session 356. The
+repositories and modules tree.
+
+**Tests.** In the library: a row's choices become the dialog's list with
+the unreachable ones marked; choosing one yields its command.
+
+**Releasable.** No.
+
+### Session 356 of 362: The catalog, a key, and Start Session with Different Models, from Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (the three actions)
+
+**Why.** These complete what a developer on a new machine needs before a
+first session: a catalog read, a key stored, and a session started with
+models other than the configured ones.
+
+**Step 1 -- Update the Catalog.** After its confirmation, `dabbler
+discovery refresh` runs and its lines are shown in the Dabbler Session
+pane. Where the catalog has never been read, it runs once without being
+asked, as in VS Code.
+
+**Step 2 -- Store a Key.** `dabbler auth set` asks for the key itself, so
+it opens in a tab of the Dabbler window of Windows Terminal. The key is
+never typed into Visual Studio and never passes through the extension.
+
+**Step 3 -- Start Session with Different Models.** The engine, the
+model, the reviewing vehicle and the two reviewers are asked in turn from
+the choices the router gives, and the start runs with them.
+
+**Non-goals.** Any store of keys in Visual Studio.
+
+**Tests.** In the library: the start built from five answers carries each
+as its flag; one left at its default carries none.
+
+**Releasable.** No.
+
+### Session 357 of 362: Set up Dabbler in the solution that is open
+
+Scope: `tools/dabbler-visual-studio/` (the command and its dialogs)
+
+**Why.** The developers this is for maintain existing solutions. A
+solution Dabbler has never seen needs its files written once, and the
+maintenance posture of sessions 305 to 309 is what reads it as it is.
+
+**Step 1 -- the offer.** Where the open solution's repository has no
+session plan, the Work Explorer window's sentence carries a button, Set
+Up Dabbler in This Solution.
+
+**Step 2 -- set-up.** It runs `dabbler bootstrap` on the repository and
+shows what it wrote and what it read the repository as, in the router's
+words.
+
+**Step 3 -- what is in the way.** A folder that is not a git repository,
+or one with uncommitted changes, is refused with the router's sentence.
+
+**Step 4 -- the first session** is then offered, as VS Code offers it.
+
+**Non-goals.** A new project or a new folder. Cloning. `git init` from
+the extension. More than one repository.
+
+**Tests.** In the library: a document for a repository with no plan
+yields the offer; one with a plan does not.
+
+**Releasable.** No.
+
+### Session 358 of 362: Visual Studio says when a session needs a person
+
+Scope: `tools/dabbler-visual-studio/` (notices, themes, the keyboard)
+
+**Why.** A session runs for an hour without anyone. If a stop waits in a
+window nobody is looking at, the developer finds out by checking, and
+checking is the going back and forth this extension exists to remove.
+
+**Step 1 -- the notices.** A session paused and an instruction overdue,
+as the Dabbler Terminal's stream names them, raise an information bar in
+Visual Studio's main window with the router's sentence and a button that
+shows the Work Explorer at that session. A session that closes raises
+one too: VS Code has none, and a developer working in another solution
+has no other way to know.
+
+**Step 2 -- once.** Each is raised once for its event, and not again
+when Visual Studio is restarted.
+
+**Step 3 -- themes.** The three windows take Visual Studio's light, dark
+and blue themes for their text, backgrounds and the terminal's tones.
+
+**Step 4 -- the keyboard.** Every row and action is reachable without a
+mouse, and each window has a command a developer can bind a key to.
+
+**Non-goals.** Sounds, Windows notifications, or anything outside Visual
+Studio. A setting for which notices to raise.
+
+**Tests.** In the library: a notice object raises one notice, and the
+same object read again raises none.
+
+**Releasable.** No.
+
+### Session 359 of 362: Before a session starts and after it ends, beside the IDE
+
+Scope: `tools/dabbler-visual-studio/` (the start check, the comparison),
+`docs/uat/uat-visual-studio.md`
+
+**Why.** Visual Studio and a session are two writers in one checkout.
+Both advisors of round 29 said this is the worst of working beside the
+IDE and that no interface removes it: a file with unsaved changes that
+the engine also edits, a debugger or IIS Express holding `bin`, a build
+running against the folders the session's own build needs. And when a
+session is over its work is already committed, so Git Changes is empty
+when the developer comes to look.
+
+**Step 1 -- before a start.** Start Session first looks for unsaved
+documents, a running debugger and a build in progress, and names what it
+found in one dialog: save all and go on, go on anyway, or not now. It
+stops nothing and closes nothing by itself.
+
+**Step 2 -- after a close.** A complete session's row offers Compare
+With Its Start, which lists the files the session changed between its
+first and last commits and opens Visual Studio's comparison for the one
+chosen.
+
+**Step 3 -- what a developer should set.** `docs/uat/uat-visual-studio.md`
+gains what was seen on this machine when an engine edits files under an
+open solution, old-style projects included: which prompts appear, and
+which of Visual Studio's own options quiets them.
+
+**Non-goals.** Reloading projects for the developer. Ending their
+debugger or their build. Keeping a session out of a checkout Visual
+Studio has open. A second working tree per session.
+
+**Tests.** In the library: unsaved documents and a running debugger
+yield the dialog naming both; neither yields none.
+
+**Releasable.** No.
+
+### Session 360 of 362: A session is walked in Visual Studio, on an old-style solution
+
+Scope: `docs/uat/uat-visual-studio.md`, whatever in
+`tools/dabbler-visual-studio/` or `packages/router/src/` the walk shows
+to be stopping a developer and is small to fix, with the test named
+after it
+
+**Why.** This walk is what decides whether the extension is published.
+The operator's rule: it is on `master` and unpublished until it works.
+
+**Step 1 -- the machine as a developer's.** The extension built from this
+tree and installed in Visual Studio 2026, VS Code closed, and the
+ContosoUniversity fork of the maintenance walk open: ASP.NET MVC 5 on
+.NET Framework 4.8.1, projects in the old format.
+
+**Step 2 -- a whole session.** Set up, choose the engine and models,
+start a session that adds a small page with its test, watch it, and take
+it to its close, with Visual Studio open on the solution throughout.
+Record every time the walk had to leave Visual Studio other than to talk
+to the engine, every prompt Visual Studio raised, and every lock.
+
+**Step 3 -- a stop.** A second session with a step that must fail its
+check: read the stop, check it, waive it or roll it back, all from
+Visual Studio.
+
+**Step 4 -- what was found,** in `docs/uat/uat-visual-studio.md`: each
+finding, and whether it was fixed here, is planned as a session before
+362, or is a limit the guide states. The page ends with one line: publish
+or do not.
+
+**Step 5 -- Visual Studio 2022.** This machine has 2026 only. The page
+says so, and says that 2022 is claimed in the listing only once someone
+has walked it on a machine that has it. Two of the operator's developers
+walking it on their own machines is the better test, and the page says
+what to ask them to do.
+
+**Non-goals.** Anything that needs a design: a session of its own.
+Java, IntelliJ or Eclipse.
+
+**Tests.** One per fix, in the file named after what it changed.
+
+**Releasable.** No.
+
+### Session 361 of 362: The Visual Studio extension is documented and made ready to publish
+
+Scope: `docs/guide/` (a page for Visual Studio, and the index),
+`tools/dabbler-visual-studio/` (the listing's text, the publish
+manifest), `.github/workflows/` (a publish workflow for the Visual
+Studio Marketplace), `packages/router/scripts/stamp-version.ts` (the
+stamp and its check learn the new manifest), `dabbler.yaml`
+(`packaging`), `version.json`,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`, `AGENTS.md`
+
+**Runs only if session 360's page says publish.** If it says do not,
+this session and 362 are cancelled or re-planned by the operator.
+
+**Step 1 -- the guide.** One page: what to install (Node, an engine CLI,
+Windows Terminal, the extension), the three windows, starting a session,
+answering a stop, and working beside an open solution, from sessions 359
+and 360. It says plainly what is not there: no terminal inside Visual
+Studio, no new-project set-up.
+
+**Step 2 -- the listing.** The Marketplace page's text, written for a
+.NET developer, claiming the Visual Studio versions that were walked.
+
+**Step 3 -- one version.** The extension's manifest takes the
+repository's one version from `version.json`, by `npm run stamp:version`,
+and `check:version` checks it.
+
+**Step 4 -- publishing.** A workflow builds the package on a Windows
+runner and publishes it with Microsoft's publishing tool when the release
+tag is pushed, as the VS Code extension's does, and the release session's
+packaging names it. The operator makes the publisher and stores its
+token as a repository secret: that is theirs to do, before session 362,
+and this step says exactly what to create.
+
+**Step 5 -- the instructions.** `AGENTS.md` says in two lines that the
+repository now holds C#, in that folder only, and that it renders and
+never decides.
+
+**Step 6 -- the number.** `version.json` goes to 3.37.0 (a minor: a
+second interface), stamped, and the changelog says what a developer in
+Visual Studio now has.
+
+**Non-goals.** Publishing: session 362. Open VSX. Any change to the VS
+Code extension's listing.
+
+**Tests.** `npm run check:version` fails on a stale Visual Studio
+manifest. The docs check reads the new guide page.
+
+**Releasable.** Yes, as 3.37.0 in session 362.
+
+### Session 362 of 362: Release 3.37.0 (release: 3.37.0)
+
+The framework publishes sessions 349 to 361 as 3.37.0, the Visual Studio
+extension to the Visual Studio Marketplace for the first time, and
+nothing else.

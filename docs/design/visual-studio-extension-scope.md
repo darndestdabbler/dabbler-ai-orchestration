@@ -222,14 +222,35 @@ That is eighteen. The operator's own figure was about twenty.
   an open designer colliding with a session. Session 16 says so before a
   session starts; nothing here removes it.
 
-## Decisions that are the operator's
+## What was decided, 2026-11-17
 
-1. Decided 2026-11-17: the engine runs in Windows Terminal, not inside
-   Visual Studio, and there is no chat pane.
-2. Whether the extension lives in this repository and takes the same
-   version number as the router and the VS Code extension.
-3. Whether Visual Studio 2022 is supported from the start, which depends
-   on what the developers run.
-4. Whether the list under "What is left out" is right.
-5. Whether sessions 1 to 5 go ahead before any decision to build the
-   rest. They serve the terminal-only developer and any later editor too.
+1. The engine runs in Windows Terminal, not inside Visual Studio, and
+   there is no chat pane. (The operator.)
+2. It is built on `master`, in `tools/dabbler-visual-studio/`, and is not
+   published until the walk says it works. No feature branch: the ledger
+   cannot be merged by hand, so a branch would freeze `master` for as long
+   as it lived. (The operator, on the orchestrator's recommendation.)
+3. The sessions that make the router print each view go first, and are
+   released on their own. (The operator: "update the plan".)
+
+Taken by the orchestrator in writing the plan, for the operator to
+overturn by amending it:
+
+4. One version number for the router and both extensions.
+5. The package installs on Visual Studio 2022 (17.14) and 2026, and the
+   listing claims a version only once it has been walked. This machine
+   has 2026 only.
+6. The list under "What is left out" stands.
+
+## Where it is planned
+
+`docs/sessions/session-plan.md`, sessions 343 to 362. The numbers in this
+page map onto it so:
+
+| This page | The plan |
+|---|---|
+| 1 to 5, the router prints each view | 343 to 347, released as 3.36.0 in 348 |
+| 6 to 15, the Visual Studio extension | 349 to 358 |
+| 16, before and after a session | 359 |
+| 17, the walk | 360 |
+| 18, the guide and publication | 361, released as 3.37.0 in 362 |

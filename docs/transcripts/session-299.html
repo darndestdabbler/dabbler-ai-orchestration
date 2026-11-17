@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 299 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 299 transcript</h1>
+<p class="stamp">Rendered 2026-11-03T11:13:59.643Z by dabbler-ai-router 3.29.0 at 7c3c6663e5822acbeb5bfe684002916ba16b5338.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-03T05:29:37.890-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 299 of 300: An engine terminal ends with its session</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</code> (the <code>createTerminal</code> call and Start), the extension's sessions watcher, the extension manifest (one new setting), their tests; <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> Staff reported that Dabbler starts slowly. On 2026-11-03 the operator's machine had 63 <code>claude.exe</code> processes holding 15 GB. 54 of them were started by Start Session (&quot;Run <code>dabbler session next …</code>&quot;) and went back as far as 2026-10-22. Memory commit stood at 115.9 of 118.2 GB, and every process start took seconds, including bare <code>node -e 0</code> and <code>git --version</code>. Dabbler 3.27.0 and 3.28.0 timed the same, so this is not a regression.</p>
+<p>The cause is that Start opens a terminal whose shell *is* the engine CLI (<code>shellPath: claude</code> or <code>copilot</code>, with <code>-i</code> for Copilot), and nothing ever closes it. Each session leaves one idle engine process until someone closes the tab. The Copilot seat is affected exactly as Claude Code is. The <code>-p</code> calls a reviewer or Mechanic makes exit by themselves.</p>
+<p>The terminals are also created without <code>isTransient</code>. Under VS Code's default <code>terminal.integrated.persistentSessionReviveProcess</code> (<code>onExit</code>), a terminal that persisted is recreated when the workspace reopens, which for these terminals means re-running the engine with its opening sentence. The operator's machine sets that option to <code>never</code>, so its leftover processes were never revived; most machines keep the default.</p>
+<p><strong>Step 1 -- Dabbler remembers the terminals it opens.</strong> Start remembers each terminal it opens, together with the repository root and the session number it registered. That covers only terminals Dabbler opened, never one the person opened. A remembered terminal is *finished* once the sessions watcher sees its session reach <code>complete</code> or <code>cancelled</code>. A terminal the person has already closed is forgotten without a word.</p>
+<p><strong>Step 2 -- at most N finished terminals stay open.</strong> A new setting, <code>dabbler.keepFinishedSessionTerminals</code>, defaults to 2 and has a minimum of</p>
+<ol><li>So the current session's terminal plus two finished ones may be open, and a fourth closes the oldest. Dabbler applies the limit across the window at two moments: at Start, before the new terminal opens, and when a session closes.</li></ol>
+<ul><li>When the finished terminals exceed the limit, the oldest are disposed first. That ends their engine processes, and the session that just finished stays open.</li><li>0 closes a terminal as soon as its session closes. A large value effectively turns cleanup off.</li><li>A terminal whose session is still in progress never counts and is never closed.</li><li>When anything was closed, Dabbler shows one *information* toast (<code>showInformationMessage</code>, never a warning or an error) naming the sessions, such as &quot;Closed 1 earlier session terminal (session 12) to free memory.&quot; It carries one button, &quot;Change limit&quot;, which opens the setting. There is no prompt and no question asked.</li></ul>
+<p>The new terminal never depends on an old one: no <code>parentTerminal</code>, no reused position, no reused process. So a person closing an old tab at any moment, before, during or after the check, changes nothing. Disposing an already closed terminal is a no-op, and Start opens the new terminal either way.</p>
+<p><strong>Step 3 -- engine terminals do not outlive a reload.</strong> The engine terminal is created with <code>isTransient: true</code>, so VS Code neither persists nor revives it, whatever <code>persistentSessionReviveProcess</code> says. The CHANGELOG 3.29.0 section says what changed for a developer and the new setting. Bump <code>version.json</code> to 3.29.0 (a minor: new behaviour and a setting), and stamp it with <code>npm run stamp:version</code>.</p>
+<p><strong>Non-goals.</strong></p>
+<ul><li>A prompt or question when a session closes.</li><li>Reusing a terminal's process or position.</li><li>Sending <code>/clear</code> or any keystrokes into an engine.</li><li>A cleanup command, or counts in Troubleshoot.</li><li>Killing engine processes Dabbler did not start.</li><li>Changing the unattended <code>session drive</code>.</li></ul>
+<p><strong>Tests.</strong></p>
+<ul><li>In the extension's unit suite (mocha, with <code>src/test/vscode-stub.js</code>):</li><li>with the default limit, a fourth finished terminal closes the oldest, and the toast is an information message naming it;</li><li>a limit of 0 closes a terminal when its session closes;</li><li>nothing closes, and no toast appears, while the count is within the limit;</li><li>in-progress terminals and the person's own terminals are never disposed;</li><li>a terminal the person disposed before or during the check produces no error, and the new terminal still opens;</li><li>the terminal options carry <code>isTransient: true</code>.</li><li><code>npm run check:version</code> checks the stamp.</li><li><strong>The walk</strong>, from the installed VSIX on a scratch repository, recorded in <code>docs/driving-a-session.md</code>:</li></ul>
+<ol><li>Run four sessions to their close with the default limit: after the fourth, the first session's terminal closes, an information toast names it, and its engine process is gone from Task Manager.</li><li>Set the limit to 0 through &quot;Change limit&quot;: the next session's terminal closes when that session closes.</li><li>Close an old terminal by hand just as Start is chosen: the new one opens with no error.</li><li>Reload the window with <code>persistentSessionReviveProcess</code> at its default: no engine terminal comes back.</li></ol>
+<p><strong>Releasable.</strong> Yes -- as 3.29.0 in session 300.</p>
+<h2>Work Plan</h2>
+<p>End the engine terminals Start opens once their sessions are over, so idle engine processes stop piling up. A small module, tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts, remembers each terminal Start opens with its repository root and the session number Start registered (repository.nextSession), and only those. A remembered terminal is finished once sessions.json shows its session <code>complete</code> or <code>cancelled</code>; one no longer in vscode.window.terminals is forgotten silently. closeFinishedTerminals() keeps at most dabbler.keepFinishedSessionTerminals (new setting, default 2, minimum 0) finished terminals open across the window, disposing the oldest first, never an in-progress one, and when it closed any shows one information toast naming the sessions with a single &quot;Change limit&quot; button that opens the setting. It runs at Start before the new terminal opens and when the sessions watcher in extension.ts sees sessions.json change. The new terminal never depends on an old one, and disposing an already closed terminal is harmless. The engine terminal is created with isTransient: true so VS Code neither persists nor revives it. version.json goes to 3.29.0, stamped with <code>npm run stamp:version</code>, with a 3.29.0 CHANGELOG section; the walk from the installed VSIX is recorded in docs/driving-a-session.md.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/b18e8e1c24703f37e663c3627cbc766140616f23"><code>b18e8e1c24703f37e663c3627cbc766140616f23</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Remember engine terminals</td><td><p>Create tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts: rememberEngineTerminal(terminal, repoRoot, session) records a terminal Start opened, in order; finishedEngineTerminals() returns the remembered terminals whose session sessions.json shows as complete or cancelled, oldest first, and forgets without a word any remembered terminal no longer in vscode.window.terminals. In runStartSession (sessionCommands.ts), remember the terminal ui.openTerminal returned with repository.root and repository.nextSession. Tests in src/test/suite/engineTerminals.test.ts: a terminal is finished only once its session is complete or cancelled; one the person closed is forgotten; a terminal never remembered is never reported.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Cap finished terminals</td><td><p>Add closeFinishedTerminals() to engineTerminals.ts: read dabbler.keepFinishedSessionTerminals (default 2, floor 0); when the finished terminals exceed it, dispose the oldest first until they do not, forget them, and show one vscode.window.showInformationMessage naming the closed sessions (e.g. &quot;Closed 1 earlier session terminal (session 12) to free memory.&quot;) with a single &quot;Change limit&quot; button that runs workbench.action.openSettings on the setting. Call it in runStartSession before the new terminal opens, and from the sessions watcher in extension.ts when sessions.json changes. Declare the setting in the extension's package.json. Tests in engineTerminals.test.ts: with the default limit a fourth finished terminal closes the oldest and the toast is an information message naming it; a limit of 0 closes a terminal when its session closes; nothing closes and no toast appears within the limit; in-progress terminals and the person's own are never disposed; a terminal disposed before or during the check produces no error and Start's new terminal still opens.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/extension.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Transient engine terminals</td><td><p>In defaultSessionRunUi's openTerminal (sessionCommands.ts), create the engine terminal with isTransient: true so VS Code neither persists nor revives it. Test in src/test/suite/commandFlows.test.ts, beside the existing defaultSessionRunUi terminal test: the options the editor is asked for carry isTransient: true.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Version and changelog</td><td><p>Set version.json to 3.29.0 and run <code>npm run stamp:version</code> to write it into the manifests. Add a 3.29.0 section to tools/dabbler-ai-orchestration/CHANGELOG.md saying what changed for a developer: finished engine terminals close past dabbler.keepFinishedSessionTerminals (default 2, 0 closes at once), the information toast and its Change limit button, and engine terminals no longer coming back on a reload.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code></td><td>yes</td></tr>
+<tr><td>Walk</td><td><p>Pack the extension, install the VSIX, and walk it on a scratch repository: (1) four sessions to their close at the default limit -- after the fourth the first session's terminal closes, an information toast names it, and its engine process is gone; (2) set the limit to 0 through Change limit -- the next session's terminal closes when it closes; (3) close an old terminal by hand as Start is chosen -- the new one opens with no error; (4) reload the window with persistentSessionReviveProcess at its default -- no engine terminal comes back. Record what was seen in docs/driving-a-session.md under 'What Start opens', naming dabbler.keepFinishedSessionTerminals.</p></td><td><span class="mono">docs/driving-a-session.md</span></td><td><code>node -e process.exit(require('fs').readFileSync('docs/driving-a-session.md','utf8').includes('keepFinishedSessionTerminals')?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>A prompt or question when a session closes.</li><li>Reusing a terminal's process or position (no parentTerminal, no reused location).</li><li>Sending /clear or any keystrokes into an engine.</li><li>A cleanup command, or counts in Troubleshoot.</li><li>Killing engine processes Dabbler did not start, including terminals the person opened.</li><li>Changing the unattended <code>session drive</code>.</li><li>Publishing 3.29.0: that is session 300's release.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[10:29:37]</span> <span class="muted">run-started</span> session=299 mode=pull</div>
+<div class="line"><span class="at">[10:29:37]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[10:31:18]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[10:31:18]</span> <span class="muted">plan-accepted</span> steps=[&quot;remember-engine-terminals&quot;,&quot;cap-finished-terminals&quot;,&quot;transient-engine-terminals&quot;,&quot;version-and-changelog&quot;,&quot;walk&quot;] non_goals=7</div>
+<div class="line"><span class="at">[10:31:18]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[10:31:18]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=remember-engine-terminals</div>
+<div class="line"><span class="at">[10:32:05]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:32:09]</span> <span class="muted">check-passed</span> step=remember-engine-terminals argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[10:32:15]</span> <span class="muted">named-tests-passed</span> step=remember-engine-terminals suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[10:32:21]</span> <span class="muted">named-tests-passed</span> step=remember-engine-terminals suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts</div>
+<div class="line"><span class="at">[10:32:21]</span> <span class="muted">report-accepted</span> seq=2 step=remember-engine-terminals files=[&quot;tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;] notes=engineTerminals.ts remembers Start's terminals with root and session; finishedEngineTerminals reports complete/cancelled ones oldest first and forgets closed ones; Start remembers its terminal</div>
+<div class="line"><span class="at">[10:32:21]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=cap-finished-terminals</div>
+<div class="line"><span class="at">[10:34:08]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:34:12]</span> <span class="muted">check-passed</span> step=cap-finished-terminals argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[10:34:18]</span> <span class="muted">named-tests-passed</span> step=cap-finished-terminals suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[10:34:24]</span> <span class="muted">named-tests-passed</span> step=cap-finished-terminals suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts</div>
+<div class="line"><span class="at">[10:34:24]</span> <span class="muted">report-accepted</span> seq=3 step=cap-finished-terminals files=[&quot;tools/dabbler-ai-orchestration/src/commands/engineTerminals.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/engineTerminals.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/extension.ts&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;] notes=closeFinishedTerminals disposes oldest finished terminals past dabbler.keepFinishedSessionTerminals (default 2) with one info toast + Change limit; runs at Start before opening and on sessions.json watcher events</div>
+<div class="line"><span class="at">[10:34:24]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=transient-engine-terminals</div>
+<div class="line"><span class="at">[10:36:06]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:36:10]</span> <span class="muted">check-passed</span> step=transient-engine-terminals argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[10:36:15]</span> <span class="muted">named-tests-passed</span> step=transient-engine-terminals suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[10:36:23]</span> <span class="muted">named-tests-passed</span> step=transient-engine-terminals suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[10:36:23]</span> <span class="muted">report-accepted</span> seq=4 step=transient-engine-terminals files=[&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=engine terminal created with isTransient: true; Start flow test asserts it</div>
+<div class="line"><span class="at">[10:36:23]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-and-changelog</div>
+<div class="line"><span class="at">[10:36:43]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[10:36:46]</span> <span class="muted">check-passed</span> step=version-and-changelog argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[10:36:46]</span> <span class="muted">report-accepted</span> seq=5 step=version-and-changelog files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version 3.29.0 stamped into the manifests; CHANGELOG 3.29.0 section for the terminal cap, toast, setting and transient terminals</div>
+<div class="line"><span class="at">[10:36:46]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=walk</div>
+<div class="line"><span class="at">[11:09:44]</span> <span class="muted">run-resumed</span> session=299 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[11:09:46]</span> <span class="muted">check-passed</span> step=walk argv=[&quot;node&quot;,&quot;-e&quot;,&quot;process.exit(require('fs').readFileSync('docs/driving-a-session.md','utf8').includes('keepFinishedSessionTerminals')?0:1)&quot;]</div>
+<div class="line"><span class="at">[11:09:46]</span> <span class="muted">report-accepted</span> seq=6 step=walk files=[&quot;docs/driving-a-session.md&quot;] notes=walked 3.29.0 VSIX on D:\tmp\walk-299 (8 sessions started+cancelled): default limit closed oldest with info toast, limit 0 closed at once, hand-closed terminal no error, reload revived no engine; process table confirmed; recorded under What Start opens</div>
+<div class="line"><span class="at">[11:09:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[11:09:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[11:09:48]</span> <span class="muted">job-started</span> name=verification pid=37692 log=.dabbler/runs/s299/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:11:41]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s299/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[11:11:41]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[11:11:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[11:11:41]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[11:11:41]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=18776 log=.dabbler/runs/s299/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:11:45]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s299/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[11:11:45]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[11:11:45]</span> <span class="muted">job-started</span> name=run of record: typescript pid=6172 log=.dabbler/runs/s299/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:13:29]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s299/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[11:13:29]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[11:13:29]</span> <span class="muted">job-started</span> name=run of record: extension pid=36304 log=.dabbler/runs/s299/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[11:13:48]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s299/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[11:13:48]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[11:13:53]</span> <span class="muted">landed</span> commit=b18e8e1c24703f37e663c3627cbc766140616f23</div>
+<div class="line"><span class="at">[11:13:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[11:13:53]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[11:13:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[11:13:53]</span> <span class="muted">job-started</span> name=close pid=25476 log=.dabbler/runs/s299/driver/jobs/close.log</div>
+<div class="line"><span class="at">[11:13:59]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s299/driver/jobs/close.log</div>
+<div class="line"><span class="at">[11:13:59]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** A terminal disposed during cleanup can still be named in a toast claiming Dabbler closed it.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The “new terminal still opens” test does not drive Start.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>3s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>103s</td><td>1415</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>19s</td><td>305</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

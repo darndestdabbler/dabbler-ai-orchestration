@@ -6789,9 +6789,9 @@
     {
       "number": 344,
       "title": "The router prints the Work Explorer's rows",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-17T13:50:03.917000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-17T14:25:48.226000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

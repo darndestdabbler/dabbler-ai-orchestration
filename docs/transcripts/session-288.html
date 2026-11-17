@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 288 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 288 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T12:57:46.554Z by dabbler-ai-router 3.23.0 at 18d084072735a1948320b8fe075c91f029edf785.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T08:35:20.694-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 288 of 291: The landed tree is the verified tree, and a failed run of record can be re-run</h3>
+<p>Scope: <code>packages/router/src/land.ts</code> (<code>judgeLandReadiness</code>), <code>packages/router/src/drive.ts</code> (<code>landFacts</code>, <code>phaseLand</code>, <code>phaseRunOfRecord</code>, the <code>fix-run-of-record</code> step), the verification task block in <code>packages/router/src/verify/prompts.ts</code>; their tests</p>
+<p><strong>Why.</strong> A second field report, on CT.DPH Syndromic-Surveillance-V2 (69 sessions on 3.22.1-3.24.0), checked against this source and reviewed by GPT-5.6 Sol on 2026-10-27, found two stops with no clean way forward. First, <code>judgeLandReadiness</code> names the paths moved since the verified tree and never judges them: a file that appears after the round and before the run of record finishes is in the run's digest, so the land commits and pushes it unverified, the close's <code>verification_clean</code> then fails and rewinds to verify, and a second commit for the same session lands (sessions 40 and 64 -- an operator's logo dropped in mid-run, a <code>__pycache__</code>). Second, a failed run of record always synthesises <code>fix-run-of-record</code>, which asks for a change: five of seven failures there were flaky or pre-existing tests unrelated to the session, a documentation-only session had to edit a test to get out, and the next round raised that edit as a blocking scope finding (sessions 33, 44).</p>
+<p><strong>Step 1 -- measure.</strong> Record, in a test, what a <code>fix-run-of-record</code> answered with no change does today: whether a verification round opens and whether the suite runs again. The steps below are written against that measurement, not against the report's description of it.</p>
+<p><strong>Step 2 -- the land judges what moved.</strong> <code>judgeLandReadiness</code> refuses when any path other than the session's own records moved since the verified tree, naming the paths, and the driver returns to verification before <code>git add</code> -- so nothing unverified is committed or pushed, and no second commit for the session lands.</p>
+<p><strong>Step 3 -- a no-change answer re-runs the suite.</strong> When <code>fix-run-of-record</code> is answered with no change and the tree is still the verified tree, the run of record runs again without a verification round.</p>
+<p><strong>Step 4 -- the next round is told why.</strong> A round that follows a failed run of record is told which suite failed and that the framework asked for the fix. It is not told the edit is excused.</p>
+<p><strong>Non-goals.</strong> A retry count. Waiving a red suite by an operator's decision -- that is a hand-written verdict on the run of record. Any change to the close's gates.</p>
+<p><strong>Tests.</strong> In <code>land.test.ts</code>, a path moved since the verified tree refuses the land and names it. In <code>drive.test.ts</code>, a no-change answer over the verified tree runs the suite again and opens no round; a changed answer still goes through verification.</p>
+<p><strong>Releasable.</strong> Yes -- with 289 and 290, as 3.26.0 in session 291.</p>
+<h2>Work Plan</h2>
+<p>Close two stops a field report found around the run of record. First, measure in a test what a <code>fix-run-of-record</code> answered with no change does today (whether a round opens, whether the suite runs again). Then <code>judgeLandReadiness</code> judges the paths moved since the verified tree instead of only naming them: any moved path other than the session's own records refuses the land, naming them, and <code>phaseLand</code> sends the run back to verification before <code>git add</code>, so nothing unverified is committed or pushed. Then a <code>fix-run-of-record</code> answered with no change, over a tree that is still the verified tree, goes straight back to the run of record instead of <code>preverify</code>, so the suite runs again without a verification round; a changed answer still goes through verification. Last, a verification round that follows a failed run of record is told, in its task block, which suite failed and with what command, and that the framework asked for the fix -- without being told the edit is excused.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/caf761dc34fd7074f623f93590f415af102f8714"><code>caf761dc34fd7074f623f93590f415af102f8714</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Measure</td><td><p>In packages/router/test/walk-session.test.ts, add a test (beside the existing run-of-record-red walk) that answers <code>fix-run-of-record</code> with no change and records what happens today: the phase the run moves to, whether a second verification round opens, and whether the suite runs again. Assert today's behaviour as measured; step no-change-reruns updates it.</p></td><td><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Land judges moved</td><td><p>In packages/router/src/land.ts, <code>judgeLandReadiness</code> refuses when any path in <code>moved</code> that is not a session record path (<code>isSessionRecordPath</code>) moved since the verified tree, naming the paths. In packages/router/src/drive.ts, <code>phaseLand</code> returns such a refusal to verification (<code>rewindOrStop</code> to <code>verify</code>) before any <code>git add</code>, and keeps the run-of-record rewind for the suite reasons. Update land.test.ts: a moved path refuses the land and names it; a moved session record alone does not.</p></td><td><span class="mono">packages/router/src/land.ts</span><br><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/land.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>No change reruns</td><td><p>In packages/router/src/drive.ts, when <code>fix-run-of-record</code> is accepted and the tree is still the verified tree (the latest round's <code>completion_tree</code>), go to <code>run-of-record</code> instead of <code>preverify</code>, so the suite runs again with no verification round; a changed tree still goes to <code>preverify</code>. Put the choice in one small exported function and test it in drive.test.ts (no-change over the verified tree -&gt; run of record; changed -&gt; preverify). Update the measuring test in walk-session.test.ts to the new behaviour: the suite runs again and no round opens.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Round told why</td><td><p>In packages/router/src/verify/prompts.ts, add a block to <code>buildTaskBlock</code> saying a run of record failed after the previous round -- which suite and command -- and that the framework asked for the fix; it does not say the edit is excused. In packages/router/src/verify/rounds.ts, pass it the latest failed final run-of-record record for this session recorded after the previous round, or nothing. Test it in prompts.test.ts: present when given, absent otherwise.</p></td><td><span class="mono">packages/router/src/verify/prompts.ts</span><br><span class="mono">packages/router/src/verify/rounds.ts</span><br><span class="mono">packages/router/test/prompts.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>A retry count for the run of record</li><li>Waiving a red suite by an operator's decision</li><li>Any change to the close's gates</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[12:35:20]</span> <span class="muted">run-started</span> session=288 mode=pull</div>
+<div class="line"><span class="at">[12:35:20]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[12:36:21]</span> <span class="muted">run-resumed</span> session=288 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[12:36:21]</span> <span class="muted">plan-accepted</span> steps=[&quot;measure&quot;,&quot;land-judges-moved&quot;,&quot;no-change-reruns&quot;,&quot;round-told-why&quot;] non_goals=3</div>
+<div class="line"><span class="at">[12:36:21]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[12:36:22]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=measure</div>
+<div class="line"><span class="at">[12:37:25]</span> <span class="muted">run-resumed</span> session=288 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:37:31]</span> <span class="muted">check-passed</span> step=measure argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:38:20]</span> <span class="muted">named-tests-passed</span> step=measure suite=typescript command=node scripts/suite.mjs container packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[12:38:21]</span> <span class="muted">report-accepted</span> seq=2 step=measure files=[&quot;packages/router/test/walk-session.test.ts&quot;] notes=Measured: a no-change fix-run-of-record opens a second verification round over the unchanged tree, then the suite runs again</div>
+<div class="line"><span class="at">[12:38:21]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=land-judges-moved</div>
+<div class="line"><span class="at">[12:44:53]</span> <span class="muted">run-resumed</span> session=288 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:44:58]</span> <span class="muted">check-passed</span> step=land-judges-moved argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:45:47]</span> <span class="muted">named-tests-passed</span> step=land-judges-moved suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/land.test.ts</div>
+<div class="line"><span class="at">[12:45:48]</span> <span class="muted">report-accepted</span> seq=3 step=land-judges-moved files=[&quot;packages/router/src/land.ts&quot;,&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/land.test.ts&quot;] notes=judgeLandReadiness refuses any non-record path moved since the verified tree and returns rewindTo verify; phaseLand rewinds there before git add</div>
+<div class="line"><span class="at">[12:45:48]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=no-change-reruns</div>
+<div class="line"><span class="at">[12:52:20]</span> <span class="muted">run-resumed</span> session=288 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:52:25]</span> <span class="muted">check-passed</span> step=no-change-reruns argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:53:14]</span> <span class="muted">named-tests-passed</span> step=no-change-reruns suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[12:53:14]</span> <span class="muted">report-accepted</span> seq=4 step=no-change-reruns files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=afterRunOfRecordFix: an accepted fix over the verified tree goes to run-of-record, a moved tree to preverify; the fix ask says a no-change answer re-runs the suite; walk test now asserts one round, suite run twice</div>
+<div class="line"><span class="at">[12:53:14]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=round-told-why</div>
+<div class="line"><span class="at">[12:54:24]</span> <span class="muted">run-resumed</span> session=288 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:54:29]</span> <span class="muted">check-passed</span> step=round-told-why argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[12:54:33]</span> <span class="muted">named-tests-passed</span> step=round-told-why suite=typescript command=node scripts/suite.mjs container packages/router/test/prompts.test.ts packages/router/test/rounds.test.ts</div>
+<div class="line"><span class="at">[12:54:33]</span> <span class="muted">report-accepted</span> seq=5 step=round-told-why files=[&quot;packages/router/src/verify/prompts.ts&quot;,&quot;packages/router/src/verify/rounds.ts&quot;,&quot;packages/router/test/prompts.test.ts&quot;] notes=runOfRecordBlock in buildTaskBlock names the suite and command of a run of record that failed after the previous round and says the framework asked for the fix; rounds.ts finds it from the records</div>
+<div class="line"><span class="at">[12:54:33]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[12:54:34]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[12:54:34]</span> <span class="muted">job-started</span> name=verification pid=33428 log=.dabbler/runs/s288/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:56:08]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s288/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:56:08]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[12:56:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[12:56:09]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[12:56:09]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=43648 log=.dabbler/runs/s288/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:56:10]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s288/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:56:11]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[12:56:11]</span> <span class="muted">job-started</span> name=run of record: typescript pid=9748 log=.dabbler/runs/s288/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:57:19]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s288/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:57:19]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[12:57:19]</span> <span class="muted">job-started</span> name=run of record: extension pid=23040 log=.dabbler/runs/s288/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:57:36]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s288/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:57:36]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[12:57:39]</span> <span class="muted">landed</span> commit=caf761dc34fd7074f623f93590f415af102f8714</div>
+<div class="line"><span class="at">[12:57:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[12:57:40]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[12:57:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[12:57:40]</span> <span class="muted">job-started</span> name=close pid=8968 log=.dabbler/runs/s288/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:57:46]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s288/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:57:46]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `judgeLandReadiness` cannot distinguish the current session’s records from another session’s records because `LandFacts` carries no session number and every path accepted by `isSessionRecordPath` is exempted.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** An unmeasurable verified-tree delta fails open when `treeNow` and suite evidence otherwise match: `facts.moved === null` becomes an empty `unverified` list and can return `null`.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The prompt test exercises `buildTaskBlock` directly but does not pin the production selection logic in `failedRunOfRecordSince`.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>68s</td><td>1390</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>15s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

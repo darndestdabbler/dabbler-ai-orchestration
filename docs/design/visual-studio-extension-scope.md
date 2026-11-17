@@ -231,5 +231,5 @@ That is eighteen. The operator's own figure was about twenty.
 3. Whether Visual Studio 2022 is supported from the start, which depends
    on what the developers run.
 4. Whether the list under "What is left out" is right.
-5. Whether sessions 1 to 5 go ahead ahead of any decision to build the
+5. Whether sessions 1 to 5 go ahead before any decision to build the
    rest. They serve the terminal-only developer and any later editor too.

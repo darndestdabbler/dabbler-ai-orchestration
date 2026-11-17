@@ -6720,11 +6720,14 @@
     {
       "number": 339,
       "title": "A document is walked to a close, on the framework as it is",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "",
+      "cancelledAt": "2026-11-17T12:45:46-05:00"
     },
     {
       "number": 340,

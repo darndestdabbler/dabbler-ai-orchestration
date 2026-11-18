@@ -6957,9 +6957,9 @@
     {
       "number": 352,
       "title": "The Dabbler Terminal's output in Visual Studio",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T05:08:35.194000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T05:22:37.525000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

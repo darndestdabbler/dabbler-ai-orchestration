@@ -40,6 +40,7 @@ namespace Dabbler.VisualStudio
             var control = new WorkExplorerControl { DataContext = tree };
             control.ActionChosen += OnActionChosen;
             control.DifferentModelsChosen += OnDifferentModelsChosen;
+            control.CompareChosen += OnCompareChosen;
             control.SetUpChosen += OnSetUpChosen;
             Content = control;
         }
@@ -72,6 +73,14 @@ namespace Dabbler.VisualStudio
             if (root == null) return;
             Dabbler.JoinableTaskFactory.RunAsync(() => new SessionStarter(Dabbler).StartWithDifferentModelsAsync(root, start))
                 .FileAndForget("dabbler/work-explorer/different-models");
+        }
+
+        private void OnCompareChosen(object sender, int session)
+        {
+            var root = repositoryRoot;
+            if (root == null) return;
+            Dabbler.JoinableTaskFactory.RunAsync(() => new CompareWithStart(Dabbler).CompareAsync(root, session))
+                .FileAndForget("dabbler/work-explorer/compare");
         }
 
         private void OnActionChosen(object sender, (WorkExplorerNode Node, WorkExplorerAction Action) chosen)

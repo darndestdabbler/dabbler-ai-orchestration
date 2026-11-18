@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
@@ -31,7 +33,7 @@ namespace Dabbler.VisualStudio
         /// <summary>Runs the Start Session <paramref name="action"/> in <paramref name="repositoryRoot"/>.</summary>
         public async Task StartAsync(string repositoryRoot, WorkExplorerAction action)
         {
-            if (action.Argv == null || !await package.EnsureNodeAsync()) return;
+            if (action.Argv == null || !await ReadyAsync() || !await package.EnsureNodeAsync()) return;
             var router = package.Router;
             if (router == null) return;
             await TaskScheduler.Default;
@@ -56,7 +58,7 @@ namespace Dabbler.VisualStudio
         /// </summary>
         public async Task StartWithDifferentModelsAsync(string repositoryRoot, WorkExplorerAction action)
         {
-            if (action.Argv == null || !await package.EnsureNodeAsync()) return;
+            if (action.Argv == null || !await ReadyAsync() || !await package.EnsureNodeAsync()) return;
             var router = package.Router;
             if (router == null) return;
             await TaskScheduler.Default;
@@ -101,6 +103,61 @@ namespace Dabbler.VisualStudio
             }
             var args = DifferentModels.Arguments(action.Argv.Skip(1).ToList(), configured, answers);
             await RunAsync(router, repositoryRoot, action, args, DifferentModels.Launching(configured, answers));
+        }
+
+        /// <summary>
+        /// Whether to go on: true where Visual Studio has no unsaved document,
+        /// no debugger running and no build in progress, or the developer
+        /// chose to go on once told which (saving every document first where
+        /// they chose that). Nothing is stopped or closed here.
+        /// </summary>
+        private async Task<bool> ReadyAsync()
+        {
+            await package.JoinableTaskFactory.SwitchToMainThreadAsync();
+            var table = await package.GetServiceAsync(typeof(SVsRunningDocumentTable)) as IVsRunningDocumentTable;
+            var debugger = await package.GetServiceAsync(typeof(SVsShellDebugger)) as IVsDebugger;
+            var builds = await package.GetServiceAsync(typeof(SVsSolutionBuildManager)) as IVsSolutionBuildManager;
+            var question = StartCheck.Ask(UnsavedDocuments(), Debugging(debugger), Building(builds));
+            if (question == null) return true;
+            var chosen = ActionDialog.Choose(question.Title, question.Detail, question.Choices, question.DefaultChoice, StartCheck.NotNow);
+            if (chosen == StartCheck.GoOnAnyway) return true;
+            if (chosen != StartCheck.SaveAllAndGoOn || table == null) return false;
+            // A null hierarchy saves every dirty document in the table.
+            var saved = table.SaveDocuments((uint)__VSRDTSAVEOPTIONS.RDTSAVEOPT_SaveIfDirty, null, VSConstants.VSITEMID_NIL, 0);
+            if (ErrorHandler.Succeeded(saved) && UnsavedDocuments().Count == 0) return true;
+            VsShellUtilities.ShowMessageBox(package, "Not every document was saved, so the session did not start. Save them, or start again and choose Go On Anyway.",
+                "Dabbler", OLEMSGICON.OLEMSGICON_WARNING, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+            return false;
+        }
+
+        /// <summary>The file names of the running document table's documents that have unsaved changes.</summary>
+        private List<string> UnsavedDocuments()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var unsaved = new List<string>();
+            foreach (var document in new RunningDocumentTable(package))
+            {
+                if ((document.Flags & (uint)_VSRDTFLAGS.RDT_VirtualDocument) != 0) continue;
+                if (!(document.DocData is IVsPersistDocData data)) continue;
+                if (ErrorHandler.Succeeded(data.IsDocDataDirty(out var dirty)) && dirty != 0)
+                {
+                    unsaved.Add(Path.GetFileName(document.Moniker) is string name && name.Length > 0 ? name : document.Moniker);
+                }
+            }
+            return unsaved;
+        }
+
+        private static bool Debugging(IVsDebugger? debugger)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var mode = new DBGMODE[1];
+            return debugger != null && ErrorHandler.Succeeded(debugger.GetMode(mode)) && (mode[0] & ~DBGMODE.DBGMODE_EncMask) != DBGMODE.DBGMODE_Design;
+        }
+
+        private static bool Building(IVsSolutionBuildManager? builds)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return builds != null && ErrorHandler.Succeeded(builds.QueryBuildManagerBusy(out var busy)) && busy != 0;
         }
 
         /// <summary>

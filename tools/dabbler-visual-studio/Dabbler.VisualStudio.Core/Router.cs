@@ -111,7 +111,7 @@ namespace Dabbler.VisualStudio.Core
         /// holds a space, a tab or a quote, with the backslashes before a quote
         /// doubled. netstandard2.0 has no argument list to do it.
         /// </summary>
-        internal static string Quote(string arg)
+        public static string Quote(string arg)
         {
             if (arg.Length > 0 && arg.IndexOfAny(new[] { ' ', '\t', '"' }) < 0) return arg;
             var quoted = new StringBuilder("\"");

@@ -90,6 +90,20 @@ namespace Dabbler.VisualStudio.Core
         /// <summary>The row's actions this extension runs, in the order the router gave them: the row's context menu.</summary>
         public IReadOnlyList<WorkExplorerAction> Actions { get; }
 
+        /// <summary>
+        /// The session's number where the row is a complete session, which
+        /// offers Compare With Its Start; null on every other row.
+        /// </summary>
+        public int? CompleteSession
+        {
+            get
+            {
+                if (Row.Kind != "session" || !Row.ContextValue.Contains(";session-complete;")) return null;
+                var slash = Row.Id.LastIndexOf('/');
+                return slash >= 0 && int.TryParse(Row.Id.Substring(slash + 1), out var number) ? number : (int?)null;
+            }
+        }
+
         public bool IsExpanded
         {
             get => isExpanded;

@@ -87,6 +87,47 @@ namespace Dabbler.VisualStudio
             return dialog.ShowModal() == true ? chosen : null;
         }
 
+        /// <summary>
+        /// The position of the item the developer chose from
+        /// <paramref name="items"/>, each a label and a description, or null
+        /// where they dismissed the list.
+        /// </summary>
+        public static int? Choose(string title, IReadOnlyList<(string Label, string Description)> items)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var dialog = new PickDialog(title);
+            var (field, filter) = Box("Type to narrow the list");
+            dialog.body.Children.Add(field);
+            var list = new ListBox { MaxHeight = 420, Margin = new Thickness(0, 8, 0, 0) };
+            ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+            var rows = items.Select(item => Row(item.Label, item.Description)).ToList();
+            foreach (var row in rows) list.Items.Add(row);
+            dialog.body.Children.Add(list);
+            filter.TextChanged += (_, _) =>
+            {
+                var text = filter.Text.Trim();
+                for (var at = 0; at < rows.Count; at++)
+                {
+                    var shown = text.Length == 0 || items[at].Label.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
+                    rows[at].Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+            int? chosen = null;
+            void Accept()
+            {
+                var at = list.SelectedItem is ListBoxItem selected ? rows.IndexOf(selected) : -1;
+                if (at < 0) return;
+                chosen = at;
+                dialog.DialogResult = true;
+            }
+            list.MouseDoubleClick += (_, _) => Accept();
+            var ok = dialog.Add("Compare");
+            ok.IsDefault = true;
+            ok.Click += (_, _) => Accept();
+            dialog.Loaded += (_, _) => filter.Focus();
+            return dialog.ShowModal() == true ? chosen : null;
+        }
+
         /// <summary>What the developer typed for a typed model, or null where they dismissed the box.</summary>
         public static string? Type(ConfigurationPick pick)
         {
@@ -135,6 +176,15 @@ namespace Dabbler.VisualStudio
                 lines.Children.Add(new TextBlock { Text = words, TextWrapping = TextWrapping.Wrap, FontStyle = FontStyles.Italic, Opacity = 0.75 });
             }
             return new ListBoxItem { Content = lines, IsEnabled = item.Choosable };
+        }
+
+        /// <summary>One plain item's line: its label, then its description.</summary>
+        private static ListBoxItem Row(string label, string description)
+        {
+            var head = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 3, 2, 3) };
+            head.Inlines.Add(new System.Windows.Documents.Run(label) { FontWeight = FontWeights.SemiBold });
+            head.Inlines.Add(new System.Windows.Documents.Run("  " + description));
+            return new ListBoxItem { Content = head };
         }
 
         private Button Add(string title)

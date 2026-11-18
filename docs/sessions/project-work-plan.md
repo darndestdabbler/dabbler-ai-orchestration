@@ -396,7 +396,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | no | 2026-11-18 |
 | 357 | Set up Dabbler in the solution that is open | no | 2026-11-18 |
 | 358 | Visual Studio says when a session needs a person | no | 2026-11-18 |
-| 359 | Before a session starts and after it ends, beside the IDE | — | not declared |
+| 359 | Before a session starts and after it ends, beside the IDE | no | 2026-11-18 |
 | 360 | A session is walked in Visual Studio, on an old-style solution | — | not declared |
 | 361 | The Visual Studio extension is documented and made ready to publish | — | not declared |
 | 362 | Release 3.37.0 (release: 3.37.0) | — | not declared |
@@ -4010,3 +4010,14 @@ Make Visual Studio say when a session needs a person. The library gains Terminal
 **Amended after acceptance:**
 
 - 2026-11-18 — step 'keyboard': its files: The keyboard's row menu and the focus hand-over are the same for the Work Explorer and Configuration trees and the terminal list, so they live once in a small RowKeys helper rather than copied into each control (claude-code (anthropic, claude-opus-5-5))
+
+### Session 359 — Before a session starts and after it ends, beside the IDE
+
+**Releasable: no.**
+
+Make working beside Visual Studio safer at both ends of a session. Before a start: Start Session (and Start Session with Different Models, and Continue Session, which run through the same starter) first asks Visual Studio whether any document has unsaved changes, whether the debugger is running and whether a build is in progress; where any is true it shows one dialog naming what it found, with Save All and Go On (offered only where there are unsaved documents), Go On Anyway and Not Now. The question and its words are decided in the Core library (StartCheck) so they are tested without Visual Studio; the extension only reads the IDE's state and saves when asked. It stops, closes and reloads nothing. After a close: a complete session's row in the Work Explorer offers Compare With Its Start, an extension-added menu item like Start Session with Different Models. It finds the session's first and last commits from the framework's own commit subjects for that session on the first-parent history (Session N:, Close session N of, Transcript for session N), lists the files changed between the first commit's parent and the last commit (git diff --name-status, renames followed), and opens Visual Studio's own comparison window (IVsDifferenceService) for the file chosen, with each side written from git to a scratch folder under TEMP and an empty side for an added or deleted file. Reading the range and the file list is Core's (SessionChanges), tested from git's printed output. Finally docs/uat/uat-visual-studio.md gains a section on what Visual Studio does when an engine edits files under an open solution, SDK-style and old-style projects both: the prompts that appear and the Tools > Options settings that quiet them, as read on this machine, with what could not be walked listed under What was not walked.
+
+**Amended after acceptance:**
+
+- 2026-11-18 — step 'compare': its files: The control only raises the menu item's event; WorkExplorerWindow runs it in the followed repository, as it does Start Session with Different Models (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'compare': its files: git's arguments are quoted by Router.Quote, made public, rather than by a second copy of the quoting rule (claude-code (anthropic, claude-opus-5-5))

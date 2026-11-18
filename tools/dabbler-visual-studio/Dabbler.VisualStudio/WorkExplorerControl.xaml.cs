@@ -28,6 +28,9 @@ namespace Dabbler.VisualStudio
         /// <summary>Start Session with Different Models was clicked: the row's Start Session, to be run with other answers.</summary>
         public event EventHandler<WorkExplorerAction>? DifferentModelsChosen;
 
+        /// <summary>Compare With Its Start was clicked on a complete session's row: that session's number.</summary>
+        public event EventHandler<int>? CompareChosen;
+
         /// <summary>Set Up Dabbler in This Solution was clicked, under the sentence saying the repository has no session plan.</summary>
         public event EventHandler? SetUpChosen;
 
@@ -56,7 +59,7 @@ namespace Dabbler.VisualStudio
         /// <summary>Fills a row's menu with its actions; false where it has none.</summary>
         private bool Fill(FrameworkElement row)
         {
-            if (!(row.DataContext is WorkExplorerNode node) || node.Actions.Count == 0 || row.ContextMenu == null) return false;
+            if (!(row.DataContext is WorkExplorerNode node) || (node.Actions.Count == 0 && node.CompleteSession == null) || row.ContextMenu == null) return false;
             node.IsSelected = true;
             row.ContextMenu.Items.Clear();
             foreach (var action in node.Actions)
@@ -69,6 +72,13 @@ namespace Dabbler.VisualStudio
                 var different = new MenuItem { Header = "Start Session with Different Models" };
                 different.Click += (_, _) => DifferentModelsChosen?.Invoke(this, action);
                 row.ContextMenu.Items.Add(different);
+            }
+            // What the session committed, offered where its work is finished.
+            if (node.CompleteSession is int session)
+            {
+                var compare = new MenuItem { Header = "Compare With Its Start" };
+                compare.Click += (_, _) => CompareChosen?.Invoke(this, session);
+                row.ContextMenu.Items.Add(compare);
             }
             return true;
         }

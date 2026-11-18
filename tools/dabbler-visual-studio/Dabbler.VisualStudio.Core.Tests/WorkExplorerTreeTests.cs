@@ -195,6 +195,29 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void CompleteSession_is_the_number_of_a_complete_sessions_row_only()
+        {
+            var complete = new
+            {
+                id = "session:D:/repo/358",
+                kind = "session",
+                label = "358: Done",
+                collapsible = "none",
+                contextValue = ";session;session-complete;",
+                actions = Array.Empty<object>(),
+                children = Array.Empty<object>(),
+            };
+            var tree = new WorkExplorerTree();
+            tree.Show(Document(Row("repository:R", "repository", "repo", null, null, "expanded",
+                complete, Row("session:D:/repo/359", "session", "359: Running", null, null, "none"))));
+
+            var sessions = tree.Roots[0].Children;
+            Assert.Equal(358, sessions[0].CompleteSession);
+            Assert.Null(sessions[1].CompleteSession);
+            Assert.Null(tree.Roots[0].CompleteSession);
+        }
+
+        [Fact]
         public void RepositoryRootOf_finds_the_git_folder_above()
         {
             var root = Path.Combine(Path.GetTempPath(), "dabbler-root-" + Guid.NewGuid().ToString("N"));

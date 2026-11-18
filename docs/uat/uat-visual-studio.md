@@ -3,7 +3,9 @@
 What this page covers: installing the Visual Studio extension built from
 `tools/dabbler-visual-studio/`, proving it reaches the router with
 **Tools > Dabbler: Version**, the sentence it shows when Node is missing,
-and what Windows Terminal does with the tabs the later sessions open in it.
+what Windows Terminal does with the tabs the later sessions open in it,
+and what Visual Studio does when an engine edits files under a solution it
+has open.
 
 Nothing here is published. The extension is built from this checkout.
 
@@ -232,6 +234,92 @@ and it opens in a console window of its own with that environment. There
 is no window to add tabs to, so each session's engine gets a window of
 its own.
 
+## 6. An engine edits files under an open solution, from outside Visual Studio
+
+A session's engine writes the same files Visual Studio has open, and it
+writes them from outside Visual Studio. Start Session asks first where a
+document has unsaved changes, the debugger is running or a build is in
+progress. It offers Save All and Go On, Go On Anyway and Not Now, and it
+stops and closes nothing. This section covers what Visual Studio itself
+does once the engine has written, and which of its own options decide it.
+
+### What this machine's Visual Studio is set to
+
+Visual Studio Community 2026 (18.12), instance `18.0_61d713b8`. These
+values were read from that instance's own settings file,
+`%LOCALAPPDATA%\Microsoft\VisualStudio\18.0_61d713b8\Settings\CurrentSettings.vssettings`,
+which Visual Studio last wrote on 2026-11-11:
+
+| Tools > Options | Setting | This machine |
+| --- | --- | --- |
+| Environment > Documents | Detect when file is changed outside the environment (`DetectFileChangesOutsideIDE`) | on |
+| Environment > Documents | Reload modified files unless there are unsaved changes (`AutoloadExternalChanges`) | on |
+| Environment > Documents | Check for consistent line endings on load (`CheckForConsistentLineEndings`) | on |
+| Projects and Solutions > Build and Run | Before building (`OnRunOrPreview`) | `0`, Save all changes |
+
+To read them again, close Visual Studio so that it writes the file, then:
+
+```powershell
+Select-String -Path "$env:LOCALAPPDATA\Microsoft\VisualStudio\18.0_*\Settings\CurrentSettings.vssettings" `
+  -Pattern 'name="(DetectFileChangesOutsideIDE|AutoloadExternalChanges|CheckForConsistentLineEndings|OnRunOrPreview)">[^<]*' -AllMatches |
+  ForEach-Object { $_.Matches.Value }
+```
+
+### What was seen
+
+Tried on 2026-11-18 with those settings, untouched. The probe was
+`C:\temp\vs-probe\Probe.sln`, opened in Visual Studio, holding two
+projects:
+
+- `ProbeSdk`, an SDK-style project (`<Project Sdk="Microsoft.NET.Sdk">`)
+  with `Program.cs`;
+- `ProbeOld`, an old-style project (`ToolsVersion="15.0"`, .NET Framework
+  4.7.2, `<Compile Include="Class1.cs" />`).
+
+Both `.cs` files were open in the editor. Each change below was written
+from outside Visual Studio, the way an engine writes, and then Visual
+Studio's window was brought to the front. The prompts' words and buttons
+were read with UI Automation and checked on a screenshot.
+
+| What changed outside | What Visual Studio did |
+| --- | --- |
+| `Program.cs`, open with no unsaved changes | Reloaded it without asking: the editor showed the new line at once. |
+| `Program.cs` again, with a CRLF line appended to a file that used LF | After the silent reload, a dialog titled **Inconsistent Line Endings**: *"The line endings in the following file are not consistent. Do you want to normalize the line endings?"*, with the file's path, a **Line ending** list set to `Windows (CR LF)`, **Yes**, **No**, and an **Always show this dialog** box. It came back each time the file was loaded again, including when the old-style project was reloaded. |
+| `ProbeSdk.csproj` (a property added) | Nothing appeared: no dialog and no bar. The project stayed loaded. |
+| `ProbeOld.csproj` (a property added) | A dialog titled **File Modification Detected**: *"The project 'ProbeOld' has been modified outside the environment. Press Reload to load the updated project from disk. Press Reload All after all external changes and operations are complete to reload all items from disk. Press Ignore to ignore the external changes. The changes will be used the next time you open the project."*, with **Reload**, **Reload All**, **Ignore** and **Ignore All**. It appeared with *Reload modified files unless there are unsaved changes* on, so that setting does not cover old-style project files. |
+| `Class1.cs`, with unsaved changes typed in the editor | A dialog titled **Microsoft Visual Studio**: the file's path, then *"The file has unsaved changes inside this editor and has been changed externally. Do you want to reload it and lose the changes made in the source editor?"*, with **Yes**, **Yes to All**, **No** and **No to All**. |
+
+### What a developer should set, and what to answer
+
+- **An open document the engine changes, and you have not changed.**
+  With *Detect when file is changed outside the environment* and *Reload
+  modified files unless there are unsaved changes* both on, as here, the
+  document reloads silently. That is the setting to keep. The probe did
+  not try them turned off.
+- **An open document the engine changes while you have unsaved changes
+  in it.** The reload question appears, and no setting answers it for
+  you. **Yes** drops your edits. **No** keeps them, and your next save
+  overwrites the engine's work. Save All and Go On, offered before a
+  start, is how to avoid this question.
+- **A project file the engine changes.** An SDK-style project needs
+  nothing. An old-style project asks **File Modification Detected** every
+  time, and this probe found no Tools > Options setting that quiets it.
+  Answer **Reload All** when the session has finished writing. **Ignore**
+  keeps the project as Visual Studio last read it, so a build in Visual
+  Studio does not see the engine's change until the solution is opened
+  again.
+- **Inconsistent Line Endings** appears where an engine writes line
+  endings unlike the rest of the file. To quiet it, clear *Always show
+  this dialog* in the dialog itself, or turn off *Check for consistent
+  line endings on load* under Environment > Documents. A repository whose
+  `.gitattributes` or `.editorconfig` settles line endings stops it at
+  the source. **No** leaves the file as the engine wrote it.
+- **Before building: Save all changes** (`0`, as here) means a build
+  you start in Visual Studio saves every open document first. So a build
+  started while the engine is working writes your unsaved editor contents
+  over anything the engine wrote to the same files. Start Session's
+  question names a build in progress for the same reason.
+
 ## What was not walked
 
 - Visual Studio 2022: this machine has only Visual Studio Community 2026
@@ -239,3 +327,10 @@ its own.
   can and the listing claims only what was walked.
 - Steps 2 to 4 above need a person at Visual Studio: there are no tests
   that run inside it.
+- Section 6 was tried with this machine's settings as they are. It did
+  not turn any of them off to see what each one changes, and it did not
+  try Visual Studio 2022.
+- Start Session's question before a start (unsaved documents, a running
+  debugger, a build in progress) and Compare With Its Start on a
+  complete session's row are built and tested in the library only.
+  Seeing them in Visual Studio also waits for session 360.

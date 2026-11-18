@@ -1563,6 +1563,8 @@ export const KNOWN_PROVIDERS: ReadonlySet<string> = new Set([
   "anthropic",
   "openai",
   "google",
+  // Reached through the seat only: no key, no direct endpoint.
+  "microsoft",
 ]);
 
 
@@ -1638,6 +1640,7 @@ const PROVIDER_PREFIXES: ReadonlyArray<readonly [string, string]> = [
   ["o3", "openai"],
   ["o4", "openai"],
   ["gemini", "google"],
+  ["mai", "microsoft"],
 ];
 
 /**

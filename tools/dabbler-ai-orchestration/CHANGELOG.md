@@ -12,6 +12,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.38.0] — 2026-11-18
+
+### Added
+
+- **Microsoft's own models can author and review.** A GitHub Copilot seat
+  lists three models Microsoft trained itself: `mai-code-1.1-flash`,
+  `mai-code-2-flash` and `mai-code-2`. They are now recorded with the vendor
+  `microsoft`, and you can choose one in Configuration to author a session
+  or to review one. The cross-vendor rule treats Microsoft like any other
+  vendor: a Microsoft model may review work an Anthropic, OpenAI or Google
+  model wrote, and never work a Microsoft model wrote. Microsoft is reached
+  through the seat only: there is no key for it and no direct endpoint.
+- **If your machine read these models before this release**, its catalog
+  records them with no vendor, and choosing one says so. Run **Update the
+  Catalog** (`dabbler discovery refresh`) once, free, and they can be
+  chosen.
+- `mai-code-1.1-flash` is reported, by one source and not by GitHub, to
+  leave Copilot on 2026-12-18: choose one of the other two.
+
 ## [3.37.0] — 2026-11-18
 
 ### Added

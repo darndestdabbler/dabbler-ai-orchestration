@@ -18,6 +18,15 @@ credits, on any of the three surfaces. If you are reasoning about the cost of
 | GitHub Copilot seat | `session/new` over `copilot --acp` returns `models.availableModels` | **free** | 2026-09-05, CLI 1.0.83 |
 | Claude Code CLI | **cannot be enumerated** — see below | — | 2026-09-10 |
 
+**Microsoft is a fourth vendor, reached through the seat only.** The seat
+lists Microsoft's own MAI Code models (`mai-code-1.1-flash`,
+`mai-code-2-flash`, `mai-code-2`; read 2026-11-18). An id beginning `mai` is
+recorded with the vendor `microsoft`, inferred from the prefix like the
+other three. There is no Microsoft key and no direct endpoint, so the
+direct-API list never names one. A catalog read by a router older than
+3.38.0 records these models with no vendor; `dabbler discovery refresh`
+reads it again, free.
+
 ## Copilot is billed in AI CREDITS, per token
 
 `copilot help billing`, in the CLI's own words:

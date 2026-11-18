@@ -93,7 +93,7 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           machine has chosen one with `dabbler configure",
     "                           --engine`, which a terminal reads and an editor",
     "                           setting could not; the flag wins over the choice",
-    "  --provider PROVIDER      required: anthropic | openai | google",
+    "  --provider PROVIDER      required: anthropic | openai | google | microsoft",
     "  --model MODEL            required for a Copilot seat; identity resolves through",
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
@@ -166,7 +166,8 @@ const OPTIONS: Record<string, readonly string[]> = {
   drive: [
     "  --engine ENGINE          required: claude-code | copilot | codex -- who",
     "                           is registered as the session's orchestrator",
-    "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
+    "  --provider PROVIDER      anthropic | openai | google | microsoft; required for a",
+    "                           fresh registration",
     "  --model MODEL            required for a Copilot seat",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     '  --engine-argv "PROG A B" the command invoked once per instruction instead of the',

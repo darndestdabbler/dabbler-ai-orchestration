@@ -37,6 +37,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import {
   IdentityResolutionError,
+  LISTED_WITHOUT_VENDOR,
+  listedWithoutVendor,
   resolveModelProvider,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
@@ -1191,6 +1193,7 @@ export function configuredModelRefusal(
       return "it is the authoring model itself, and a reviewer is never from the author's vendor";
     }
     if (withheld.includes(chosen)) return "its vendor no longer serves it";
+    if (listedWithoutVendor(chosen)) return LISTED_WITHOUT_VENDOR;
     const vehicle = (role["vehicle"] as Record<string, unknown> | undefined)?.["chosen"];
     return typeof vehicle === "string"
       ? `the '${vehicle}' vehicle does not list it`

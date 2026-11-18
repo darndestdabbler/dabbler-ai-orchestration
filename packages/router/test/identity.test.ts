@@ -12,6 +12,7 @@ import {
   IdentityResolutionError,
   chooseOrchestratorBlock,
   classifyIdentityProvenance,
+  listedWithoutVendor,
   resolveModelProvider,
   resolveOrchestratorIdentity,
 } from "../src/identity.ts";
@@ -73,6 +74,28 @@ describe("resolving the orchestrator's identity", () => {
         /model catalog/.test(error.message) &&
         /dabbler discovery refresh/.test(error.message) &&
         !/registry/.test(error.message),
+    );
+  });
+
+  it("resolves a seat session on a `mai` model to Microsoft", () => {
+    const resolved = resolveOrchestratorIdentity(
+      { engine: "github-copilot", provider: "openai", model: "mai-code-2" },
+      { catalog: [{ id: "mai-code-2", provider: "microsoft" }] },
+    );
+    assert.equal(resolved.effectiveProvider, "microsoft");
+  });
+
+  it("says a listed model with no vendor is listed, and names the free refresh", () => {
+    const catalog = [{ id: "mai-code-2", provider: null }];
+    assert.equal(listedWithoutVendor("mai-code-2", catalog), true);
+    assert.equal(listedWithoutVendor("mystery-9000", catalog), false);
+    assert.throws(
+      () => resolveOrchestratorIdentity({ engine: "github-copilot", model: "mai-code-2" }, { catalog }),
+      (error: unknown) =>
+        error instanceof IdentityResolutionError &&
+        /lists it and names no vendor/.test(error.message) &&
+        /dabbler discovery refresh/.test(error.message) &&
+        !/is not in this machine's model catalog/.test(error.message),
     );
   });
 

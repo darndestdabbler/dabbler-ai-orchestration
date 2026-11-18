@@ -227,6 +227,14 @@ describe("what a reviewing role may not be", () => {
       ["anthropic", "openai"],
     );
   });
+
+  it("offers a Microsoft model to review an OpenAI author, and never a Microsoft one", () => {
+    const seat = [...CANDIDATES, ["mai-code-2", "microsoft"] as const];
+    const reviewing = (author: string): string[] =>
+      ids(resolveRole(makeConfig(), ROLE_PRIMARY_REVIEWER, seat, reviewerExclusions(ROLE_PRIMARY_REVIEWER, author, [])));
+    assert.ok(reviewing("openai").includes("mai-code-2"));
+    assert.ok(!reviewing("microsoft").includes("mai-code-2"));
+  });
 });
 
 describe("a model a person selected", () => {

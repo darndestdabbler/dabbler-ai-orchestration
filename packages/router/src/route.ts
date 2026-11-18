@@ -38,6 +38,7 @@ import {
 import { namedReviewers, namedReviewingVehicle } from "./sessionState.ts";
 import { CATALOG_REFRESH_COMMAND, apiBlock, apiSelectableModels } from "./discovery.ts";
 import { normalizeModelToken } from "./contracts/models.ts";
+import { LISTED_WITHOUT_VENDOR, listedWithoutVendor } from "./identity.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import {
@@ -737,6 +738,12 @@ function unreachableLadder(
         message:
           `${opening}'${selected}' is ${vendor}'s, and this machine holds no ${vendor} key. ` +
           `\`dabbler auth set ${provider}\` stores one, or ${choose("a model this machine can reach")}.${closing}`,
+      };
+    }
+    if (listedWithoutVendor(selected, reading.listed)) {
+      return {
+        cause: CAUSE_NOT_LISTED,
+        message: `${opening}${LISTED_WITHOUT_VENDOR}, or ${choose("a model it places")}.${closing}`,
       };
     }
     const where = reading.vehicle === "api" ? "no vendor's list on this machine names it" : "the Copilot seat does not list it";

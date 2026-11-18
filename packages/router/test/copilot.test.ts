@@ -25,9 +25,12 @@ import {
   PROVIDER_SOURCE_HEURISTIC,
   SEAT_ENUMERATION_SOURCE,
   enumerateSeatModels,
+  inferProvider,
   readVendorUsage,
   renderedUtf16Units,
   resolveRoleCandidates,
+  seatCatalogModel,
+  seatModel,
   validateTransportTimeouts,
   type CopilotCliTransportOptions,
   type ProcessHandle,
@@ -738,6 +741,12 @@ describe("the seat's own model list", () => {
     // The assertion this session exists to keep: enumerating is free, and it
     // is free because no turn is ever taken.
     assert.equal(existsSync(seat.prompted), false);
+  });
+
+  it("places a `mai` id as Microsoft's and records the seat's entry with that vendor", () => {
+    assert.equal(inferProvider("mai-code-2"), "microsoft");
+    const entry = seatModel({ modelId: "mai-code-2-flash", name: "MAI Code 2 Flash", _meta: { copilotEnablement: "enabled" } });
+    assert.equal(seatCatalogModel(entry, "2026-11-18T00:00:00Z").provider, "microsoft");
   });
 
   it("calls a seat that lists nothing unknown, not empty", async () => {

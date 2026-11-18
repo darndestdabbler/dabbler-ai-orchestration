@@ -140,7 +140,10 @@ sent:
 
 - the direct-API list is read from each provider's model-list endpoint;
 - the Copilot seat's list is the one the seat returns when a conversation
-  is opened, with each model's cost;
+  is opened, with each model's cost. Besides Anthropic, OpenAI and Google
+  models it lists Microsoft's own MAI Code models, whose vendor is
+  `microsoft` and which are reached through the seat only: there is no
+  Microsoft key and no direct endpoint;
 - the Claude Code CLI has no list command, so the Anthropic key's model
   list stands in for it. Claude Code itself is the authority, and refuses a
   model its own catalog does not describe. With no Anthropic key, `opus`,

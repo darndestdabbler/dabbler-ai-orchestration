@@ -401,7 +401,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 361 | The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop | no | 2026-11-18 |
 | 362 | The Visual Studio extension is documented and made ready to publish | no | 2026-11-18 |
 | 363 | Release 3.37.0 (release: 3.37.0) | yes | 2026-11-18 |
-| 364 | Microsoft's own models can author and review | — | not declared |
+| 364 | Microsoft's own models can author and review | no | 2026-11-18 |
 | 365 | Release 3.38.0 (release: 3.38.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -4056,3 +4056,9 @@ Session 360's page ends in Publish, so this session makes the Visual Studio exte
 **Releasable: yes.**
 
 Release 3.37.0: the framework packs and publishes what is on the trunk.
+
+### Session 364 — Microsoft's own models can author and review
+
+**Releasable: no.**
+
+Make Microsoft's own models on a Copilot seat choosable. An id that begins `mai` is placed as the vendor `microsoft` by the seat's id-prefix table in transports/copilot.ts, and `microsoft` joins the vendors a seat may front, so after a free `dabbler discovery refresh` mai-code-1.1-flash, mai-code-2-flash and mai-code-2 are recorded with that vendor, offered for the author and both reviewers on the seat, and held to the cross-vendor rule like any other model. Where a catalog read by an older router still lists a model with no vendor, every refusal a person meets for choosing it (identity at Start, the start's held-selection check, and the route's not-listed refusal) says the catalog lists the model and names no vendor for it, and that `dabbler discovery refresh` reads it again for nothing, instead of saying it is not listed; nothing guesses a vendor at start. The `--provider` help of `session start` and `session next` names four vendors; docs/schema-reference.md, docs/model-and-pricing-sources.md and the guide say `microsoft` is reached through the seat only, with no key and no direct endpoint. version.json goes to 3.38.0, stamped into every manifest, and the changelog's 3.38.0 section says what a person with a Copilot seat can now choose.

@@ -21,11 +21,7 @@ import { readRawSessionState } from "./sessionState.ts";
 import { pythonRepr } from "./pythonJson.ts";
 import { type CatalogModel } from "./catalog.ts";
 import { apiBlock } from "./discovery.ts";
-import {
-  KNOWN_PROVIDERS,
-  seatModels,
-  type ConfirmedCatalogEntry,
-} from "./transports/copilot.ts";
+import { KNOWN_PROVIDERS, seatModels } from "./transports/copilot.ts";
 
 export const MULTI_PROVIDER_ENGINES: ReadonlySet<string> = new Set([
   "github-copilot",
@@ -97,8 +93,7 @@ import { normalizeModelToken } from "./contracts/models.ts";
  * Each block is fetched through its own SCOPED reading, so a block recorded
  * for another seat or another key set is not read at all.
  */
-function catalogEntries(): ConfirmedCatalogEntry[] {
-  const entries: ConfirmedCatalogEntry[] = [];
+function catalogEntries(): ListedEntry[] {
   const blocks: Array<readonly CatalogModel[]> = [seatModels() ?? []];
   try {
     blocks.push(apiBlock(loadConfig())?.models ?? []);
@@ -107,13 +102,40 @@ function catalogEntries(): ConfirmedCatalogEntry[] {
     // the one reader that is best-effort by design, because its caller must
     // fail closed on a bare id it cannot vouch for anyway.
   }
-  for (const block of blocks) {
-    for (const entry of block) {
-      if (entry.provider !== null) entries.push({ id: entry.id, provider: entry.provider });
-    }
-  }
-  return entries;
+  return blocks.flat();
 }
+
+/**
+ * One model as a catalog lists it: its vendor, or `null` where the reading
+ * that recorded it could place none -- which a reading by an older router
+ * does for a vendor it did not know.
+ */
+export interface ListedEntry {
+  readonly id: string;
+  readonly provider: string | null;
+}
+
+/**
+ * Whether this machine's catalog lists the model and names no vendor this
+ * router can place for it. Such a model is listed, and saying it is not sends
+ * a person looking for it in a list that has it; nothing guesses its vendor.
+ */
+export function listedWithoutVendor(
+  model: unknown,
+  catalog: readonly ListedEntry[] = catalogEntries(),
+): boolean {
+  if (typeof model !== "string" || model.trim() === "") return false;
+  const token = normalizeModelToken(model);
+  return (
+    catalog.some((entry) => normalizeModelToken(entry.id) === token) &&
+    resolveModelProvider(model, catalog) === null
+  );
+}
+
+/** What a person is told about such a model, as a clause about "it". */
+export const LISTED_WITHOUT_VENDOR =
+  "this machine's model catalog lists it and names no vendor for it, and " +
+  "`dabbler discovery refresh` reads the catalog again for nothing";
 
 /**
  * The seat-catalog fallback: the Copilot CLI's confirmed model universe is
@@ -122,9 +144,10 @@ function catalogEntries(): ConfirmedCatalogEntry[] {
  */
 function catalogProvider(
   token: string,
-  entries: readonly ConfirmedCatalogEntry[] = catalogEntries(),
+  entries: readonly ListedEntry[] = catalogEntries(),
 ): string | null {
   for (const entry of entries) {
+    if (entry.provider === null) continue;
     if (normalizeModelToken(entry.id) === token) {
       const provider = entry.provider.trim().toLowerCase();
       return KNOWN_PROVIDERS.has(provider) ? provider : null;
@@ -145,7 +168,7 @@ function catalogProvider(
  */
 export function resolveModelProvider(
   model: unknown,
-  catalog?: readonly ConfirmedCatalogEntry[],
+  catalog?: readonly ListedEntry[],
 ): string | null {
   if (typeof model !== "string" || model.trim() === "") return null;
   return catalogProvider(normalizeModelToken(model), catalog);
@@ -167,7 +190,7 @@ function trimmedOrNull(value: unknown): string | null {
 export function resolveOrchestratorIdentity(
   orchestrator: unknown,
   options: {
-    catalog?: readonly ConfirmedCatalogEntry[];
+    catalog?: readonly ListedEntry[];
   } = {},
 ): OrchestratorIdentity {
   if (!isRecord(orchestrator) || Object.keys(orchestrator).length === 0) {
@@ -191,6 +214,13 @@ export function resolveOrchestratorIdentity(
         model,
         engine,
       };
+    }
+    if (multi && listedWithoutVendor(model, options.catalog)) {
+      throw new IdentityResolutionError(
+        `orchestrator model '${model}' cannot be placed with a vendor: ` +
+          `${LISTED_WITHOUT_VENDOR}, and places it where this router knows ` +
+          "its vendor. Start the session again after it.",
+      );
     }
     if (multi) {
       // The registry this used to name was deleted in session 151 and the
@@ -247,7 +277,7 @@ export function resolveSessionOrchestratorIdentity(
   sessionsDir: string,
   sessionNumber?: number | null,
   options: {
-    catalog?: readonly ConfirmedCatalogEntry[];
+    catalog?: readonly ListedEntry[];
   } = {},
 ): OrchestratorIdentity {
   // The raw record: identity needs the sessions array and its stored

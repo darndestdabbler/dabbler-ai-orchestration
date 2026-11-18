@@ -63,6 +63,9 @@ Each company publishes its own prices:
 - Anthropic: [Claude pricing](https://platform.claude.com/docs/en/about-claude/pricing)
 - GitHub Copilot: [Models and pricing for GitHub Copilot](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing)
 
+Microsoft's MAI Code models are reached through a Copilot seat only, so
+their price is the seat's, on the Copilot page above.
+
 ## One person's experience
 
 This is the experience of the person who maintains Dabbler, as of

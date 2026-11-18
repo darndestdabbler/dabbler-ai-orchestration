@@ -721,7 +721,7 @@ never silently drops them.
 | Key | Notes |
 |---|---|
 | `id` | required |
-| `provider` | `anthropic` \| `openai` \| `google`, inferred from the id prefix |
+| `provider` | `anthropic` \| `openai` \| `google` \| `microsoft`, inferred from the id prefix (`mai` is `microsoft`). `microsoft` is reached through the Copilot seat only: there is no key for it and no direct endpoint |
 | `provider_source` | always `name-prefix-heuristic` — a declared guess, never presented as first-party truth |
 | `enablement` | `confirmed` \| `unconfirmed`. Strictly empirical: an invalid model name and a policy-blocked one return the identical CLI error, so nothing is inferred from a name |
 | `confirmed_at`, `confirmed_on_cli_version` | provenance of the last successful probe |

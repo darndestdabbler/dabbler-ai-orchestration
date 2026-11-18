@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 332 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 332 transcript</h1>
+<p class="stamp">Rendered 2026-11-16T12:59:40.323Z by dabbler-ai-router 3.34.0 at 4296a67a3b3114b59e7f7d6fe927425c357fd0b7.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-16T07:37:55.367-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 332 of 337: The Work Explorer stops freezing the window</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/utils/projection.ts</code> (<code>projectionCacheKey</code>, <code>taskRecordInputs</code>), <code>tools/dabbler-ai-orchestration/src/utils/fileSystem.ts</code> (<code>discoverRoots</code>, <code>listGitWorktrees</code>, <code>scanRepositories</code>), <code>tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts</code> (<code>refresh</code>), <code>tools/dabbler-ai-orchestration/src/extension.ts</code> (the watchers and the poll), <code>projection.test.ts</code>, <code>fileSystem.test.ts</code>, <code>workExplorerTreeProvider.test.ts</code> (new), <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>An emergency fix, before the walks.</strong> The operator, 2026-11-16: Dabbler &quot;seems to be running really slowly&quot;, and a Start in chromatic-notation-configurator did nothing the first time and took a couple of minutes the second. Every session in every repository pays for this, and sessions 334 and 335 would walk a framework that freezes the window they are walked in. So it comes first, and ships alone as 3.34.1.</p>
+<p><strong>Why.</strong> Measured on this machine, 2026-11-16, from VS Code's own logs:</p>
+<ul><li>Since 2026-11-14, about fifty <code>UNRESPONSIVE extension host</code> reports name <code>darndestdabbler.dabbler-ai-orchestration</code>, each with a CPU profile saved under <code>%TEMP%</code>. Across 53 profiles, 73% of the time attributed to the extension is in one chain: <code>getChildren &gt; scan &gt; scanRepositories &gt; ProjectionCache.get &gt; projectionCacheKey</code>.</li><li>The freezes come every 30 seconds or so, in every open window at once, and last 1 to 8 seconds each. The chromatic window registered session 73 at 07:08:26, and its run started at 07:11:11. In between, the window froze for about 40 seconds, in pieces of up to 8.6.</li><li>The key decides only whether to ask the router again, yet working it out stats five files for every session the repository has ever run: 1,305 stats here (580 of them for files that do not exist) and 360 in chromatic, all synchronous on the extension host's one thread. A closed session's records never move, and they are stat'ed on every scan for good, so the cost grows with every session closed. The same sweep takes 17 ms in a plain <code>node</code>, and 230 to 490 ms in the profiles. Why the host is that much slower is not known, and nothing here depends on knowing.</li><li>Every scan, and every 30-second poll before it (<code>bindWatchers</code>), also runs <code>git worktree list</code> through <code>execFileSync</code>. That is two blocking git processes per poll per window.</li><li>Every write to a watched file starts a full scan of its own, with nothing to merge a burst. Starting a session writes in bursts.</li></ul>
+<p><strong>Step 1 -- the key reads what can move.</strong> The key is the four sessions-root files, the runs directory's own mtime (a run directory added or removed moves it), and the five records of one run: the run the cached projection named current, or the highest-numbered run when there is none. The number of files it reads no longer depends on how many sessions the repository has run. This rests on one constraint, and the session confirms it from the writers before relying on it: a closed session's run records move only with <code>sessions.json</code> or <code>activity-log.json</code>, which are in the key. A writer that breaks that keeps its file in the key, and the session records which one it was.</p>
+<p><strong>Step 2 -- git does not block the window.</strong> <code>listGitWorktrees</code> runs git asynchronously. Roots are discovered once per poll tick, workspace-folder change or explicit refresh, and not once per scan: the poll's watcher binding and the scan take the same list.</p>
+<p><strong>Step 3 -- a burst is one scan.</strong> <code>refresh()</code> merges the calls that arrive within a quarter of a second into one repaint. The explicit refresh command, <code>refresh(true)</code>, still repaints at once.</p>
+<p><strong>Step 4 -- the number.</strong> <code>version.json</code> goes to 3.34.1 (a patch: nothing a person does changes, and the window stops freezing), stamped with <code>npm run stamp:version</code>, and the changelog's 3.34.1 section says so in a sentence.</p>
+<p><strong>Non-goals.</strong> The router's in-process projection (<code>buildProjection</code>, about 6% of the time sampled) and the scan's other readers (<code>currentActivity</code>, <code>uncollectedWords</code>, about 10%). They were measured and are left alone; if the logs still show the host unresponsive after this release, they get a session of their own. Moving the scan to a worker thread. Any change to <code>dabbler.refreshSeconds</code> or its default. Explaining the Start that did nothing: no trace of it was found (no run directory and no write), and if it happens again after this release it becomes a session of its own.</p>
+<p><strong>Tests.</strong> In <code>projection.test.ts</code>: the key reads the same number of files for a repository with three runs as for one with three hundred (counted through the injected <code>statFile</code>); the key moves when the current run's <code>driver/run.json</code> moves, and when a run directory is added. In <code>fileSystem.test.ts</code>: the scan takes the roots it is given and starts no git process. In <code>workExplorerTreeProvider.test.ts</code>: three <code>refresh()</code> calls inside the window fire one change, and <code>refresh(true)</code> fires at once. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes, as 3.34.1 in session 333.</p>
+<h2>Work Plan</h2>
+<p>Stop the Work Explorer from freezing the extension host, and stamp it as 3.34.1. The projection cache key stops stat'ing five records for every run the repository has ever had: it reads the four sessions-root files, the runs directory's own mtime, and the five records of one run -- the run the cached projection named current, or the highest-numbered run when there is none -- after confirming from the router's writers that a closed session's run records move only together with sessions.json or activity-log.json (a writer that breaks that keeps its file in the key, and the step's report names it). <code>git worktree list</code> runs asynchronously, and roots are discovered once per poll tick, workspace-folder change or explicit refresh, with the poll's watcher binding and the scan taking the same list; the scan no longer discovers roots itself. <code>refresh()</code> merges calls inside a quarter of a second into one repaint while <code>refresh(true)</code> still repaints at once. version.json goes to 3.34.1, stamped with <code>npm run stamp:version</code>, with a one-sentence 3.34.1 changelog section.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/2366f45362bcd9a799bc1fdaf1cdf7a1ef9403c2"><code>2366f45362bcd9a799bc1fdaf1cdf7a1ef9403c2</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Cache key</td><td><p>First read the router's writers of the per-run records (step-execution.jsonl, approved-plan.json, rounds.jsonl, driver/run.json, driver/plan.json) and confirm that a closed session's records move only together with sessions.json or activity-log.json; if one does not, keep that file in the key for every run and say which writer it was in the report's notes. Then, in projection.ts: taskRecordInputs takes the one run to read (a session number, or null) and returns that run's five records, falling back to the highest-numbered s&lt;N&gt; directory under .dabbler/runs when it is null; projectionCacheKey keys on the four sessions-root files, the runs directory's own mtime, and those five records, with a short comment stating the constraint it rests on; ProjectionCache.get passes the run its cached projection named current (repository.currentSession), or null when it has none. In projection.test.ts, update the taskRecordInputs tests to the one-run shape, and add: the key stats the same number of files for three runs as for three hundred (counted through the injected statFile); the key moves when the current run's driver/run.json moves; the key moves when a run directory is added (the runs directory's mtime).</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/utils/projection.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</span></td><td><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</code><br><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Async roots</td><td><p>In fileSystem.ts, listGitWorktrees runs <code>git worktree list --porcelain</code> through the asynchronous child_process.execFile (same timeout and buffer, still [] on failure) and discoverRoots becomes async; scanRepositories takes the roots it is given as a parameter and no longer discovers them. In WorkExplorerTreeProvider.ts, the provider holds the current roots (set by extension.ts) and its scan passes them to scanRepositories. In extension.ts, roots are discovered once per poll tick, workspace-folder change and explicit refresh command: that one list goes to bindWatchers (which takes it rather than discovering its own) and to the provider, and the activation-time terminal opening and the show-terminal command await discoverRoots. In fileSystem.test.ts, pass the roots to scanRepositories in the existing tests and add one: the scan takes the roots it is given and starts no git process.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/utils/fileSystem.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/extension.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts</span></td><td><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts</code><br><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Refresh burst</td><td><p>In WorkExplorerTreeProvider.ts, refresh() merges the calls that arrive within 250 ms into one scan invalidation and one change event (a single pending timer, cleared on dispose); refresh(true) clears the projection cache, cancels any pending timer and fires at once. Create workExplorerTreeProvider.test.ts: three refresh() calls inside the window fire one change; refresh(true) fires at once.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts</span></td><td><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts</code><br><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code></td><td>yes</td></tr>
+<tr><td>Version 3 34 1</td><td><p>Set version.json to 3.34.1, run <code>npm run stamp:version</code> to write it into the manifests and the lock file, and add a 3.34.1 section to the extension's CHANGELOG.md saying in a sentence that the Work Explorer no longer freezes the window every poll.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.34.1'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.34.1]')){process.exit(1)}</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The router's in-process projection (buildProjection) and the scan's other readers (currentActivity, uncollectedWords) are measured and left alone; a later session takes them if the host is still reported unresponsive after this release.</li><li>Moving the scan to a worker thread.</li><li>Any change to dabbler.refreshSeconds or its default.</li><li>Explaining the Start that did nothing in chromatic-notation-configurator; it becomes a session of its own only if it recurs after this release.</li><li>Publishing 3.34.1: session 333 releases it.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[12:37:55]</span> <span class="muted">run-started</span> session=332 mode=pull</div>
+<div class="line"><span class="at">[12:37:55]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[12:41:00]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[12:41:00]</span> <span class="muted">plan-accepted</span> steps=[&quot;cache-key&quot;,&quot;async-roots&quot;,&quot;refresh-burst&quot;,&quot;version-3-34-1&quot;] non_goals=5</div>
+<div class="line"><span class="at">[12:41:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[12:41:08]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=cache-key</div>
+<div class="line"><span class="at">[12:43:28]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:43:43]</span> <span class="muted">check-passed</span> step=cache-key argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts&quot;]</div>
+<div class="line"><span class="at">[12:43:43]</span> <span class="muted">check-passed</span> step=cache-key argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[12:43:57]</span> <span class="muted">named-tests-passed</span> step=cache-key suite=typescript command=node scripts/suite.mjs container packages/router/test/projection.test.ts</div>
+<div class="line"><span class="at">[12:44:09]</span> <span class="muted">named-tests-passed</span> step=cache-key suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</div>
+<div class="line"><span class="at">[12:44:11]</span> <span class="muted">report-accepted</span> seq=2 step=cache-key files=[&quot;tools/dabbler-ai-orchestration/src/utils/projection.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts&quot;] notes=Constraint confirmed: per-run writers (drive/driver writeRun, rounds, configure baseline) write the session in flight; a session's rounds land before its close writes sessions.json, so no file stays keyed for every run. Key = 4 sessions-root files + runs dir mtime + one run's 5 records.</div>
+<div class="line"><span class="at">[12:44:11]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=async-roots</div>
+<div class="line"><span class="at">[12:46:13]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:46:33]</span> <span class="muted">check-passed</span> step=async-roots argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts&quot;]</div>
+<div class="line"><span class="at">[12:46:33]</span> <span class="muted">check-passed</span> step=async-roots argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[12:46:44]</span> <span class="muted">named-tests-passed</span> step=async-roots suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[12:46:59]</span> <span class="muted">named-tests-passed</span> step=async-roots suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts</div>
+<div class="line"><span class="at">[12:47:02]</span> <span class="muted">report-accepted</span> seq=3 step=async-roots files=[&quot;tools/dabbler-ai-orchestration/src/utils/fileSystem.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/extension.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts&quot;] notes=git worktree list via async execFile; discoverRoots async; scanRepositories(cache, roots); provider.setRoots takes a list or a promise so the first scan waits for the first discovery; one rediscover() feeds watchers and scan per poll, folder change and explicit refresh.</div>
+<div class="line"><span class="at">[12:47:02]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=refresh-burst</div>
+<div class="line"><span class="at">[12:47:55]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:48:11]</span> <span class="muted">check-passed</span> step=refresh-burst argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts&quot;]</div>
+<div class="line"><span class="at">[12:48:11]</span> <span class="muted">check-passed</span> step=refresh-burst argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[12:48:24]</span> <span class="muted">named-tests-passed</span> step=refresh-burst suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[12:48:38]</span> <span class="muted">named-tests-passed</span> step=refresh-burst suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts</div>
+<div class="line"><span class="at">[12:48:39]</span> <span class="muted">report-accepted</span> seq=4 step=refresh-burst files=[&quot;tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts&quot;] notes=refresh() merges calls within 250 ms (one pending timer, cleared on dispose); refresh(true) cancels it, clears the cache and fires at once.</div>
+<div class="line"><span class="at">[12:48:39]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-3-34-1</div>
+<div class="line"><span class="at">[12:49:22]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[12:49:38]</span> <span class="muted">check-passed</span> step=version-3-34-1 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[12:49:38]</span> <span class="muted">check-passed</span> step=version-3-34-1 argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.34.1'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.34.1]')){process.exit(1)}&quot;]</div>
+<div class="line"><span class="at">[12:49:40]</span> <span class="muted">report-accepted</span> seq=5 step=version-3-34-1 files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.34.1, stamped with npm run stamp:version; CHANGELOG 3.34.1 Fixed section.</div>
+<div class="line"><span class="at">[12:49:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[12:49:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[12:49:46]</span> <span class="muted">job-started</span> name=verification pid=44792 log=.dabbler/runs/s332/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:50:30]</span> <span class="muted">job-finished</span> name=verification exit=<span class="bad">2</span> log=.dabbler/runs/s332/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:50:34]</span> <span class="muted">mechanic-called</span> stop=verification model=claude-fable-5-1</div>
+<div class="line"><span class="at">[12:50:47]</span> <span class="muted">mechanic-handed-back</span> stop=verification</div>
+<div class="line"><span class="at">[12:52:37]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">verify</span> mode=pull after=verification</div>
+<div class="line"><span class="at">[12:52:45]</span> <span class="muted">job-started</span> name=verification pid=22440 log=.dabbler/runs/s332/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:53:30]</span> <span class="muted">instruction-issued</span> seq=6 kind=wait</div>
+<div class="line"><span class="at">[12:53:49]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">verify</span> mode=pull</div>
+<div class="line"><span class="at">[12:54:40]</span> <span class="muted">instruction-issued</span> seq=7 kind=wait</div>
+<div class="line"><span class="at">[12:54:57]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">verify</span> mode=pull</div>
+<div class="line"><span class="at">[12:55:23]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s332/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[12:55:23]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[12:55:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[12:55:23]</span> <span class="good">progress-resumed</span> past=verification from=verify phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[12:55:26]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[12:55:27]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=33324 log=.dabbler/runs/s332/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:55:42]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s332/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[12:55:45]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[12:55:46]</span> <span class="muted">job-started</span> name=run of record: typescript pid=33276 log=.dabbler/runs/s332/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:56:32]</span> <span class="muted">instruction-issued</span> seq=8 kind=wait</div>
+<div class="line"><span class="at">[12:56:58]</span> <span class="muted">run-resumed</span> session=332 phase=<span class="milestone">run-of-record</span> mode=pull</div>
+<div class="line"><span class="at">[12:57:03]</span> <span class="muted">run-of-record-standing</span> suite=typescript-windows reason=fresh, green, recorded 2026-11-16T07:55:42.301000-05:00</div>
+<div class="line"><span class="at">[12:57:05]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[12:57:48]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s332/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[12:57:52]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[12:57:53]</span> <span class="muted">job-started</span> name=run of record: extension pid=46160 log=.dabbler/runs/s332/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:58:24]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s332/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[12:58:24]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[12:58:51]</span> <span class="muted">landed</span> commit=2366f45362bcd9a799bc1fdaf1cdf7a1ef9403c2</div>
+<div class="line"><span class="at">[12:58:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[12:58:53]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[12:58:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[12:58:58]</span> <span class="muted">job-started</span> name=close pid=55892 log=.dabbler/runs/s332/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:59:40]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s332/driver/jobs/close.log</div>
+<div class="line"><span class="at">[12:59:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `refresh()` uses a fixed leading-edge window rather than a trailing debounce. With calls at 0 ms, 200 ms, and 400 ms, a test expecting one repaint after the burst would currently observe two; the visible test’s three synchronous calls cannot distinguish these semantics. Location: `tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts`.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The projection count test only compares two counts. A stronger case would record every `statFile` path for current session 2 and assert exactly four session-root files, the runs directory, and five `s2` records—ten paths total and none from another run. Current code appears to satisfy this, but the existing assertion would also accept a wrong constant set. Location: `tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts`.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** No visible test directly exercises asynchronous `listGitWorktrees` parsing or `discoverRoots`. A useful case would supply one workspace folder, complete an asynchronous `execFile` callback with porcelain output, and assert the workspace plus parsed worktrees are returned without invoking a synchronous child-process API. Location: `tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts`.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>7s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>116s</td><td>1500</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>24s</td><td>328</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

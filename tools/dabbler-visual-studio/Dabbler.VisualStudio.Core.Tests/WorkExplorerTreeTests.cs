@@ -123,9 +123,9 @@ namespace Dabbler.VisualStudio.Core.Tests
                 actions = new[]
                 {
                     Action("dabblerSessionSets.startSession", "Start Session"),
-                    Action("dabblerSessionSets.rollback", "Rollback to Start of This Session"),
+                    Action("dabbler.notBuiltHere", "Not Built Here"),
                     Action("dabbler.consultWithAi", "Consult with AI"),
-                    Action("dabbler.checkStop", "Check this stop"),
+                    Action("dabbler.alsoNotBuiltHere", "Also Not Built Here"),
                 },
             };
             var tree = new WorkExplorerTree();

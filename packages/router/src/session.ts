@@ -108,6 +108,7 @@ import {
   waiverConsequence,
 } from "./driver.ts";
 import type { DriverInstruction, DriverRun } from "./generated/index.ts";
+import type { RollbackFacts } from "./contracts/router.ts";
 import { type ExtensionManifest, VERSION, extensionManifestAbove } from "./version.ts";
 import { PACKAGE_ROOT } from "./paths.ts";
 import { citedRules } from "./triage.ts";
@@ -3955,6 +3956,31 @@ function rollbackFacts(repoRoot: string, anchor: string): { readonly authors: st
   return { authors: [...authors].sort(), oldest };
 }
 
+/**
+ * The rollback dialog's detail, from the facts and nothing else: the sessions
+ * undone, the commits reverted and whose, the oldest, and that uncommitted
+ * work is kept. No count of files: that is the plan's own line. A clause
+ * that does not apply is left out rather than written as zero. The dry run
+ * prints it beside the facts, for an interface that cannot call it.
+ */
+export function rollbackDetail(facts: RollbackFacts): string {
+  const span =
+    facts.through === facts.session
+      ? `Session ${facts.session} is undone`
+      : `Sessions ${facts.session} to ${facts.through} are undone`;
+  const clauses: string[] = [];
+  if (facts.commits > 0) {
+    const who = facts.authors.length > 0 ? ` by ${facts.authors.join(" and ")}` : "";
+    const since = facts.oldest ? `, the oldest from ${facts.oldest.slice(0, 10)}` : "";
+    clauses.push(`${facts.commits} commit${facts.commits === 1 ? "" : "s"}${who}${since}, ${facts.commits === 1 ? "is" : "are"} reverted on the trunk`);
+  }
+  if (facts.uncommitted > 0) {
+    clauses.push("uncommitted work is kept on a safety branch");
+  }
+  clauses.push(`the session${facts.through === facts.session ? " returns" : "s return"} to not-started`);
+  return `${span}: ${clauses.join("; ")}. The session plan is kept.`;
+}
+
 /** The paths a rollback discards: changed since the anchor, committed or not, and untracked. */
 function discardedPaths(repoRoot: string, anchor: string): string[] {
   const paths = new Set<string>();
@@ -4112,18 +4138,17 @@ export function rollback(sessionsDir: string, options: RollbackCliOptions): numb
     const uncommitted = materialWorktreeChanges(sessionsDir).paths;
     const headNow = runGit(repoRoot, ["rev-parse", "HEAD"]).stdout.trim();
     if (options.dryRun === true) {
-      writeOut(
-        `${dumps({
-          session: target,
-          through,
-          anchor,
-          head: headNow,
-          commits: commits.length,
-          authors: facts.authors,
-          oldest: facts.oldest,
-          uncommitted: uncommitted.length,
-        })}\n`,
-      );
+      const printed = {
+        session: target,
+        through,
+        anchor,
+        head: headNow,
+        commits: commits.length,
+        authors: facts.authors,
+        oldest: facts.oldest,
+        uncommitted: uncommitted.length,
+      };
+      writeOut(`${dumps({ ...printed, detail: rollbackDetail(printed) })}\n`);
       return EXIT_OK;
     }
     // The confirm is bound to the facts it was given: the dialog read them at

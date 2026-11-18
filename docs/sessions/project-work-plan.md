@@ -391,7 +391,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 351 | Start Session from Visual Studio, with the engine in Windows Terminal | no | 2026-11-18 |
 | 352 | The Dabbler Terminal's output in Visual Studio | no | 2026-11-18 |
 | 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | no | 2026-11-18 |
-| 354 | Rollback and the ways on from a stop, from Visual Studio | — | not declared |
+| 354 | Rollback and the ways on from a stop, from Visual Studio | no | 2026-11-18 |
 | 355 | The Configuration window in Visual Studio | — | not declared |
 | 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | — | not declared |
 | 357 | Set up Dabbler in the solution that is open | — | not declared |
@@ -3969,3 +3969,9 @@ Give a developer in Visual Studio the Work Explorer's Stop, Continue, Close, Can
 **Amended after acceptance:**
 
 - 2026-11-18 — step 'close': its files: Close is now runnable, so WorkExplorerTreeTests' hidden-action example must name actions session 354 builds instead (claude-code (anthropic, claude-opus-5-5))
+
+### Session 354 — Rollback and the ways on from a stop, from Visual Studio
+
+**Releasable: no.**
+
+Give a developer in Visual Studio Rollback to Start of This Session and the ways on from a stop, beside the code. Rollback asks the router's dry run first and shows its facts as the confirmation's detail. The router prints that detail as a `detail` field of the dry run's JSON, built by the same `rollbackDetail` VS Code calls in-process, so C# does not write the rule a second time. Where a stop stands (the row also offers Report this stop), the dialog offers "Report, Then Roll Back" first, as VS Code's does. That choice writes the report with `--rolling-back`, then rolls back bound to the dry run's HEAD (`--as-of`), then opens the report in the editor. If no report could be written, the developer is asked once whether to roll back anyway. Check this stop asks its confirmation, runs `dabbler triage` under a progress indication, and shows the answer in the Dabbler Session pane. Review exception runs `session waive` with no reason, shows the card in the Dabbler Session pane, asks for a reason, and records the waiver with it. A blank or dismissed reason records nothing. Report this stop to Dabbler asks its confirmation, writes the report (`defect-report --json`), and opens it in the editor, saying where to send it if the router names an address. The extension sends nothing. Open Transcript at its Exceptions opens the committed page at its anchor in the browser, through the file opener that already handles that. The library holds the parts that decide: RollbackAsk (the question, its choices, the arguments with `--as-of`) and StopReport (the report's arguments and the file it says it wrote). Each part has its tests, and the five ids join RunnableActions.

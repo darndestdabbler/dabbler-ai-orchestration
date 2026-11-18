@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -46,17 +47,37 @@ namespace Dabbler.VisualStudio
         public static bool Confirm(WorkExplorerConfirmation confirmation)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            var choices = confirmation.Keep != null ? new[] { confirmation.Accept, confirmation.Keep } : new[] { confirmation.Accept };
+            return Choose(confirmation.Title, confirmation.Detail, choices, confirmation.Accept, confirmation.Keep) == confirmation.Accept;
+        }
+
+        /// <summary>
+        /// The choice the developer clicked, or null where they dismissed the
+        /// dialog. Enter chooses <paramref name="defaultChoice"/>;
+        /// <paramref name="keep"/>, where given, is the button Esc stands for.
+        /// </summary>
+        public static string? Choose(string title, string? detail, IReadOnlyList<string> choices, string defaultChoice, string? keep)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             var dialog = new ActionDialog();
-            dialog.body.Children.Add(new TextBlock { Text = confirmation.Title, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold });
-            if (!string.IsNullOrEmpty(confirmation.Detail))
+            dialog.body.Children.Add(new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold });
+            if (!string.IsNullOrEmpty(detail))
             {
-                dialog.body.Children.Add(new TextBlock { Text = confirmation.Detail, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
+                dialog.body.Children.Add(new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
             }
-            var accept = dialog.Add(confirmation.Accept);
-            accept.IsDefault = true;
-            accept.Click += (_, _) => dialog.DialogResult = true;
-            if (confirmation.Keep != null) dialog.Add(confirmation.Keep).IsCancel = true;
-            return dialog.ShowModal() == true;
+            string? chosen = null;
+            foreach (var choice in choices)
+            {
+                var button = dialog.Add(choice);
+                button.IsDefault = choice == defaultChoice;
+                button.IsCancel = choice == keep;
+                button.Click += (_, _) =>
+                {
+                    chosen = choice;
+                    dialog.DialogResult = true;
+                };
+            }
+            return dialog.ShowModal() == true ? chosen : null;
         }
 
         /// <summary>What the developer typed, or null where they dismissed the box.</summary>

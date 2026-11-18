@@ -42,11 +42,11 @@ namespace Dabbler.VisualStudio
             Content = control;
         }
 
-        private void OnActionChosen(object sender, WorkExplorerAction action)
+        private void OnActionChosen(object sender, (WorkExplorerNode Node, WorkExplorerAction Action) chosen)
         {
             var root = repositoryRoot;
             if (root == null) return;
-            Dabbler.JoinableTaskFactory.RunAsync(() => new RowActions(Dabbler).RunAsync(root, action))
+            Dabbler.JoinableTaskFactory.RunAsync(() => new RowActions(Dabbler).RunAsync(root, chosen.Node, chosen.Action))
                 .FileAndForget("dabbler/work-explorer/action");
         }
 

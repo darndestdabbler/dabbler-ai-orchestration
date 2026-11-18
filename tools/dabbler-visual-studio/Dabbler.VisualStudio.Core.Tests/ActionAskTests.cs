@@ -38,6 +38,28 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void Arguments_runs_no_waiver_on_an_empty_reason()
+        {
+            // Review exception's reason, as the router offers it: no blank
+            // text, and a dismissed box aborts.
+            var waive = JsonConvert.DeserializeObject<WorkExplorerAction>(JsonConvert.SerializeObject(new
+            {
+                id = "dabbler.reviewException",
+                title = "Review exception",
+                argv = new[] { "dabbler", "session", "waive", "--sessions-dir", "s" },
+                preview = new[] { "dabbler", "session", "waive", "--sessions-dir", "s" },
+                reason = new { prompt = "Why may session 007 go past this stop?", placeholder = "e.g. flaky", dismissed = "abort", blank = (string?)null },
+            }))!;
+
+            Assert.Null(ActionAsk.Arguments(waive, _ => true, _ => ""));
+            Assert.Null(ActionAsk.Arguments(waive, _ => true, _ => "  "));
+            Assert.Null(ActionAsk.Arguments(waive, _ => true, _ => null));
+            Assert.Equal(
+                new[] { "session", "waive", "--sessions-dir", "s", "--reason", "the clock test is flaky" },
+                ActionAsk.Arguments(waive, _ => true, _ => "the clock test is flaky"));
+        }
+
+        [Fact]
         public void Arguments_runs_nothing_when_a_dialog_is_dismissed()
         {
             var reasonAsked = false;

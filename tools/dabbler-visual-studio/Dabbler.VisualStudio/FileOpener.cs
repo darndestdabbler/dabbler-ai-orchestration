@@ -38,6 +38,18 @@ namespace Dabbler.VisualStudio
             if (ErrorHandler.Succeeded(view.SetCaretPos(line, 0))) view.CenterLines(line, 1);
         }
 
+        /// <summary>Opens <paramref name="file"/> in Visual Studio's own editor, at the top.</summary>
+        public static void Open(IServiceProvider services, string file)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (!File.Exists(file))
+            {
+                Say(services, $"{file} does not exist, so there is nothing to open.");
+                return;
+            }
+            VsShellUtilities.OpenDocument(services, file);
+        }
+
         private static void InBrowser(IServiceProvider services, WorkExplorerOpens opens)
         {
             ThreadHelper.ThrowIfNotOnUIThread();

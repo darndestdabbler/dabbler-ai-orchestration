@@ -18,8 +18,8 @@ namespace Dabbler.VisualStudio
             this.package = package;
         }
 
-        /// <summary>Runs <paramref name="action"/> for the repository at <paramref name="repositoryRoot"/>.</summary>
-        public async Task RunAsync(string repositoryRoot, WorkExplorerAction action)
+        /// <summary>Runs <paramref name="action"/>, chosen on <paramref name="node"/>, for the repository at <paramref name="repositoryRoot"/>.</summary>
+        public async Task RunAsync(string repositoryRoot, WorkExplorerNode node, WorkExplorerAction action)
         {
             await package.JoinableTaskFactory.SwitchToMainThreadAsync();
             if (action.Opens != null)
@@ -37,7 +37,15 @@ namespace Dabbler.VisualStudio
                 case ActionIds.CloseSession:
                 case ActionIds.CancelSession:
                 case ActionIds.RestoreSession:
+                case ActionIds.CheckStop:
+                case ActionIds.ReviewException:
                     await new LifecycleActions(package).RunAsync(repositoryRoot, action);
+                    return;
+                case ActionIds.ReportStop:
+                    await new LifecycleActions(package).ReportAsync(repositoryRoot, action);
+                    return;
+                case ActionIds.Rollback:
+                    await new LifecycleActions(package).RollbackAsync(repositoryRoot, node.Actions, action);
                     return;
                 case ActionIds.ConsultWithAi:
                 case ActionIds.OpenMechanic:

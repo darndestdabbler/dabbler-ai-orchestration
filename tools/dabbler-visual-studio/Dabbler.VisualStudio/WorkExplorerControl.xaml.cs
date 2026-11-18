@@ -18,8 +18,11 @@ namespace Dabbler.VisualStudio
             InitializeComponent();
         }
 
-        /// <summary>A menu item was clicked, or a row with a `click` was double-clicked or had Enter pressed on it.</summary>
-        public event EventHandler<WorkExplorerAction>? ActionChosen;
+        /// <summary>
+        /// A menu item was clicked, or a row with a `click` was double-clicked
+        /// or had Enter pressed on it: the action, and the row it was chosen on.
+        /// </summary>
+        public event EventHandler<(WorkExplorerNode Node, WorkExplorerAction Action)>? ActionChosen;
 
         private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
         {
@@ -34,7 +37,7 @@ namespace Dabbler.VisualStudio
             foreach (var action in node.Actions)
             {
                 var item = new MenuItem { Header = action.Title };
-                item.Click += (_, _) => ActionChosen?.Invoke(this, action);
+                item.Click += (_, _) => ActionChosen?.Invoke(this, (node, action));
                 row.ContextMenu.Items.Add(item);
             }
         }
@@ -55,7 +58,7 @@ namespace Dabbler.VisualStudio
         {
             var click = node.Row.Click;
             if (click == null) return false;
-            ActionChosen?.Invoke(this, click);
+            ActionChosen?.Invoke(this, (node, click));
             return true;
         }
     }

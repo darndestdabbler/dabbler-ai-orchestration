@@ -342,29 +342,8 @@ export function rollbackConfirmation(sessionNumber: number, name: string): Actio
 
 export type { RollbackFacts };
 
-/**
- * The rollback dialog's detail, from the facts and nothing else: the sessions
- * undone, the commits reverted and whose, the oldest, and that uncommitted
- * work is kept. No count of files: that is the plan's own line. A clause
- * that does not apply is left out rather than written as zero.
- */
-export function rollbackDetail(facts: RollbackFacts): string {
-  const span =
-    facts.through === facts.session
-      ? `Session ${facts.session} is undone`
-      : `Sessions ${facts.session} to ${facts.through} are undone`;
-  const clauses: string[] = [];
-  if (facts.commits > 0) {
-    const who = facts.authors.length > 0 ? ` by ${facts.authors.join(" and ")}` : "";
-    const since = facts.oldest ? `, the oldest from ${facts.oldest.slice(0, 10)}` : "";
-    clauses.push(`${facts.commits} commit${facts.commits === 1 ? "" : "s"}${who}${since}, ${facts.commits === 1 ? "is" : "are"} reverted on the trunk`);
-  }
-  if (facts.uncommitted > 0) {
-    clauses.push("uncommitted work is kept on a safety branch");
-  }
-  clauses.push(`the session${facts.through === facts.session ? " returns" : "s return"} to not-started`);
-  return `${span}: ${clauses.join("; ")}. The session plan is kept.`;
-}
+// The dry run prints it, so it lives beside the facts it reads.
+export { rollbackDetail } from "../session.ts";
 
 /** The reason a stop is recorded with when the person typed none. */
 export const STOP_REASON_BLANK = "the operator stopped the session";

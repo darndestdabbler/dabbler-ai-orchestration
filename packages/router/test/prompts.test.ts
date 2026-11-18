@@ -186,6 +186,17 @@ describe("the task block a round opens with", () => {
     assert.match(prompt, /replaces a boundary — an in-memory database, a stubbed client, a partial seed — ask for evidence that the shipped configuration and the real path are exercised at least once/);
   });
 
+  it("holds the finish of what a person sees to the task, and reads a Word document's text as content, not appearance", () => {
+    // A document's headings and tables, and an interface's layout, were read
+    // as work beyond the task beside the operator's sentence.
+    const template = readFileSync(join(import.meta.dirname, "..", "prompt-templates", "verification.md"), "utf8");
+    const prompt = buildVerificationPrompt(template, "Write the user guide.", "code-review", "done");
+    assert.match(prompt, /Over-engineering is strictly forbidden\. The value AI brings/);
+    assert.match(prompt, /the finish of a user interface or a document [^]*is part of what was asked for, and is never work beyond the task/);
+    assert.match(prompt, /A block headed \*\*Word document text\*\* is that document's content [^]*and not its appearance/);
+    assert.match(prompt, /a person judges how the document looks/);
+  });
+
   it("carries a dropped non-goal with its reason, so the round judges the reason", () => {
     // Round 3 blocked a one-line fix as a non-goal violation and round 4
     // blocked the revert, because the plan could not say the non-goal had

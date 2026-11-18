@@ -722,6 +722,16 @@ model:
 None of this is yours to drive: the framework decides, reads and records
 it inside the verification job.
 
+**A Word document is reviewed as its text.** Where a session's plan asks
+for a `.docx`, the author writes the document directly with the best
+document tooling it has and reads it before reporting the step; the step's
+check proves the file opens, not that a script reproduces it. A reviewer
+cannot read a Word file's bytes, so the evidence carries the document's
+text instead, round 1 for every `.docx` the session created or changed and
+a later round for each one the fix changed. The reviewer holds that text
+to the plan and says nothing about layout, which it is not shown: how the
+document looks is the person's to judge before they rely on it.
+
 ## `wait`: the framework's own long work
 
 Three things take longer than a tool call: a verification round, the

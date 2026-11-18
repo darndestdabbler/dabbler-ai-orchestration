@@ -1862,6 +1862,20 @@ describe("the plan ask's answer file", () => {
     const ask = String(JSON.parse(asked.stdout).ask);
     assert.match(ask, /one that writes a tracked file is refused, so a generator is run as the step's work and the check proves its output is current/);
   });
+
+  it("says a document is written directly, its check proves it opens, and its finish was asked for", async () => {
+    // A staff member's Word documents were a generator script's first draft.
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+
+    const asked = await capture(() => sessionNext(sessionsDir, {}));
+
+    const ask = String(JSON.parse(asked.stdout).ask);
+    assert.match(ask, /the author writes the document directly/);
+    assert.match(ask, /opens as the archive it is, not that a script reproduces it/);
+    assert.match(ask, /Over-engineering is strictly forbidden\. The value AI brings/);
+    assert.match(ask, /the finish of a user interface or a document [^]*is part of what was asked for/);
+  });
 });
 
 describe("the Log phase, which records the session it cannot stop", () => {

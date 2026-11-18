@@ -316,6 +316,13 @@ describe("the instruction files", () => {
     assert.match(agents.toLowerCase(), /working tree/);
   });
 
+  it("names the exception to the editing-tools rule: a binary document is written by document tooling", () => {
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    assert.match(agents, /never with a shell heredoc\*\*, and a\s+binary document -- `\.docx`[^]*with document tooling/);
+  });
+
   it("tells the engine the clock is the framework's, not a thing to re-engineer", () => {
     // The body said "a call you make later, never a sleep you hold", and a
     // capable model read it and built a background poll on `run.json`'s job

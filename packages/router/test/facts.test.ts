@@ -6,8 +6,10 @@
 // green. The controls that really spawn, and the evidence bundle over a
 // real diff, are walked in walk-record.test.ts.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { crc32, deflateRawSync } from "node:zlib";
 
 import {
   CONTROL_TIMEOUT_SECONDS,
@@ -19,6 +21,7 @@ import {
   STATUS_UNKNOWN,
   appendFacts,
   assembleEvidence,
+  assembleFixDeltaEvidence,
   buildDiffPathspecs,
   changedLines,
   checkEvidenceCap,
@@ -81,6 +84,163 @@ describe("the evidence", () => {
       assert.match(bookkeeping, /- docs\/transcripts\/session-2\.html/);
       assert.doesNotMatch(evidence, /REGENERATED PAGE/);
       assert.match(evidence, /\+two/);
+    } finally {
+      restore();
+    }
+  });
+});
+
+/** A zip archive of deflated members, as Word writes one. */
+function zipOf(members: Record<string, string>): Buffer {
+  const parts: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(members)) {
+    const data = Buffer.from(text, "utf8");
+    const body = deflateRawSync(data);
+    const nameBytes = Buffer.from(name, "utf8");
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc32(data), 14);
+    local.writeUInt32LE(body.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(crc32(data), 16);
+    central.writeUInt32LE(body.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(offset, 42);
+    parts.push(local, nameBytes, body);
+    centrals.push(central, nameBytes);
+    offset += 30 + nameBytes.length + body.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(centrals.length / 2, 8);
+  end.writeUInt16LE(centrals.length / 2, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, directory, end]);
+}
+
+/** A Word document whose body is `body`, a run of w:p and w:tbl elements. */
+function docx(body: string): Buffer {
+  return zipOf({
+    "[Content_Types].xml": '<?xml version="1.0"?><Types/>',
+    "word/document.xml":
+      '<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      `<w:body>${body}</w:body></w:document>`,
+  });
+}
+
+function para(text: string, style = ""): string {
+  const properties = style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : "";
+  return `<w:p>${properties}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+}
+
+const GUIDE = docx(
+  para("User guide", "Title") +
+    para("Installing", "Heading2") +
+    para("Run the installer &amp; restart.") +
+    "<w:tbl><w:tblPr/><w:tr><w:tc>" + para("Option") + "</w:tc><w:tc>" + para("Meaning") + "</w:tc></w:tr>" +
+    "<w:tr><w:tc>" + para("--quiet") + "</w:tc><w:tc>" + para("Prints nothing") + "</w:tc></w:tr></w:tbl>",
+);
+
+/** git as it answers round 1 for a tree whose only work is what `untracked` and `changed` name. */
+function roundOneAnswers(untracked: string[], changed: string[]): () => void {
+  return gitAnswers([
+    [["status"], { stdout: [...untracked.map((path) => `?? ${path}`), ...changed.map((path) => ` M ${path}`)].join("\n") }],
+    [(args) => args[0] === "diff" && args.includes("--diff-filter=d"), { stdout: changed.map((path) => `${path}\0`).join("") }],
+    [["diff", "--name-only"], { stdout: "" }],
+    [(args) => args[0] === "ls-files" && args.includes("docs/transcripts"), { stdout: "" }],
+    [["ls-files"], { stdout: untracked.map((path) => `${path}\0`).join("") }],
+    [["diff"], { stdout: changed.map((path) => `diff --git a/${path} b/${path}\nBinary files differ`).join("\n") }],
+  ]);
+}
+
+describe("a Word document's text in the evidence", () => {
+  it("carries a new document's text in the first round, headings marked and table cells in reading order", () => {
+    const repo = tempDir();
+    writeFileSync(join(repo, "guide.docx"), GUIDE);
+    const restore = roundOneAnswers(["guide.docx"], []);
+    try {
+      const evidence = assembleEvidence(repo, "docs/sessions", 1);
+      const block = evidence.split("#### Word document text")[1] ?? "";
+      assert.match(block, /\*\*guide\.docx\*\*/);
+      assert.match(block, /^# User guide$/m);
+      assert.match(block, /^## Installing$/m);
+      assert.match(block, /^Run the installer & restart\.$/m);
+      assert.match(block, /^\| Option \| Meaning \|$/m);
+      assert.match(block, /^\| --quiet \| Prints nothing \|$/m);
+      assert.doesNotMatch(evidence, /binary \/ non-UTF-8/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("carries a tracked document's text where the session changed it", () => {
+    const repo = tempDir();
+    writeFileSync(join(repo, "guide.docx"), GUIDE);
+    const restore = roundOneAnswers([], ["guide.docx"]);
+    try {
+      const evidence = assembleEvidence(repo, "docs/sessions", 1);
+      assert.match(evidence.split("#### Word document text")[1] ?? "", /^## Installing$/m);
+    } finally {
+      restore();
+    }
+  });
+
+  it("lists a document whose text is over the cap with its size, and does not inline it", () => {
+    const repo = tempDir();
+    writeFileSync(join(repo, "long.docx"), docx(para("x".repeat(70 * 1024))));
+    const restore = roundOneAnswers(["long.docx"], []);
+    try {
+      const evidence = assembleEvidence(repo, "docs/sessions", 1);
+      assert.match(evidence, /#### Word documents NOT inlined\n- long\.docx — oversized text \(\d+ chars\)/);
+      assert.doesNotMatch(evidence, /xxxxxxxxxx/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("lists a .docx that is not a readable archive as unreadable and still assembles the evidence", () => {
+    const repo = tempDir();
+    seed(repo, { "broken.docx": "not a zip archive", "src/a.ts": "export const a = 1;\n" });
+    const restore = roundOneAnswers(["broken.docx", "src/a.ts"], []);
+    try {
+      const evidence = assembleEvidence(repo, "docs/sessions", 1);
+      assert.match(evidence, /- broken\.docx — unreadable as a Word document/);
+      assert.match(evidence, /export const a = 1;/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("leaves a document unchanged since the round before out of a later round's evidence", () => {
+    const repo = tempDir();
+    writeFileSync(join(repo, "same.docx"), docx(para("Unchanged words")));
+    writeFileSync(join(repo, "fixed.docx"), docx(para("Corrected words")));
+    const restore = gitAnswers([
+      [["status"], { stdout: "?? fixed.docx\n?? same.docx" }],
+      [["read-tree"], { code: 0 }],
+      [["add"], { code: 0 }],
+      [["rm", "--cached"], { code: 0 }],
+      [["write-tree"], { stdout: "c".repeat(40) }],
+      [(args) => args[0] === "diff" && args.includes("--diff-filter=d"), { stdout: "fixed.docx\0" }],
+      [["diff"], { stdout: "diff --git a/fixed.docx b/fixed.docx\nBinary files differ" }],
+    ]);
+    try {
+      const evidence = assembleFixDeltaEvidence(repo, "docs/sessions", 1, "b".repeat(40));
+      assert.match(evidence, /Corrected words/);
+      assert.doesNotMatch(evidence, /Unchanged words/);
     } finally {
       restore();
     }

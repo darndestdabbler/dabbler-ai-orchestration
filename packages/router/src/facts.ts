@@ -25,6 +25,7 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { inflateRawSync } from "node:zlib";
 
 import { SET_BOOKKEEPING_BASENAMES, shlexSplit, vsToolsDetail, withVsTools } from "./checks.ts";
 import type { ContractChange } from "./approvedPlan.ts";
@@ -262,6 +263,193 @@ interface UntrackedContents {
   readonly inlined: ReadonlyArray<readonly [string, string]>;
   readonly omitted: ReadonlyArray<readonly [string, string]>;
   readonly bookkeeping: readonly string[];
+  /** New Word documents, read for their text rather than as bytes. */
+  readonly documents: readonly string[];
+}
+
+// --- A Word document's text -------------------------------------------------
+//
+// A .docx is a zip archive of XML, and a reviewer shown its bytes reviews
+// nothing: the text is what it can hold to the plan. Read with what Node
+// ships -- the archive's central directory, zlib, and the document part's
+// paragraphs -- so no dependency rides with the router. Appearance is not
+// read at all; a person judges that.
+
+const WORD_DOCUMENT = /\.docx$/i;
+const DOCUMENT_PART = "word/document.xml";
+/** Bounds the inflated part, so an archive that expands without end is unreadable, not a hang. */
+const DOCUMENT_PART_LIMIT = 64 * 1024 * 1024;
+
+/** One stored or deflated member of a zip archive, or null when the archive does not hold it readably. */
+function zipMember(raw: Buffer, name: string): Buffer | null {
+  const floor = Math.max(0, raw.length - 22 - 0xffff);
+  let end = -1;
+  for (let at = raw.length - 22; at >= floor; at -= 1) {
+    if (raw.readUInt32LE(at) === 0x06054b50) {
+      end = at;
+      break;
+    }
+  }
+  if (end < 0) return null;
+  const count = raw.readUInt16LE(end + 10);
+  let at = raw.readUInt32LE(end + 16);
+  for (let index = 0; index < count; index += 1) {
+    if (at + 46 > raw.length || raw.readUInt32LE(at) !== 0x02014b50) return null;
+    const method = raw.readUInt16LE(at + 10);
+    const size = raw.readUInt32LE(at + 20);
+    const nameLength = raw.readUInt16LE(at + 28);
+    const skip = nameLength + raw.readUInt16LE(at + 30) + raw.readUInt16LE(at + 32);
+    const local = raw.readUInt32LE(at + 42);
+    if (raw.toString("utf8", at + 46, at + 46 + nameLength) === name) {
+      if (local + 30 > raw.length || raw.readUInt32LE(local) !== 0x04034b50) return null;
+      const start = local + 30 + raw.readUInt16LE(local + 26) + raw.readUInt16LE(local + 28);
+      const body = raw.subarray(start, start + size);
+      if (method === 0) return body;
+      if (method === 8) return inflateRawSync(body, { maxOutputLength: DOCUMENT_PART_LIMIT });
+      return null;
+    }
+    at += 46 + skip;
+  }
+  return null;
+}
+
+function xmlUnescape(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|lt|gt|amp|quot|apos);/gi, (whole, entity: string) => {
+    const named: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+    const lower = entity.toLowerCase();
+    if (lower in named) return named[lower] as string;
+    const code = lower.startsWith("#x") ? Number.parseInt(lower.slice(2), 16) : Number.parseInt(lower.slice(1), 10);
+    return Number.isFinite(code) && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+}
+
+const WORD_TOKEN =
+  /<(\/?)w:(p|pStyle|t|tab|br|tbl|tr|tc)(?=[\s/>])([^>]*?)(\/?)>|([^<]+)|<[^>]*>/g;
+
+/**
+ * The text of a Word document: one paragraph to a line, a heading marked
+ * with `#` for each level of it, a table one row to a line with its cells
+ * in reading order. Null when the bytes are not a Word document.
+ */
+function wordDocumentText(raw: Buffer): string | null {
+  let part: Buffer | null;
+  try {
+    part = zipMember(raw, DOCUMENT_PART);
+  } catch {
+    return null;
+  }
+  if (part === null) return null;
+  const xml = part.toString("utf8");
+  if (!/<w:document[\s>]/.test(xml)) return null;
+
+  const lines: string[] = [];
+  const tables: Array<{ row: string[] | null; cell: string[] | null }> = [];
+  let paragraph: string | null = null;
+  let level = 0;
+  let inText = false;
+  const emit = (line: string): void => {
+    const cell = tables[tables.length - 1]?.cell;
+    if (cell) cell.push(line);
+    else lines.push(line);
+  };
+  for (const match of xml.matchAll(WORD_TOKEN)) {
+    const [, closing, name, attributes = "", selfClosing, text] = match;
+    if (text !== undefined) {
+      if (inText && paragraph !== null) paragraph += xmlUnescape(text);
+      continue;
+    }
+    if (name === undefined) continue;
+    const opens = closing !== "/";
+    const closes = closing === "/" || selfClosing === "/";
+    if (name === "t") inText = opens && selfClosing !== "/";
+    if (name === "p") {
+      if (opens) {
+        paragraph = "";
+        level = 0;
+      }
+      if (closes && paragraph !== null) {
+        const words = paragraph.trim();
+        if (words !== "") emit(level > 0 ? `${"#".repeat(level)} ${words}` : words);
+        paragraph = null;
+      }
+    } else if (name === "pStyle" && opens) {
+      const style = /w:val="([^"]*)"/.exec(attributes)?.[1] ?? "";
+      const heading = /^heading\s*([1-9])$/i.exec(style);
+      level = heading ? Number(heading[1]) : /^title$/i.test(style) ? 1 : 0;
+    } else if ((name === "tab" || name === "br") && opens && paragraph !== null) {
+      paragraph += name === "tab" ? "\t" : " ";
+    } else if (name === "tbl") {
+      if (opens && !closes) tables.push({ row: null, cell: null });
+      else if (!opens) tables.pop();
+    } else if (name === "tr") {
+      const table = tables[tables.length - 1];
+      if (table === undefined) continue;
+      if (opens && !closes) table.row = [];
+      else if (!opens && table.row !== null) {
+        const row = table.row;
+        table.row = null;
+        emit(`| ${row.join(" | ")} |`);
+      }
+    } else if (name === "tc") {
+      const table = tables[tables.length - 1];
+      if (table === undefined) continue;
+      if (opens && !closes) table.cell = [];
+      else if (!opens && table.cell !== null) {
+        const cell = table.cell;
+        table.cell = null;
+        table.row?.push(cell.join(" "));
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
+interface DocumentTexts {
+  readonly inlined: ReadonlyArray<readonly [string, string]>;
+  readonly omitted: ReadonlyArray<readonly [string, string]>;
+}
+
+/** Each Word document's text as the working tree holds it, or the reason it is not inlined. */
+function documentTexts(repoRoot: string, paths: readonly string[]): DocumentTexts {
+  const inlined: Array<readonly [string, string]> = [];
+  const omitted: Array<readonly [string, string]> = [];
+  for (const rel of [...new Set(paths)].sort(compareCodePoints)) {
+    let raw: Buffer;
+    try {
+      raw = readFileSync(join(repoRoot, ...rel.split("/")));
+    } catch {
+      omitted.push([rel, "unreadable"]);
+      continue;
+    }
+    const text = wordDocumentText(raw);
+    if (text === null) {
+      omitted.push([rel, "unreadable as a Word document"]);
+      continue;
+    }
+    const length = evidenceLength(text);
+    if (length > UNTRACKED_INLINE_CAP) {
+      omitted.push([rel, `oversized text (${length} chars)`]);
+      continue;
+    }
+    inlined.push([rel, text]);
+  }
+  return { inlined, omitted };
+}
+
+/** The Word documents a diff between two points changes, deletions aside. */
+function changedDocuments(repoRoot: string, from: string, to: string | null, pathspecs: readonly string[]): string[] {
+  const listed = runGit(repoRoot, [
+    "diff",
+    "--name-only",
+    "-z",
+    "--diff-filter=d",
+    from,
+    ...(to === null ? [] : [to]),
+    "--",
+    ...pathspecs,
+  ]);
+  if (listed.code !== 0) return [];
+  return listed.stdout.split("\0").filter((path) => WORD_DOCUMENT.test(path));
 }
 
 /**
@@ -281,17 +469,22 @@ function untrackedContents(
     "--",
     ...pathspecs,
   ]);
-  if (result.code !== 0) return { inlined: [], omitted: [], bookkeeping: [] };
+  if (result.code !== 0) return { inlined: [], omitted: [], bookkeeping: [], documents: [] };
 
   const inlined: Array<readonly [string, string]> = [];
   const omitted: Array<readonly [string, string]> = [];
   const bookkeeping: string[] = [];
+  const documents: string[] = [];
   for (const rel of result.stdout.split("\0").filter((path) => path !== "")) {
     const parts = rel.replace(/\\/g, "/").split("/");
     const basename = parts[parts.length - 1] ?? rel;
     // The lifecycle lock too: the close measures the change while holding it.
     if (SET_BOOKKEEPING_BASENAMES.has(basename)) {
       bookkeeping.push(rel);
+      continue;
+    }
+    if (WORD_DOCUMENT.test(rel)) {
+      documents.push(rel);
       continue;
     }
     const full = join(repoRoot, ...rel.split("/"));
@@ -323,8 +516,10 @@ function untrackedContents(
     }
     inlined.push([rel, text]);
   }
-  return { inlined, omitted, bookkeeping };
+  return { inlined, omitted, bookkeeping, documents };
 }
+
+const NO_DOCUMENTS: DocumentTexts = { inlined: [], omitted: [] };
 
 function renderEvidence(
   status: string,
@@ -333,6 +528,7 @@ function renderEvidence(
   inlined: ReadonlyArray<readonly [string, string]>,
   omitted: ReadonlyArray<readonly [string, string]>,
   bookkeeping: readonly string[],
+  documents: DocumentTexts = NO_DOCUMENTS,
 ): string {
   const parts = [
     "The session's work, as the working tree presents it.",
@@ -359,6 +555,19 @@ function renderEvidence(
   if (omitted.length > 0) {
     parts.push("\n#### Untracked paths NOT inlined");
     for (const [rel, reason] of omitted) parts.push(`- ${rel} — ${reason}`);
+  }
+  if (documents.inlined.length > 0) {
+    parts.push(
+      "\n#### Word document text (each document's content as the working tree holds it, " +
+        "not its appearance: a paragraph to a line, `#` per heading level, a table row to a line)",
+    );
+    for (const [rel, text] of documents.inlined) {
+      parts.push(`\n**${rel}**`, "```", text || "(the document has no text)", "```");
+    }
+  }
+  if (documents.omitted.length > 0) {
+    parts.push("\n#### Word documents NOT inlined");
+    for (const [rel, reason] of documents.omitted) parts.push(`- ${rel} — ${reason}`);
   }
   if (bookkeeping.length > 0) {
     parts.push("\n#### Expected framework bookkeeping (paths only)");
@@ -406,8 +615,8 @@ export function changeIsEmpty(
   diffAt: (context: number) => string = diffVsHead(repoRoot),
 ): boolean {
   if (diffAt(DIFF_CONTEXT_LADDER[DIFF_CONTEXT_LADDER.length - 1]!).trim() !== "") return false;
-  const { inlined } = untrackedContents(repoRoot, buildDiffPathspecs());
-  return inlined.length === 0;
+  const { inlined, documents } = untrackedContents(repoRoot, buildDiffPathspecs());
+  return inlined.length === 0 && documents.length === 0;
 }
 
 /** Round 1: full working-tree evidence vs HEAD. */
@@ -424,11 +633,15 @@ export function assembleEvidence(
   // Memoised, because the ladder may ask for a width the emptiness probe
   // already paid for.
   const diffAt = diffVsHead(repoRoot);
-  const { inlined, omitted, bookkeeping } = untrackedContents(
+  const { inlined, omitted, bookkeeping, documents } = untrackedContents(
     repoRoot,
     pathspecs,
   );
   const allBookkeeping = [...bookkeeping, ...trackedBookkeeping(repoRoot)];
+  const texts = documentTexts(repoRoot, [
+    ...documents,
+    ...changedDocuments(repoRoot, "HEAD", null, pathspecs),
+  ]);
   if (changeIsEmpty(repoRoot, diffAt)) {
     throw new EvidenceEmptyError(
       "the evidence bundle is empty (no diff vs HEAD, no untracked " +
@@ -448,6 +661,7 @@ export function assembleEvidence(
       inlined,
       omitted,
       allBookkeeping,
+      texts,
     ),
   );
   checkEvidenceCap(rendered);
@@ -494,8 +708,11 @@ export function assembleFixDeltaEvidence(
     ` -> current working tree ${currentTree.slice(0, 12)}). This is NOT the ` +
     "full session diff — new defects are admissible only within these " +
     "hunks. A deleted file is its header alone, contents omitted.";
+  // A document the fix changed is shown whole as text: its tree diff is one
+  // "Binary files differ" line.
+  const texts = documentTexts(repoRoot, changedDocuments(repoRoot, baselineTree, currentTree, pathspecs));
   const rendered = renderWidestThatFits((context) =>
-    renderEvidence(statusRun.stdout, diffAt(context), heading, [], [], []),
+    renderEvidence(statusRun.stdout, diffAt(context), heading, [], [], [], texts),
   );
   checkEvidenceCap(rendered);
   return rendered;

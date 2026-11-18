@@ -373,8 +373,9 @@ session, which does nothing else; the close refuses an unpublished release.
 
 ## Writing files
 
-**Write files with your editing tools, never with a shell heredoc.** On a
-Windows host the shell is usually Git Bash, and a heredoc there eats
+**Write files with your editing tools, never with a shell heredoc**, and a
+binary document -- `.docx`, `.pptx`, `.xlsx`, `.pdf` -- with document tooling.
+On a Windows host the shell is usually Git Bash, and a heredoc there eats
 backslashes: `\n` arrives as a newline and `\\` as one backslash, so JSON
 escapes, regular expressions and Windows paths are silently corrupted on the
 way to disk. Nothing fails — the file is written, and it is wrong. The same
@@ -384,8 +385,7 @@ goes for `echo` and for `printf` with a format you did not escape twice.
 instruction that follows it.** The framework hashes the tree before and
 after a step's checks, and an edit made while one is running refuses the
 report — correctly, because a check run against a tree that moved under
-it proves nothing about either version. Finish the step, report it, and
-wait for the next instruction before starting the next step.
+it proves nothing about either version. Report, then wait for the instruction.
 
 ---
 

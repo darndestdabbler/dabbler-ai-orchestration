@@ -57,6 +57,15 @@ controls run, and a red one refuses the round without sending it.
 The reviewer judges work against the plan, including its non-goals: work
 the plan's non-goals rule out is a finding like any other.
 
+**A Word document.** When a session's plan asks for a `.docx`, the author
+writes the document itself and reads it before reporting the step, rather
+than writing a script that produces it. The reviewer cannot read the bytes
+of a Word file, so it is sent the document's text instead: one paragraph
+to a line, headings marked, tables a row to a line. It holds that text to
+the plan as it would any other deliverable. It is not shown the layout or
+styling, so how the document looks is yours to judge before you rely on
+it.
+
 ## What the reviewer is asked about tests
 
 The framework runs the automated tests before any code is committed: each

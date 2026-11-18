@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="DarndestDabbler.DabblerAiOrchestration.VisualStudio" Version="3.38.0" Language="en-US" Publisher="DarndestDabbler" />
+    <Identity Id="DarndestDabbler.DabblerAiOrchestration.VisualStudio" Version="3.39.0" Language="en-US" Publisher="DarndestDabbler" />
     <DisplayName>Dabbler AI Orchestration for Visual Studio</DisplayName>
     <Description xml:space="preserve">AI writes the code in your solution. The framework runs your build and tests, has a model from another provider review the work, and commits only what passed.</Description>
     <MoreInfo>https://github.com/darndestdabbler/dabbler-ai-orchestration</MoreInfo>

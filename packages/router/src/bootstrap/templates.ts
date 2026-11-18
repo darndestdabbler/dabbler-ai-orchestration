@@ -165,8 +165,9 @@ export const SHARED_BODY =
   "\n" +
   "## Writing files\n" +
   "\n" +
-  "**Write files with your editing tools, never with a shell heredoc.** On a\n" +
-  "Windows host the shell is usually Git Bash, and a heredoc there eats\n" +
+  "**Write files with your editing tools, never with a shell heredoc**, and a\n" +
+  "binary document -- `.docx`, `.pptx`, `.xlsx`, `.pdf` -- with document tooling.\n" +
+  "On a Windows host the shell is usually Git Bash, and a heredoc there eats\n" +
   "backslashes: `\\n` arrives as a newline and `\\\\` as one backslash, so JSON\n" +
   "escapes, regular expressions and Windows paths are silently corrupted on the\n" +
   "way to disk. Nothing fails — the file is written, and it is wrong. The same\n" +
@@ -176,8 +177,7 @@ export const SHARED_BODY =
   "instruction that follows it.** The framework hashes the tree before and\n" +
   "after a step's checks, and an edit made while one is running refuses the\n" +
   "report — correctly, because a check run against a tree that moved under\n" +
-  "it proves nothing about either version. Finish the step, report it, and\n" +
-  "wait for the next instruction before starting the next step.\n";
+  "it proves nothing about either version. Report, then wait for the instruction.\n";
 
 /**
  * Claude Code reads `CLAUDE.md` only.

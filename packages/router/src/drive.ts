@@ -3362,7 +3362,16 @@ class Driver {
       // every round: the two roles are held to one rule.
       "Over-engineering is strictly forbidden. The value AI brings to a solution is measured as " +
       "much by the simplicity and clarity of its design and implementation as by the alignment " +
-      "of the solution with the stated requirements and objectives.\n\n" +
+      "of the solution with the stated requirements and objectives. " +
+      // One rule for everything a person looks at, not an exemption for a
+      // kind of file: read beside a document or a screen, the sentence above
+      // was taken to forbid its headings, tables and layout.
+      "Simplicity is asked of how a thing is built, not of what the person who uses it sees " +
+      "or reads: the finish of a user interface or a document -- layout, styling, headings, a " +
+      "contents table, tables and figures where the content calls for them -- is part of what " +
+      "was asked for, and the machinery behind that finish -- a theming system, a component " +
+      "abstraction, a library nobody asked for -- is still over-engineering however good the " +
+      "screen looks.\n\n" +
       "Answer with a work plan as JSON, written to a file outside the tracked tree " +
       `(for example .dabbler/scratch/plan-s${this.sessionNumber}.json), then run the answer ` +
       "command. The file carries exactly these members and no other:\n" +
@@ -3380,6 +3389,16 @@ class Driver {
       "the run of record, the publish) inherits the shell, so do not assert a credential from " +
       "a check. A check changes nothing: one that writes a tracked file is refused, so a " +
       "generator is run as the step's work and the check proves its output is current. " +
+      // A staff member's Word documents were a first script's output: a
+      // document finished by hand no longer matched its script and failed.
+      "A step whose product is a file a person opens in an office program -- .docx, .pptx, " +
+      ".xlsx, .pdf -- is not generated: the author writes the document directly, with the best " +
+      "document tooling it has, and opens or renders it and reads it before reporting the " +
+      "step, and a generator script is written only where the session's plan asks for one. " +
+      "Its check proves the file is there and opens as the archive it is, not that a script " +
+      "reproduces it: `tar -tf <file>` lists a .docx, .pptx or .xlsx on Windows and macOS, " +
+      "whose tar reads zip archives; GNU tar on Linux refuses one, and there " +
+      "`python3 -m zipfile -t <file>` holds. " +
       "A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +

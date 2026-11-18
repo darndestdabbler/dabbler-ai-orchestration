@@ -12,6 +12,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.39.0] — 2026-11-18
+
+### Changed
+
+- **A Word document a session writes is written as a document.** When a
+  session's plan asks for a `.docx` (or a `.pptx`, `.xlsx` or `.pdf`), the
+  author is now told to write the document itself with the best document
+  tooling it has, and to open it and read it before reporting the step,
+  instead of writing a script that produces it. The step's check proves the
+  file is there and opens, not that a script reproduces it, so a document
+  finished by hand no longer fails its own check.
+- **The reviewer reads a Word document's text.** It used to be shown a new
+  or changed `.docx` only as a binary file, so nobody reviewed it. Each
+  round now carries the text of every `.docx` the session created or
+  changed: one paragraph to a line, headings marked, and tables a row to a
+  line. The reviewer holds that text to the session's plan as it would any
+  other deliverable. It is not shown the layout or styling, so how the
+  document looks is still yours to judge before you rely on it.
+- **A finished look is no longer read as over-engineering.** The rule
+  against over-engineering now says it is about how a thing is built, not
+  about what a person sees: the layout and styling of an interface, or a
+  document's headings, contents table, tables and figures, are part of the
+  work asked for. Machinery nobody asked for behind them is still
+  over-engineering.
+
 ## [3.38.0] — 2026-11-18
 
 ### Added

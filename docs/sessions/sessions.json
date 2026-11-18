@@ -7089,9 +7089,9 @@
     {
       "number": 358,
       "title": "Visual Studio says when a session needs a person",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T09:57:44.819000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T10:22:55.959000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

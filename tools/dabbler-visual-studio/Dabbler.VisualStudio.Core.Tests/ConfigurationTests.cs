@@ -40,5 +40,21 @@ namespace Dabbler.VisualStudio.Core.Tests
 
             Assert.Throws<System.FormatException>(() => ConfiguredChoice.Read("[1]"));
         }
+
+        [Fact]
+        public void Parse_reads_a_row_and_refuses_another_shape()
+        {
+            var choice = new { label = "codex", description = (string?)null, detail = "what you chose", value = "codex", unreachable = "codex is not on PATH", argv = new[] { "dabbler", "configure", "--engine", "codex" }, mineArgv = new[] { "dabbler", "configure", "--engine", "codex", "--mine" } };
+            var action = new { id = "dabblerSolution.setEngine", title = "Set the Authoring Vehicle", argv = (string[]?)null, pick = new { title = "Which engine?", placeholder = "", choices = new[] { choice }, withheld = new[] { new { label = "copilot", reason = "not installed" } }, typed = (object?)null }, confirm = (object?)null, unavailable = (string?)null };
+            var row = new { id = "config:vehicle:authoring", kind = "configVehicle", label = "Vehicle", description = "codex · this repository", value = "codex", decidedLayer = "checkout", click = action, actions = new[] { action }, children = new object[0] };
+            var document = ConfigurationDocument.Parse(JsonConvert.SerializeObject(new { schemaVersion = 1, machineOnly = false, configuration = row }));
+
+            Assert.Equal("checkout", document.Configuration.DecidedLayer);
+            var pick = document.Configuration.Click!.Pick!;
+            Assert.Equal("codex is not on PATH", Assert.Single(pick.Choices).Unreachable);
+            Assert.Equal("not installed", Assert.Single(pick.Withheld).Reason);
+
+            Assert.Throws<System.FormatException>(() => ConfigurationDocument.Parse(JsonConvert.SerializeObject(new { schemaVersion = 2, machineOnly = false, configuration = row })));
+        }
     }
 }

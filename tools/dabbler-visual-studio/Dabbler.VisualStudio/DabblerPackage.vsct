@@ -30,6 +30,12 @@
           <ButtonText>Dabbler Terminal</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidDabblerCommandSet" id="ConfigurationCommandId" priority="0x0102" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>Dabbler Configuration</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -40,6 +46,7 @@
       <IDSymbol name="VersionCommandId" value="0x0100" />
       <IDSymbol name="WorkExplorerCommandId" value="0x0101" />
       <IDSymbol name="TerminalCommandId" value="0x0102" />
+      <IDSymbol name="ConfigurationCommandId" value="0x0103" />
     </GuidSymbol>
   </Symbols>
 

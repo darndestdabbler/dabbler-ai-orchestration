@@ -7223,23 +7223,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "d1b223d9830d6347953efbf05c6405fecaf645b9",
-      "frameworkVersion": "3.34.1",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.34.1",
+      "startCommit": "d1b223d9830d6347953efbf05c6405fecaf645b9"
     },
     {
       "number": 365,
       "title": "Release 3.38.0 (release: 3.38.0)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-11-18T15:42:12.724000-05:00",
+      "completedAt": "2026-11-18T15:42:38.332000-05:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "bd46e74902bf22c8cae29983850f096d152a91c9",
+      "frameworkVersion": "3.34.1",
+      "noChange": true
     }
   ]
 }

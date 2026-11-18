@@ -21506,3 +21506,142 @@ the other two.
 ### Session 365 of 365: Release 3.38.0 (release: 3.38.0)
 
 The framework publishes session 364 as 3.38.0, and nothing else.
+
+### Session 366 of 367: A Word document is written as a document, and its text is reviewed
+
+Scope: `packages/router/src/drive.ts` (the planning instruction),
+`packages/router/src/facts.ts` (what the reviewer is shown),
+`packages/router/prompt-templates/verification.md` (what the reviewer is
+told about it), `packages/router/src/bootstrap/templates.ts` and the
+`AGENTS.md` it writes (the rule about writing files),
+`packages/router/test/` (the tests named after those files),
+`docs/driving-a-session.md`, `docs/guide/` (where a session's product is
+described), `version.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** A member of staff reports that when a session's plan calls for
+a Word document, the document is much poorer than the one the same model
+writes outside the framework, and that it has happened more than once.
+The model is not the cause: the engine is started as the same program
+with the same model and nothing withheld. Three things the framework
+says and does are.
+
+The planning instruction says that every step has a check, that a check
+writes nothing, and that "a generator is run as the step's work and the
+check proves its output is current". It was written for generated code.
+An author who reads it with a `.docx` to produce writes a script that
+emits the document and a check that the document matches the script. The
+field report of 2026-11-16 shows exactly that in a consumer repository:
+`scripts/build-user-guide.ps1` writes `docs/user-guide.docx`, and two
+further scripts check it. Outside the framework the same model writes
+the document itself, opens it, reads it and puts it right. Inside, a
+document finished by hand no longer matches its script and fails its
+check, so the document is as good as a first script and no better.
+
+The same instruction says "Over-engineering is strictly forbidden" and
+that value is measured by simplicity. That sentence is the operator's
+and is about the design of code. Read beside a document, it says not to
+give it styles, a contents table, tables or figures.
+
+Nobody reviews the document. The reviewer is shown a text diff: a new
+`.docx` is listed as "binary / non-UTF-8" and left out, a changed one
+appears as "Binary files differ", and the reviewer runs nothing. It
+reviews the generator script as code and never sees what the script
+made. Outside the framework a person looks at the first draft and asks
+for a better one; inside, the first draft closes the session.
+
+The consumer repository is on another machine and was not read for this
+plan. The instruction's text and the reviewer's evidence were read in
+this repository's source; that the staff member's documents came from a
+generator script rests on the field report alone.
+
+**What.**
+
+**Step 1 -- the instruction says what a document step is.** Where a
+step's product is a file a person opens in an office program -- `.docx`,
+`.pptx`, `.xlsx`, `.pdf` -- the planning instruction says, beside the
+sentence about generators: the author writes the document directly, with
+the best document tooling the engine has; opens or renders it and reads
+it before reporting the step; and its check proves that the file is
+there and opens as the archive it is, not that a script reproduces it. A
+generator script is written only where the session's plan asks for one.
+The instruction names one check that needs nothing installed on Windows,
+macOS and Linux; `tar -tf <file>` reads a `.docx` on all three and is
+the candidate, and the session confirms it before the text names it.
+
+The operator's sentence about over-engineering stays word for word. One
+sentence follows it: the finish of a document a person reads -- its
+headings, styles, contents table, and tables and figures where the
+content calls for them -- is part of what was asked for, and is not
+over-engineering.
+
+**Step 2 -- the reviewer is shown the document's text.** For a `.docx`
+the session created or changed, tracked or not, the evidence carries the
+text of the file as it stands in the working tree: one paragraph to a
+line, a heading marked with its level, a table's cells in reading order.
+It rides in the first round's evidence and in a later round's wherever
+the file changed since the round before. It answers to the cap a new
+text file already answers to; a document over the cap, or one that
+cannot be read as a Word document, is listed with the reason, as an
+omitted file is now, and the round goes on. The file is a zip archive
+of XML, and Node reads both with what it ships: no dependency is added.
+
+**Step 3 -- the reviewer is told what it is reading.** The verification
+template says that a block headed as a Word document's text is that
+document's content and not its appearance: the reviewer holds the
+content to the session's plan as it holds any deliverable -- a
+requirement missed, a section the plan names and the document lacks, a
+statement that contradicts the code or an earlier section -- and says
+nothing about layout, which it was not shown. A person judges how the
+document looks.
+
+**Step 4 -- the rule about writing files, and the guide.** The managed
+body's "Write files with your editing tools" gains the exception it has
+always had in practice: a binary document is written by document
+tooling, and never by a heredoc either. `AGENTS.md` here is refreshed
+from it. `docs/driving-a-session.md` and the guide say in one short
+paragraph what a session does with a Word document: the author writes
+it directly, the reviewer reads its text, and its appearance is the
+person's to judge before they rely on it.
+
+**Step 5 -- the number.** `version.json` goes to 3.39.0 (a minor: the
+reviewer reads a kind of file it could not read before), stamped, and
+the changelog says what a person whose plan asks for a Word document
+now gets.
+
+**Non-goals.** Reading the text of `.pptx`, `.xlsx`, `.pdf` or any
+other binary format for the reviewer: the report is about Word, and
+each format is its own reader. Rendering a document to an image, or any
+review of how it looks. Converting Markdown to Word or Word to Markdown
+in the framework's code. Installing or requiring a document library, a
+skill or an office program. A new verb. Any change to the rule that a
+step has a check or that a check writes nothing. Changing the
+operator's sentence about over-engineering. A `kind` of session, or
+anything that branches on what a session produces beyond the file's
+extension. Templates or a house style for documents. The template's
+sentence about findings evidenced only by documentation prose.
+
+**Tests.** In `drive.test.ts`: the planning instruction says a document
+is written directly and that its check proves it opens. In
+`facts.test.ts`: a new `.docx` has its text in the first round's
+evidence, headings marked; a tracked one that changed has its text
+there too; one over the cap is listed with its size and not inlined; a
+`.docx` that is not a readable archive is listed as unreadable and the
+evidence is still assembled; a `.docx` unchanged since the round before
+is absent from a later round's evidence. In `bootstrap.test.ts`: the
+managed body names the exception. The docs check reads the changed
+pages.
+
+**After it lands, by the operator.** The staff member runs one session
+whose plan asks for a Word document and sets it beside one written
+outside the framework: that comparison is the only proof this was the
+cause. Two things are still owed from them and would settle it sooner:
+the generator script the earlier session wrote, and whether the better
+document came from the same engine in a terminal or from a chat
+application, which has document tooling of its own that no instruction
+here supplies.
+
+**Releasable.** Yes, as 3.39.0 in session 367.
+
+### Session 367 of 367: Release 3.39.0 (release: 3.39.0)
+
+The framework publishes session 366 as 3.39.0, and nothing else.

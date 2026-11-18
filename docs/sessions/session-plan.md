@@ -21540,7 +21540,13 @@ check, so the document is as good as a first script and no better.
 The same instruction says "Over-engineering is strictly forbidden" and
 that value is measured by simplicity. That sentence is the operator's
 and is about the design of code. Read beside a document, it says not to
-give it styles, a contents table, tables or figures.
+give it styles, a contents table, tables or figures. Read beside a user
+interface it says the same of layout and styling, and the same member
+of staff spent many sessions improving the look of one. Nothing else
+the framework says to an author or a reviewer bears on how an interface
+looks, so that sentence is all an author hears about it. That those
+sessions went as they did because of it is an inference: they were not
+read for this plan.
 
 Nobody reviews the document. The reviewer is shown a text diff: a new
 `.docx` is listed as "binary / non-UTF-8" and left out, a changed one
@@ -21569,10 +21575,18 @@ macOS and Linux; `tar -tf <file>` reads a `.docx` on all three and is
 the candidate, and the session confirms it before the text names it.
 
 The operator's sentence about over-engineering stays word for word. One
-sentence follows it: the finish of a document a person reads -- its
-headings, styles, contents table, and tables and figures where the
-content calls for them -- is part of what was asked for, and is not
-over-engineering.
+sentence follows it, and it is one rule for everything a person looks
+at, not an exemption for a kind of file: simplicity is asked of how a
+thing is built, not of what the person who uses it sees or reads, so
+the finish of a user interface or a document -- layout, styling,
+headings, a contents table, tables and figures where the content calls
+for them -- is part of what was asked for. The machinery behind that
+finish is still held to the operator's sentence: a theming system, a
+component abstraction or a library nobody asked for is over-engineering
+however good the screen looks. The reviewer's template repeats the
+operator's sentence and gains the same one after it, so the two roles
+are held to one rule and a reviewer does not report finish as work
+beyond the task.
 
 **Step 2 -- the reviewer is shown the document's text.** For a `.docx`
 the session created or changed, tracked or not, the evidence carries the
@@ -21617,11 +21631,16 @@ skill or an office program. A new verb. Any change to the rule that a
 step has a check or that a check writes nothing. Changing the
 operator's sentence about over-engineering. A `kind` of session, or
 anything that branches on what a session produces beyond the file's
-extension. Templates or a house style for documents. The template's
+extension. Templates or a house style for documents. A question at
+planning about the visual standard an interface follows, and an
+instruction that the author runs the application and looks at the
+screen before reporting: both wait for the staff member's sessions to
+be read, and are a session of their own. The template's
 sentence about findings evidenced only by documentation prose.
 
 **Tests.** In `drive.test.ts`: the planning instruction says a document
-is written directly and that its check proves it opens. In
+is written directly and that its check proves it opens, and that the
+finish of what a person sees is part of what was asked for. In
 `facts.test.ts`: a new `.docx` has its text in the first round's
 evidence, headings marked; a tracked one that changed has its text
 there too; one over the cap is listed with its size and not inlined; a

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 340 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 340 transcript</h1>
+<div class="cancelled" id="cancelled"><strong>CANCELLED</strong> <span class="at">at 2026-11-17T12:46:15-05:00</span><div>No reason was given.</div><div>It was cancelled before anything ran.</div></div>
+<p class="stamp">Rendered 2026-11-17T17:46:15.698Z by dabbler-ai-router 3.34.1 at f5ae2f636e0f1b9b83aeb6f0fa76d07445e0db76.</p>
+<h2>Session Plan</h2>
+<h3>Session 340 of 342: Scripts are read as code, and a blog post is walked to a close</h3>
+<p>Scope: <code>packages/router/src/bootstrap/detect.ts</code> (<code>SOURCE_FILE</code>), <code>packages/router/test/detect.test.ts</code>, <code>docs/uat/uat-prose-walk.md</code> (new), whatever in <code>packages/router/src/</code> or <code>tools/dabbler-ai-orchestration/src/</code> the walk shows to be stopping a session and is small to fix, with the test named after it</p>
+<p><strong>Why.</strong> Two things, one small and known, one not known.</p>
+<p>Set-up reads a repository's posture from the files git tracks, and its list of what counts as source names C#, Java, TypeScript, Python and their neighbours and omits PowerShell, R and shell scripts. A repository of forty PowerShell modules is read as holding no code and is given the sessions for a new solution. This session first planned to walk such a repository to a close as well. That walk is dropped: three repositories in languages the framework has no detector for have closed 131 sessions with suites a person declared, and a fourth language would show nothing new. The source list is the part that was wrong.</p>
+<p>What is not known is how the framework behaves on writing that nothing can check. Session 339's pages are about code, and a claim in them is true or false. A blog post has no path to look up and no source to contradict, so it is where a review turns into an argument about taste, and where a person's reading is the only test there is. Round 28's advisors split on whether this needs walking before session 341; the operator has a post to write for darndestdabbler.org, which settles it.</p>
+<p><strong>Step 1 -- the source list.</strong> <code>SOURCE_FILE</code> gains <code>.ps1</code>, <code>.psm1</code>, <code>.psd1</code>, <code>.r</code>, <code>.sh</code> and <code>.bash</code>. Not <code>.rmd</code> or <code>.qmd</code>, which nobody has asked for: they can hold code, and leaving them out says nothing about whether such a repository needs checks. Prose is not added: a folder of tracked Markdown is material to start from.</p>
+<p><strong>Step 2 -- the post, to a close.</strong> A scratch folder outside this repository, set up as it is today, with a session plan written by hand. The idea for the post is the operator's and is asked for, in their words, and kept as <code>docs/planning/brief.md</code> with who the post is for and how long it should be; nothing is drafted from a guess. One drafting session writes the whole post, Markdown, one sentence per line, and a second revises it from what the operator says. Each session's section says what counts as an error -- the brief missed or contradicted, a fact stated that the brief does not support, an earlier paragraph contradicted, the length broken -- and that wording, structure and taste are suggestions. Record the check each step could honestly declare, how many rounds each review took, which findings were errors and which were preferences raised as more, and each sentence the framework printed that assumes code.</p>
+<p><strong>Step 3 -- the operator reads it.</strong> Between the two sessions the operator reads the draft and says whether it is the post they meant and what must change, against two or three questions agreed before the first session ran. That is the whole of the review, by hand, as in session 339. Record what it cost and what the second session did with it.</p>
+<p><strong>Step 4 -- what was found, written down</strong> in <code>docs/uat/uat-prose-walk.md</code>, as session 339 does for documentation, with what the two walks found alike and what only this one did.</p>
+<p><strong>Step 5 -- fix what is small,</strong> within the bound of session 339's step 6.</p>
+<p><strong>Non-goals.</strong> Publishing the post, or anything in the site's own repository: the operator takes the text from the scratch folder. Walking a script repository. Detectors, suites or scaffolding for PowerShell, R, or any ecosystem <code>detect.ts</code> does not already read: a person declares the suite, as the scaffolded <code>dabbler.yaml</code> says. Source extensions nobody has asked for. Any change to the scaffolded sessions 1 and 2: session 341. Fiction, verse, music or slides: one post, and the page says so.</p>
+<p><strong>Tests.</strong> In <code>detect.test.ts</code>: a repository whose tracked files are PowerShell reads <code>maintenance</code>, and one whose tracked files are Markdown or R Markdown reads <code>greenfield</code>. One test per fix step 5 makes.</p>
+<p><strong>Releasable.</strong> Yes, as 3.36.0 in session 342.</p>
+<h2>Verification</h2>
+<p>No verification round was recorded.</p>
+<h2>Test runs</h2>
+<p>No test run was recorded.</p>
+</main>
+</body>
+</html>

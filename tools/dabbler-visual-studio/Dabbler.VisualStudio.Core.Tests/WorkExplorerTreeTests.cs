@@ -68,6 +68,17 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void ToString_is_what_a_screen_reader_says_for_the_row()
+        {
+            var tree = new WorkExplorerTree();
+            tree.Show(TwoBuckets());
+
+            var repository = tree.Roots[0];
+            Assert.Equal("repo", repository.ToString());
+            Assert.Equal("7: Rows, step 2 of 4", repository.Children[0].Children[0].ToString());
+        }
+
+        [Fact]
         public void Show_keeps_the_rows_a_developer_opened_and_selected()
         {
             var tree = new WorkExplorerTree();

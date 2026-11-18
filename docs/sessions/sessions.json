@@ -7121,23 +7121,36 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "9d4bf453abea69925fcabcb790d7948e1e786840",
-      "frameworkVersion": "3.34.1",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "3.34.1",
+      "startCommit": "9d4bf453abea69925fcabcb790d7948e1e786840"
     },
     {
       "number": 360,
       "title": "A session is walked in Visual Studio, on an old-style solution",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-11-18T11:00:51.701000-05:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "5049f204989aba9a1812499c2e6139c9b9af4e13",
+      "frameworkVersion": "3.34.1",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 361,

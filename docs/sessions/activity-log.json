@@ -13639,6 +13639,69 @@
       "what": "step 'compare': its files",
       "reason": "git's arguments are quoted by Router.Quote, made public, rather than by a second copy of the quoting rule",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T11:02:01.456000-05:00",
+      "task": "Walk the Visual Studio extension the way a developer would, to decide whether it is published. The .vsix is built from this tree and installed into this machine's Visual Studio Community 2026 with VS Code closed, and the ContosoUniversity fork of the maintenance walk (C:\\temp\\s310-contosouniversity: ASP.NET MVC 5 on .NET Framework 4.8.1, old-format projects) is opened in it. One session in that checkout -- a small page with its test -- is set up, configured (engine and models), started, watched and taken to its close from Visual Studio, with the solution open throughout; every time the walk had to leave Visual Studio other than to talk to the engine, every prompt Visual Studio raised and every lock is recorded. A second session there carries a step that must fail its check, and its stop is read, checked, and waived or rolled back from Visual Studio. What only a person at the screen can do is asked of the operator and recorded as they report it; what can be driven is driven with UI Automation and DTE as session 359's probe was. docs/uat/uat-visual-studio.md records each finding with its disposition -- fixed here, planned as a session before 362, or a limit the guide states -- states that Visual Studio 2022 was not walked on this machine and is claimed only once walked, says what to ask two developers to do on their own machines, and ends with one line: publish or do not. Anything the walk shows stopping a developer that is small to fix is fixed here in tools/dabbler-visual-studio/ or packages/router/src/, with its test in the file named after what it changed; the step that meets it amends its files on the record.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T11:10:58.794000-05:00",
+      "what": "step 'machine': its files",
+      "reason": "The walk found the installed extension cannot run its router (Cannot find module 'yaml'); the .vsix now carries the VS Code extension's self-contained copy, and CI builds it first.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T11:11:23.239000-05:00",
+      "what": "step 'machine': its checks",
+      "reason": "The router-bundle fix gets its proof: the .vsix's router folder, copied outside the repository, runs dabbler version.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T12:13:51.718000-05:00",
+      "what": "step 'whole-session': its files",
+      "reason": "The walk found every Work Explorer and Configuration row named by its class to UI Automation; both node types now give their label and description, tested.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T12:13:52.774000-05:00",
+      "what": "step 'whole-session': its checks",
+      "reason": "The accessibility fix is proven by the library's tests.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T12:27:43.626000-05:00",
+      "what": "step 'a-stop': its files",
+      "reason": "The walk found a rollback's result said as raw JSON in the Work Explorer; RollbackAsk.Done now says it in words, tested.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T12:27:44.701000-05:00",
+      "what": "step 'a-stop': its checks",
+      "reason": "The rollback wording fix is proven by the library's tests.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 360,
+      "dateTime": "2026-11-18T12:30:19.034000-05:00",
+      "what": "step 'findings': its files",
+      "reason": "Findings 5-7 need a session of their own before the release: session 361 is inserted into the plan and 361-364 renumbered to 362-365.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

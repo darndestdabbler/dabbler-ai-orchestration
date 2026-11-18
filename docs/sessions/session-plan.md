@@ -21318,7 +21318,57 @@ Java, IntelliJ or Eclipse.
 
 **Releasable.** No.
 
-### Session 361 of 364: The Visual Studio extension is documented and made ready to publish
+### Session 361 of 365: The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop
+
+Scope: `packages/router/src/views/workExplorer.ts` (which actions a
+session's row offers), `packages/router/src/progress.ts` with the progress
+projection's schema and its generated type (whether a standing stop can be
+waived), `tools/dabbler-visual-studio/Dabbler.VisualStudio/NoticeWatcher.cs`
+(the editor's bar for a session that needs a person), and the tests named
+after each
+
+**Why.** Session 360's walk in Visual Studio found three things a
+developer meets at a stop, and none was small enough to fix inside the
+walk.
+
+**Step 1 -- Review exception only where a waiver can go.** A session's
+row offers Review exception on every standing stop, because the row knows
+who the stop waits on and not what kind it is. On a `blocked` stop, which
+the walk produced, it runs `session waive` and the router refuses: *"a
+'blocked' stop has nothing to go past"*. The projection says whether the
+standing stop is one `session waive` accepts, read from the one list it
+reads (`WAIVABLE_STOP_KINDS`), and the row offers Review exception only
+then. The VS Code extension and the Visual Studio extension both take the
+row's actions as the router gives them, so neither changes.
+
+**Step 2 -- a way back to the engine on the session's own row.** With the
+engine's terminal closed mid-session, the session's row offered nothing
+that reopens it; the repository's row did, because its Start Session
+re-registers the session in flight, which is how a session continues.
+The session in flight's row offers that same start as Continue Session
+where no stop stands -- the action and its label exist already, for a wait
+on funds. It adds no way to start an engine the repository row does not
+already offer.
+
+**Step 3 -- the bar goes when the stop does.** Visual Studio says *"session
+N is paused"* in an information bar across the editor, and the bar stayed
+after the walk rolled the session back, until closed by hand. It closes
+itself when the next notice for that repository says the session has moved
+on.
+
+**Non-goals.** Knowing whether an engine is still running. Any new stop
+kind or any change to what `session waive` accepts. The Configuration
+window.
+
+**Tests.** In `workExplorer.test.ts`: a `blocked` stop's row offers no
+Review exception and a `tests` stop's row does; a session in flight with
+no stop offers Continue Session. In `progress.test.ts`: the projection
+says a `blocked` stop cannot be waived. In the Visual Studio library, the
+test named after the file that decides when the bar closes.
+
+**Releasable.** No: it ships in 3.37.0, in session 363.
+
+### Session 362 of 365: The Visual Studio extension is documented and made ready to publish
 
 Scope: `docs/guide/` (a page for Visual Studio, and the index),
 `tools/dabbler-visual-studio/` (the listing's text, the publish
@@ -21329,7 +21379,7 @@ stamp and its check learn the new manifest), `dabbler.yaml`
 `tools/dabbler-ai-orchestration/CHANGELOG.md`, `AGENTS.md`
 
 **Runs only if session 360's page says publish.** If it says do not,
-this session and 362 are cancelled or re-planned by the operator.
+this session and 363 are cancelled or re-planned by the operator.
 
 **Step 1 -- the guide.** One page: what to install (Node, an engine CLI,
 Windows Terminal, the extension), the three windows, starting a session,
@@ -21348,7 +21398,7 @@ and `check:version` checks it.
 runner and publishes it with Microsoft's publishing tool when the release
 tag is pushed, as the VS Code extension's does, and the release session's
 packaging names it. The operator makes the publisher and stores its
-token as a repository secret: that is theirs to do, before session 362,
+token as a repository secret: that is theirs to do, before session 363,
 and this step says exactly what to create.
 
 **Step 5 -- the instructions.** `AGENTS.md` says in two lines that the
@@ -21359,21 +21409,21 @@ never decides.
 second interface), stamped, and the changelog says what a developer in
 Visual Studio now has.
 
-**Non-goals.** Publishing: session 362. Open VSX. Any change to the VS
+**Non-goals.** Publishing: session 363. Open VSX. Any change to the VS
 Code extension's listing.
 
 **Tests.** `npm run check:version` fails on a stale Visual Studio
 manifest. The docs check reads the new guide page.
 
-**Releasable.** Yes, as 3.37.0 in session 362.
+**Releasable.** Yes, as 3.37.0 in session 363.
 
-### Session 362 of 364: Release 3.37.0 (release: 3.37.0)
+### Session 363 of 365: Release 3.37.0 (release: 3.37.0)
 
-The framework publishes sessions 349 to 361 as 3.37.0, the Visual Studio
+The framework publishes sessions 349 to 362 as 3.37.0, the Visual Studio
 extension to the Visual Studio Marketplace for the first time, and
 nothing else.
 
-### Session 363 of 364: Microsoft's own models can author and review
+### Session 364 of 365: Microsoft's own models can author and review
 
 Scope: `packages/router/src/transports/copilot.ts` (the vendor a seat
 model's id names), `packages/router/src/identity.ts` (the refusal for a
@@ -21451,8 +21501,8 @@ reviews well enough to keep. `mai-code-1.1-flash` is reported, by one
 source and not by GitHub, to leave Copilot on 2026-12-18: choose one of
 the other two.
 
-**Releasable.** Yes, as 3.38.0 in session 364.
+**Releasable.** Yes, as 3.38.0 in session 365.
 
-### Session 364 of 364: Release 3.38.0 (release: 3.38.0)
+### Session 365 of 365: Release 3.38.0 (release: 3.38.0)
 
-The framework publishes session 363 as 3.38.0, and nothing else.
+The framework publishes session 364 as 3.38.0, and nothing else.

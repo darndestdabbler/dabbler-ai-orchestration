@@ -164,7 +164,7 @@ namespace Dabbler.VisualStudio
             var opened = written != null ? OpenReport(written) : null;
             if (result.Succeeded)
             {
-                var words = OneLine(result.Words.Length > 0 ? result.Words : action.Title);
+                var words = OneLine(result.Words.Length > 0 ? RollbackAsk.Done(result.Words) : action.Title);
                 await package.SayDoneAsync(opened != null ? $"{words} {opened}" : words);
                 return;
             }

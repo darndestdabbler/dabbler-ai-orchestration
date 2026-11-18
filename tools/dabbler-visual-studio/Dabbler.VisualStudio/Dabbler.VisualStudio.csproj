@@ -37,8 +37,14 @@
   <ItemGroup>
     <None Include="source.extension.vsixmanifest" SubType="Designer" />
     <VSCTCompile Include="DabblerPackage.vsct" ResourceName="Menus.ctmenu" />
-    <!-- The router, built by `npm run build -w dabbler-ai-router` before this. -->
-    <Content Include="..\..\..\packages\router\dist\dabbler.cjs" Link="router\dabbler.cjs" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The router as the VS Code extension ships it, built by
+         `npm run compile -w dabbler-ai-orchestration` before this: its
+         dependencies bundled in, a package.json naming it and its data beside
+         it. The router's own dist/dabbler.cjs leaves its dependencies to a
+         node_modules, which an installed extension has none of. -->
+    <Content Include="..\..\dabbler-ai-orchestration\dist\dabbler.cjs;..\..\dabbler-ai-orchestration\dist\package.json;..\..\dabbler-ai-orchestration\dist\router-config.yaml" Link="router\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\dist\schemas\**\*" Link="router\schemas\%(RecursiveDir)%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\dist\prompt-templates\**\*" Link="router\prompt-templates\%(RecursiveDir)%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
     <!-- `dabbler` on an engine tab's PATH: it runs the bundle beside it. -->
     <Content Include="dabbler.cmd" Link="router\dabbler.cmd" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
     <!-- The status pictures are the VS Code extension's own, one per theme. -->

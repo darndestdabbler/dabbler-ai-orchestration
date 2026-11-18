@@ -78,6 +78,15 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void ToString_is_what_a_screen_reader_says_for_the_row()
+        {
+            var tree = new ConfigurationTree();
+            tree.Show(Document());
+
+            Assert.Equal("Authoring AI, claude-code · claude-opus-5-5", tree.Roots[0].ToString());
+        }
+
+        [Fact]
         public void Show_keeps_what_was_open_and_selected_by_id()
         {
             var tree = new ConfigurationTree();

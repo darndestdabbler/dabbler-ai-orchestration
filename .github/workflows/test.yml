@@ -110,9 +110,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The .vsix carries this bundle, so it is built before the extension.
+      # The .vsix carries the VS Code extension's self-contained copy of the
+      # router, so both are built before the extension.
       - name: Router bundle
         run: npm run build -w dabbler-ai-router
+
+      - name: The VS Code extension's copy of the router
+        run: npm run compile -w dabbler-ai-orchestration
 
       # The extension is an in-process VSSDK project, which builds with
       # Visual Studio's MSBuild and not with `dotnet build`.

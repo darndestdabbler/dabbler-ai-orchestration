@@ -50,5 +50,14 @@ namespace Dabbler.VisualStudio.Core.Tests
 
             Assert.Throws<FormatException>(() => RollbackAsk.Ask(Rollback, new[] { Rollback }, "{\"session\": 7}"));
         }
+
+        [Fact]
+        public void Done_says_the_rollback_in_words_rather_than_its_result()
+        {
+            Assert.Equal(
+                "Rolled back to the start of session 6; amend the plan, then Start Session.",
+                RollbackAsk.Done("{\"session\": 6, \"through\": 6, \"status\": \"not-started\", \"anchor\": \"a23bf8f\", \"reverted\": 0}\n"));
+            Assert.Equal("rolled back", RollbackAsk.Done("rolled back\n"));
+        }
     }
 }

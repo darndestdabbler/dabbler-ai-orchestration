@@ -50,6 +50,26 @@ namespace Dabbler.VisualStudio.Core
             var arguments = rollback.Argv.Skip(1).Concat(new[] { "--as-of", head! }).ToList();
             return new RollbackQuestion(words.Title, detail!, choices, words.Accept, report, arguments);
         }
+
+        /// <summary>
+        /// What to say once a rollback went through, from the result it
+        /// printed (`{"session": N, ...}`): the same sentence the VS Code
+        /// extension says. Anything else it printed is said as it was.
+        /// </summary>
+        public static string Done(string printed)
+        {
+            int? session = null;
+            try
+            {
+                session = JsonConvert.DeserializeObject<JObject>(printed.Trim())?.Value<int?>("session");
+            }
+            catch (JsonException)
+            {
+            }
+            return session == null
+                ? printed.Trim()
+                : $"Rolled back to the start of session {session}; amend the plan, then Start Session.";
+        }
     }
 
     /// <summary>The rollback's confirmation, the choices in the order shown, and what each runs.</summary>

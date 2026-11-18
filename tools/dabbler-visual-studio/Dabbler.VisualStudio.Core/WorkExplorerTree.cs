@@ -123,6 +123,15 @@ namespace Dabbler.VisualStudio.Core
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
+        /// <summary>
+        /// The row as a screen reader says it: WPF names a tree item by its
+        /// data's ToString, which would otherwise be this class's name.
+        /// </summary>
+        public override string ToString()
+        {
+            return string.IsNullOrWhiteSpace(Description) ? Label : $"{Label}, {Description}";
+        }
+
         private static string? PlainText(string? markdown)
         {
             if (markdown == null) return null;

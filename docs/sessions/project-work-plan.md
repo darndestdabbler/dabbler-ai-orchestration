@@ -397,7 +397,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 357 | Set up Dabbler in the solution that is open | no | 2026-11-18 |
 | 358 | Visual Studio says when a session needs a person | no | 2026-11-18 |
 | 359 | Before a session starts and after it ends, beside the IDE | no | 2026-11-18 |
-| 360 | A session is walked in Visual Studio, on an old-style solution | — | not declared |
+| 360 | A session is walked in Visual Studio, on an old-style solution | no | 2026-11-18 |
 | 361 | The Visual Studio extension is documented and made ready to publish | — | not declared |
 | 362 | Release 3.37.0 (release: 3.37.0) | — | not declared |
 | 363 | Microsoft's own models can author and review | — | not declared |
@@ -4021,3 +4021,19 @@ Make working beside Visual Studio safer at both ends of a session. Before a star
 
 - 2026-11-18 — step 'compare': its files: The control only raises the menu item's event; WorkExplorerWindow runs it in the followed repository, as it does Start Session with Different Models (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-18 — step 'compare': its files: git's arguments are quoted by Router.Quote, made public, rather than by a second copy of the quoting rule (claude-code (anthropic, claude-opus-5-5))
+
+### Session 360 — A session is walked in Visual Studio, on an old-style solution
+
+**Releasable: no.**
+
+Walk the Visual Studio extension the way a developer would, to decide whether it is published. The .vsix is built from this tree and installed into this machine's Visual Studio Community 2026 with VS Code closed, and the ContosoUniversity fork of the maintenance walk (C:\temp\s310-contosouniversity: ASP.NET MVC 5 on .NET Framework 4.8.1, old-format projects) is opened in it. One session in that checkout -- a small page with its test -- is set up, configured (engine and models), started, watched and taken to its close from Visual Studio, with the solution open throughout; every time the walk had to leave Visual Studio other than to talk to the engine, every prompt Visual Studio raised and every lock is recorded. A second session there carries a step that must fail its check, and its stop is read, checked, and waived or rolled back from Visual Studio. What only a person at the screen can do is asked of the operator and recorded as they report it; what can be driven is driven with UI Automation and DTE as session 359's probe was. docs/uat/uat-visual-studio.md records each finding with its disposition -- fixed here, planned as a session before 362, or a limit the guide states -- states that Visual Studio 2022 was not walked on this machine and is claimed only once walked, says what to ask two developers to do on their own machines, and ends with one line: publish or do not. Anything the walk shows stopping a developer that is small to fix is fixed here in tools/dabbler-visual-studio/ or packages/router/src/, with its test in the file named after what it changed; the step that meets it amends its files on the record.
+
+**Amended after acceptance:**
+
+- 2026-11-18 — step 'machine': its files: The walk found the installed extension cannot run its router (Cannot find module 'yaml'); the .vsix now carries the VS Code extension's self-contained copy, and CI builds it first. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'machine': its checks: The router-bundle fix gets its proof: the .vsix's router folder, copied outside the repository, runs dabbler version. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'whole-session': its files: The walk found every Work Explorer and Configuration row named by its class to UI Automation; both node types now give their label and description, tested. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'whole-session': its checks: The accessibility fix is proven by the library's tests. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'a-stop': its files: The walk found a rollback's result said as raw JSON in the Work Explorer; RollbackAsk.Done now says it in words, tested. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'a-stop': its checks: The rollback wording fix is proven by the library's tests. (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'findings': its files: Findings 5-7 need a session of their own before the release: session 361 is inserted into the plan and 361-364 renumbered to 362-365. (claude-code (anthropic, claude-opus-5-5))

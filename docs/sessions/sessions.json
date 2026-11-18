@@ -7045,9 +7045,9 @@
     {
       "number": 356,
       "title": "The catalog, a key, and Start Session with Different Models, from Visual Studio",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T08:41:24.870000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T09:07:41.011000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

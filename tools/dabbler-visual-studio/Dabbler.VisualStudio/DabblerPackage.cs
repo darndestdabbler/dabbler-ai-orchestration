@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
@@ -20,6 +21,8 @@ namespace Dabbler.VisualStudio
     [ProvideMenuResource("Menus.ctmenu", 1)]
     // Docked beside the Solution Explorer, as VS Code's sits in its explorer.
     [ProvideToolWindow(typeof(WorkExplorerWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
+    // Docked with the Output window, where a developer looks for what is running.
+    [ProvideToolWindow(typeof(TerminalWindow), Style = VsDockStyle.Tabbed, Window = "34e76e81-ee4a-11d0-ae2e-00a0c90fffc3")]
     [Guid(PackageGuidString)]
     public sealed class DabblerPackage : AsyncPackage
     {
@@ -28,6 +31,7 @@ namespace Dabbler.VisualStudio
         private static readonly Guid CommandSet = new Guid("a9db3fec-b5ee-439b-acfe-21f711d1ec33");
         private const int VersionCommandId = 0x0100;
         private const int WorkExplorerCommandId = 0x0101;
+        private const int TerminalCommandId = 0x0102;
 
         private bool nodePassed;
         private Router? router;
@@ -54,12 +58,41 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(ShowWorkExplorerAsync).FileAndForget("dabbler/work-explorer"),
                 new CommandID(CommandSet, WorkExplorerCommandId)));
+            commands.AddCommand(new MenuCommand(
+                (_, _) => JoinableTaskFactory.RunAsync(ShowTerminalAsync).FileAndForget("dabbler/terminal"),
+                new CommandID(CommandSet, TerminalCommandId)));
         }
 
         /// <summary>View > Other Windows > Dabbler Work Explorer.</summary>
         private async Task ShowWorkExplorerAsync()
         {
             await ShowToolWindowAsync(typeof(WorkExplorerWindow), 0, create: true, DisposalToken);
+        }
+
+        /// <summary>View > Other Windows > Dabbler Terminal.</summary>
+        private async Task ShowTerminalAsync()
+        {
+            await ShowToolWindowAsync(typeof(TerminalWindow), 0, create: true, DisposalToken);
+        }
+
+        /// <summary>
+        /// The Dabbler Terminal shown, created if it was not, without taking
+        /// the keyboard from wherever the developer has it.
+        /// </summary>
+        internal async Task ShowTerminalQuietlyAsync()
+        {
+            var window = await FindToolWindowAsync(typeof(TerminalWindow), 0, create: true, DisposalToken);
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            if (window?.Frame is IVsWindowFrame frame) frame.ShowNoActivate();
+        }
+
+        /// <summary>The open solution's folder, or null where no solution is open.</summary>
+        internal async Task<string?> SolutionFolderAsync()
+        {
+            await JoinableTaskFactory.SwitchToMainThreadAsync();
+            if (!(await GetServiceAsync(typeof(SVsSolution)) is IVsSolution solution)) return null;
+            if (ErrorHandler.Failed(solution.GetSolutionInfo(out var folder, out _, out _))) return null;
+            return string.IsNullOrEmpty(folder) ? null : folder;
         }
 
         /// <summary>Dabbler: Version -- `dabbler version`, which proves the road from Visual Studio to the router.</summary>

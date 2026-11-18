@@ -2,9 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
 using SolutionEvents = Microsoft.VisualStudio.Shell.Events.SolutionEvents;
 using Task = System.Threading.Tasks.Task;
@@ -88,7 +86,7 @@ namespace Dabbler.VisualStudio
             repositoryRoot = null;
             tree.Roots.Clear();
             tree.Message = null;
-            var folder = await SolutionFolderAsync();
+            var folder = await Dabbler.SolutionFolderAsync();
             if (mine != generation) return;
             if (folder == null)
             {
@@ -135,15 +133,6 @@ namespace Dabbler.VisualStudio
                 await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
                 if (mine == generation) tree.Show(document);
             }).FileAndForget("dabbler/work-explorer/show");
-        }
-
-        /// <summary>The open solution's folder, or null where no solution is open.</summary>
-        private async Task<string?> SolutionFolderAsync()
-        {
-            await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (!(await Dabbler.GetServiceAsync(typeof(SVsSolution)) is IVsSolution solution)) return null;
-            if (ErrorHandler.Failed(solution.GetSolutionInfo(out var folder, out _, out _))) return null;
-            return string.IsNullOrEmpty(folder) ? null : folder;
         }
 
         private void Stop()

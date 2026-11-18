@@ -50,6 +50,7 @@ namespace Dabbler.VisualStudio
                 await package.JoinableTaskFactory.SwitchToMainThreadAsync();
                 if (answer?.Registered == true)
                 {
+                    await package.ShowTerminalQuietlyAsync();
                     await new EngineTab(package).OpenAsync(repositoryRoot, action, choice);
                     return;
                 }

@@ -15,7 +15,6 @@
 
 import {
   configurationNode,
-  configurationSourceDirs,
   createInProcessRouter,
   commandLineFor,
   tryWriteProjection,
@@ -120,23 +119,6 @@ export function reprojectSolution(repoRoot: string): void {
  * one sentence that says how to fix it, and a pane that went blank would
  * hide it.
  */
-/**
- * The directories the model catalog and this operator's preferences are in.
- *
- * Exported so the Solution Explorer can WATCH it. Everything a configuration
- * reading derives from lives there, outside every repository -- and a view
- * that only watched its own workspace had no way to be told any of it moved,
- * so a `dabbler configure` or a catalog refresh typed in a terminal reached
- * the pane only when something unrelated happened to fire.
- */
-export function userConfigurationDirs(): string[] {
-  try {
-    return configurationSourceDirs();
-  } catch {
-    return [];
-  }
-}
-
 export function solutionConfiguration(
   /** The repository, or null for this machine's defaults alone: no folder is open. */
   repoRoot: string | null,

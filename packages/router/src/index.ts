@@ -302,3 +302,11 @@ export {
   type DecidedLayer,
   type ProjectionConfiguration,
 } from "./views/configuration.ts";
+// Which files each view is read from: an interface builds its watchers and
+// its cache key from this rather than keeping its own list.
+export {
+  followedPaths,
+  followedPatterns,
+  type FollowedPattern,
+  type FollowedView,
+} from "./views/follow.ts";

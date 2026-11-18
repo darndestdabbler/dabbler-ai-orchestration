@@ -384,7 +384,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 344 | The router prints the Work Explorer's rows | no | 2026-11-17 |
 | 345 | The router prints the Configuration rows and what may be chosen | no | 2026-11-17 |
 | 346 | The router says how an engine is started, and answers with data | no | 2026-11-17 |
-| 347 | The views follow the records | — | not declared |
+| 347 | The views follow the records | no | 2026-11-17 |
 | 348 | Release 3.36.0 (release: 3.36.0) | — | not declared |
 | 349 | A Visual Studio extension that installs and finds the router | — | not declared |
 | 350 | The Work Explorer in Visual Studio | — | not declared |
@@ -3915,3 +3915,9 @@ Move how an engine's own CLI is started out of the VS Code extension and into th
 **Amended after acceptance:**
 
 - 2026-11-17 — step 'typed-results': its files: RollbackFacts is declared in views/workExplorer.ts; importing it into contracts/router.ts makes an import cycle the boundary check refuses, so the type moves to the contract and workExplorer re-exports it (claude-code (anthropic, claude-opus-5-5))
+
+### Session 347 — The views follow the records
+
+**Releasable: no.**
+
+Make the router the one place that says which files each view depends on, and let a view follow them. A new `packages/router/src/views/follow.ts` names, for a repository, the paths the Work Explorer is read from (the sessions root's sessions.json, activity-log.json, session-plan.md and change-log.md; the runs directory; and the current run's step-execution.jsonl, approved-plan.json, rounds.jsonl, driver/run.json and driver/plan.json) and the paths the Configuration is read from (the model catalog and preferences under this platform's per-user data directory, and the repository's .vscode/settings.json and dabbler.yaml), both as concrete files for a key or a poll and as base-plus-glob patterns for a watcher, from one list. The extension's file watchers in extension.ts, its user-configuration watchers in SolutionTreeProvider.ts and the cache key in projection.ts are built from it, and their own lists (CACHE_INPUTS, taskRecordInputs, the hand-written globs, host.ts's userConfigurationDirs) go. `dabbler view work-explorer --follow` and `dabbler view configuration --follow` print the view once, then print it again, whole, one JSON document to a line, whenever a path it depends on changes, with changes close together making one printing, until interrupted; it polls the paths' modification times, so nothing is listened on. `dabbler status` and `dabbler view work-explorer` take `--stalled-after-seconds N`, which reaches the projection exactly as the in-process call's option does. Finally version.json goes to 3.36.0, stamped with `npm run stamp:version`, and the changelog gains a 3.36.0 section saying what sessions 343 to 347 give a person: `dabbler terminal` and `dabbler view` at a bare terminal, `--follow`, and nothing changed in VS Code.

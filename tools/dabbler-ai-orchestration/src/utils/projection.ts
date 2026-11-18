@@ -10,96 +10,26 @@
 
 import * as fs from "fs";
 import * as vscode from "vscode";
-import * as path from "path";
 import type { ProgressProjection, Router } from "dabbler-ai-router";
-import { RouterUnavailableError } from "dabbler-ai-router";
+import { RouterUnavailableError, followedPaths } from "dabbler-ai-router";
 import { productionRouter } from "../router/host";
 
-/** The sessions-root files whose mtimes invalidate a cached projection. */
-const CACHE_INPUTS = [
-  "sessions.json",
-  "activity-log.json",
-  "session-plan.md",
-  "change-log.md",
-];
-
-/** Where the machine-owned run records live, relative to the repository root. */
-export const RUNS_REL = path.join(".dabbler", "runs");
-
 /**
- * The per-session run artifacts the task level and the verification view
- * are folded from. They sit under the REPOSITORY root, not the sessions
- * root, and they must be in the cache key: a step opening or a round
- * landing changes only these, and a key that ignored them would serve the
- * stale payload back to the watcher tick the write fired.
- *
- * `driver/run.json` and `driver/plan.json` are the pulled-session pair:
- * `buildTaskRows`'s six lifecycle rows read `run.json` for the driver's
- * phase and `accepted_steps`, and the Work row's own nested steps read
- * `plan.json` for the engine's steps and `run.json` again for which of them
- * is accepted -- a cache key blind to either would leave a step's row
- * showing stale state after the extension's own watcher (which fires on
- * both, in extension.ts) asked for a fresh one. Measured: `dabbler session
- * next` accepting a step moved nothing in the Work Explorer until the
- * cache aged out on its own.
- *
- * ONE run's records, not every run's: `session` (the run the cached
- * projection named current), or the highest-numbered run when it is null.
- * The key is computed on the extension host's one thread every scan, and
- * statting five files per session ever run made it grow with every close.
- */
-export function taskRecordInputs(
-  repositoryRoot: string,
-  session: number | null,
-  listDir: (p: string) => string[] = readdirOrEmpty,
-): string[] {
-  const runs = path.join(repositoryRoot, RUNS_REL);
-  let run = session;
-  if (run === null) {
-    for (const entry of listDir(runs)) {
-      const match = /^s(\d+)$/.exec(entry);
-      if (match && (run === null || Number(match[1]) > run)) run = Number(match[1]);
-    }
-  }
-  if (run === null) return [];
-  const dir = path.join(runs, `s${run}`);
-  return [
-    path.join(dir, "step-execution.jsonl"),
-    path.join(dir, "approved-plan.json"),
-    path.join(dir, "rounds.jsonl"),
-    path.join(dir, "driver", "run.json"),
-    path.join(dir, "driver", "plan.json"),
-  ];
-}
-
-/**
- * Rests on one constraint: a run that is not the current one moves only
- * together with `sessions.json` or `activity-log.json`. Every per-run writer
- * writes the session in flight, and a session's rounds land before its
- * close writes the ledger. A run added or removed moves the runs
- * directory's own mtime, which is in the key.
+ * The modification times of the files the Work Explorer is read from, as
+ * the router names them -- for `session` (the run the cached projection
+ * named current), or the highest-numbered run when it is null. A step
+ * opening or a round landing changes only a run's records, and a key blind
+ * to them would serve the stale payload back to the watcher tick the write
+ * fired.
  */
 export function projectionCacheKey(
-  sessionsDir: string,
   repositoryRoot: string,
   session: number | null = null,
   statFile: (p: string) => number | null = mtimeOrNull,
-  listDir: (p: string) => string[] = readdirOrEmpty,
 ): string {
-  const files = [
-    ...CACHE_INPUTS.map((f) => path.join(sessionsDir, f)),
-    path.join(repositoryRoot, RUNS_REL),
-    ...taskRecordInputs(repositoryRoot, session, listDir),
-  ];
-  return files.map((f) => `${f}=${statFile(f)}`).join("|");
-}
-
-function readdirOrEmpty(p: string): string[] {
-  try {
-    return fs.readdirSync(p);
-  } catch {
-    return [];
-  }
+  return followedPaths("work-explorer", [repositoryRoot], session)
+    .map((f) => `${f}=${statFile(f)}`)
+    .join("|");
 }
 
 function mtimeOrNull(p: string): number | null {
@@ -233,7 +163,7 @@ export class ProjectionCache {
   async get(sessionsDir: string, repoRoot: string): Promise<ProjectionResult> {
     const cached = this.entries.get(sessionsDir);
     const current = cached?.result.payload?.repository?.currentSession ?? null;
-    const key = projectionCacheKey(sessionsDir, repoRoot, current);
+    const key = projectionCacheKey(repoRoot, current);
     if (cached && cached.key === key) return cached.result;
     const result = await this.runner(sessionsDir, repoRoot);
     // Only an answer is kept. A failure used to be cached as well, so that

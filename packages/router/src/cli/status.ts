@@ -29,7 +29,7 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
-    "usage: dabbler status [-h] [--sessions-dir SESSIONS_DIR] [--json]",
+    "usage: dabbler status [-h] [--sessions-dir SESSIONS_DIR] [--stalled-after-seconds N] [--json]",
     "",
     "Emit the Work Explorer projection for this repository.",
     "",
@@ -38,9 +38,24 @@ function usage(): string {
     "  --sessions-dir SESSIONS_DIR",
     "                        the repository's sessions root; derived from the",
     "                        working directory when omitted",
+    "  --stalled-after-seconds N",
+    "                        judge an outstanding instruction stalled after N",
+    "                        seconds, rather than after the repository's own",
+    "                        threshold",
     "  --json                emit the projection JSON (the only output mode)",
     "",
   ].join("\n");
+}
+
+/**
+ * The stalled threshold a flag names: a positive number of seconds, or the
+ * sentence saying why the value is not one.
+ */
+export function parseStalledAfterSeconds(value: string | undefined): number | string {
+  const seconds = value === undefined || value.trim() === "" ? Number.NaN : Number(value);
+  return Number.isFinite(seconds) && seconds > 0
+    ? seconds
+    : "--stalled-after-seconds takes a positive number of seconds";
 }
 
 function isDirectory(path: string): boolean {
@@ -53,6 +68,7 @@ function isDirectory(path: string): boolean {
 
 export async function statusVerb(argv: string[]): Promise<number> {
   let explicit: string | undefined;
+  let stalledAfterSeconds: number | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--help" || token === "-h") {
@@ -60,6 +76,17 @@ export async function statusVerb(argv: string[]): Promise<number> {
       return EXIT_OK;
     }
     if (token === "--json") continue;
+    if (token === "--stalled-after-seconds" || token.startsWith("--stalled-after-seconds=")) {
+      const inline = token.includes("=");
+      const seconds = parseStalledAfterSeconds(inline ? token.slice(token.indexOf("=") + 1) : argv[index + 1]);
+      if (typeof seconds === "string") {
+        writeErr(`dabbler status: ${seconds}\n`);
+        return EXIT_USAGE;
+      }
+      stalledAfterSeconds = seconds;
+      if (!inline) index += 1;
+      continue;
+    }
     if (token.startsWith("--sessions-dir=")) {
       explicit = token.slice("--sessions-dir=".length);
       continue;
@@ -90,6 +117,6 @@ export async function statusVerb(argv: string[]): Promise<number> {
     writeErr(`status: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  writeOut(dumps(buildProjection(sessionsDir), { indent: 2 }) + "\n");
+  writeOut(dumps(buildProjection(sessionsDir, { stalledAfterSeconds }), { indent: 2 }) + "\n");
   return EXIT_OK;
 }

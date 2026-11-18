@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { chosenEngineOf } from "dabbler-ai-router";
+import { chosenEngineOf, followedPatterns } from "dabbler-ai-router";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
@@ -21,8 +21,7 @@ import {
   asRepositoryNode,
   registerWorkExplorerTreeCommands,
 } from "./commands/workExplorerTreeCommands";
-import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
-import { RUNS_REL } from "./utils/projection";
+import { discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { closeFinishedTerminals } from "./commands/engineTerminals";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import type { ConfigRoleName, SolutionNode } from "./providers/solutionTreeModel";
@@ -170,38 +169,14 @@ export function activate(context: vscode.ExtensionContext): void {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      // Exactly the artifacts the projection derives from. The
-      // projection cache is mtime-keyed on the same files, so a watcher
-      // tick re-projects only repositories that actually changed.
-      //
-      // The run records are watched as well as the sessions root, and
-      // that is a requirement rather than a nicety: the task level folds
-      // step-execution.jsonl, and a task row up to 30 seconds behind the
-      // step it describes is the untrustworthy surface this view exists
-      // to replace. A step opening or closing must move the row on the
-      // event.
-      const patterns = [
-        new vscode.RelativePattern(
-          path.join(root, SESSIONS_REL),
-          "{sessions.json,activity-log.json,session-plan.md,change-log.md}",
-        ),
-        // rounds.jsonl for the same reason: a round landing, or the cap
-        // terminal being recorded, is what the verification row folds,
-        // and it has to move on the event too.
-        new vscode.RelativePattern(
-          path.join(root, RUNS_REL),
-          "*/{step-execution.jsonl,approved-plan.json,rounds.jsonl}",
-        ),
-        // A driven session's stop lands on run.json and is the attention
-        // row; a step being accepted moves the same file. plan.json is the
-        // engine's answer to the plan step and the only file the Work row's
-        // nested steps are read from: the report that writes it touches
-        // nothing else, so it must fire on its own or the steps wait for
-        // the backstop poll. Measured under VS Code (session 126): with
-        // run.json alone watched, the steps appeared only at the next
-        // `next`, ten seconds later.
-        new vscode.RelativePattern(path.join(root, RUNS_REL), "*/driver/{run.json,plan.json}"),
-      ];
+      // Exactly the records the Work Explorer is read from, as the router
+      // names them; the projection cache is keyed on the same files, so a
+      // watcher tick re-projects only repositories that actually changed.
+      // A step opening, a round landing or a stop being written must move
+      // its row on the event, not at the backstop poll.
+      const patterns = followedPatterns("work-explorer", root).map(
+        ({ base, glob }) => new vscode.RelativePattern(base, glob),
+      );
       const onEvent = (uri: vscode.Uri) => {
         treeProvider.refresh();
         // A session closing is when its engine terminal may be past the limit.

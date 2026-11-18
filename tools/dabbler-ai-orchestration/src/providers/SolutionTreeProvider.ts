@@ -21,12 +21,8 @@ import {
   descriptorFor,
   rootNodes,
 } from "./solutionTreeModel";
-import {
-  reprojectSolution,
-  solutionConfiguration,
-  userConfigurationDirs,
-} from "../router/host";
-import { configurationContext } from "dabbler-ai-router";
+import { reprojectSolution, solutionConfiguration } from "../router/host";
+import { configurationContext, followedPatterns, type FollowedPattern } from "dabbler-ai-router";
 import { hasSessionsRoot } from "../utils/fileSystem";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "solution.json");
@@ -106,7 +102,9 @@ export class SolutionTreeProvider
     for (const glob of PROJECTION_SOURCE_GLOBS) {
       this.watch(glob, () => this.rederive());
     }
-    // **And the user-level files a configuration is derived from.**
+    // **And the files a configuration is derived from**, as the router
+    // names them: this repository's settings and dabbler.yaml, and the
+    // user-level files.
     //
     // The model catalog and this operator's preferences sit outside every
     // repository, so no workspace-relative glob reaches them -- which is
@@ -161,9 +159,16 @@ export class SolutionTreeProvider
     }
   }
 
+  /** The files a configuration reading is joined from, as the router names them. */
   private watchUserConfiguration(): void {
-    for (const dir of userConfigurationDirs()) {
-      this.watchAt(dir, "*.json", () => this.refresh());
+    let patterns: FollowedPattern[];
+    try {
+      patterns = followedPatterns("configuration", this.workspaceRoot ?? null);
+    } catch {
+      return;
+    }
+    for (const { base, glob } of patterns) {
+      this.watchAt(base, glob, () => this.refresh());
     }
   }
 

@@ -12,6 +12,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.36.0] — 2026-11-17
+
+### Added
+
+- **What the extension shows, at a bare terminal.** The Dabbler Terminal,
+  the Work Explorer and the Configuration section are now worked out by the
+  `dabbler` command itself, so you can see them without VS Code:
+  - `dabbler terminal --sessions-dir docs/sessions` prints the Dabbler
+    Terminal's lines for the run in flight, or the last one. `--follow`
+    keeps printing as the run goes on; `--width` and `--theme` lay the lines
+    out; `--json` prints each line as data.
+  - `dabbler view work-explorer --repo-root <folder>` prints the Work
+    Explorer's whole tree as JSON: each repository, its sessions and their
+    tasks, verification and findings, and on every row the `dabbler` command
+    each of its actions runs.
+  - `dabbler view configuration --repo-root <folder>` prints the
+    Configuration section as JSON: who authors and who reviews, through
+    what, with which model, which setting decided each, and what each row
+    could be set to.
+  - Both views take `--follow`: the view is printed as one line of JSON,
+    then printed again, whole, whenever a file it is read from changes,
+    until you stop it. Changes close together print once.
+  - `dabbler status` and `dabbler view work-explorer` take
+    `--stalled-after-seconds N`, the same threshold the
+    `dabbler.stalledAfterSeconds` setting gives the Work Explorer.
+- **How an engine is started, and what a start said, as data.** `dabbler
+  session launch --for session|consult|mechanic` prints the command line
+  that opens your AI's CLI, and starts nothing. `session start --json`,
+  `session defect-report --json` and `workspace --json` say what happened as
+  fields rather than as sentences.
+
+### Changed
+
+- **Nothing you see in VS Code.** The extension now reads all of the above
+  from the router rather than working it out itself, and the files it
+  watches to keep its views current are the ones the router names. Every
+  row, line, icon and refresh is as it was.
+
 ## [3.35.0] — 2026-11-16
 
 ### Added

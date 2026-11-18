@@ -368,6 +368,19 @@ describe("dabbler status", () => {
     assert.equal(strip(flagged.out), strip(bare.out));
   });
 
+  it("publishes the stalled threshold it is given, and refuses one that is not a number", async () => {
+    const { sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const given = await run(() => statusVerb(["--stalled-after-seconds", "120", "--sessions-dir", sessionsDir]));
+    assert.equal(given.code, 0);
+    const repository = (JSON.parse(given.out) as { repository: Record<string, unknown> }).repository;
+    assert.equal(repository["stalledAfterSeconds"], 120);
+
+    const refused = await run(() => statusVerb(["--stalled-after-seconds", "soon", "--sessions-dir", sessionsDir]));
+    assert.equal(refused.code, 2);
+    assert.match(refused.err, /positive number of seconds/);
+  });
+
   it("is the one name for the projection, and `progress` is not a verb", async () => {
     // `status` is what the operator was promised when the run core's own
     // `status` went away. It was an alias over `progress` for one session,

@@ -20,7 +20,7 @@ import type {
   ProgressProjectionFinding as VerificationFinding,
 } from "../src/generated/progress-projection.ts";
 import type { WorkExplorer } from "../src/generated/work-explorer.ts";
-import { viewVerb } from "../src/cli/view.ts";
+import { parseViewArgs, viewVerb } from "../src/cli/view.ts";
 import { loadSchemaFile, schemaFailure } from "../src/schema/validate.ts";
 import {
   ICON_FILES,
@@ -1612,6 +1612,14 @@ suite("workExplorer: an action is the verb a person would type", () => {
 });
 
 suite("workExplorer: dabbler view work-explorer", () => {
+  test("parseViewArgs takes a stalled threshold for the Work Explorer and refuses it elsewhere", () => {
+    const parsed = parseViewArgs(["work-explorer", "--repo-root", ".", "--stalled-after-seconds", "90"]);
+    assert.ok(typeof parsed !== "string");
+    assert.strictEqual(parsed.stalledAfterSeconds, 90);
+    assert.strictEqual(typeof parseViewArgs(["work-explorer", "--repo-root", ".", "--stalled-after-seconds", "0"]), "string");
+    assert.strictEqual(typeof parseViewArgs(["configuration", "--stalled-after-seconds", "90"]), "string");
+  });
+
   async function printed(argv: string[]): Promise<{ code: number; out: string }> {
     const out: string[] = [];
     const write = process.stdout.write.bind(process.stdout);

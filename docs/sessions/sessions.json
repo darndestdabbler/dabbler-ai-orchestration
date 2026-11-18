@@ -6891,9 +6891,9 @@
     {
       "number": 349,
       "title": "A Visual Studio extension that installs and finds the router",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T00:54:13.582000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T01:20:38.991000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

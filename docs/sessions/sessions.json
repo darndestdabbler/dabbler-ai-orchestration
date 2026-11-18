@@ -7213,9 +7213,9 @@
     {
       "number": 364,
       "title": "Microsoft's own models can author and review",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T15:24:25.372000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T15:37:44.600000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

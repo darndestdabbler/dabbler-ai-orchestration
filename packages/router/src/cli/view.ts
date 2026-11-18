@@ -32,7 +32,8 @@ function usage(): string {
   return [
     "usage: dabbler view [-h] work-explorer --repo-root PATH [--repo-root PATH ...]",
     "                            [--stalled-after-seconds N] [--follow]",
-    "       dabbler view [-h] configuration [--repo-root PATH] [--follow]",
+    "       dabbler view [-h] configuration [--repo-root PATH] [--engine E]",
+    "                            [--authoring-model M] [--reviewer-transport T] [--follow]",
     "",
     "  Print a view as JSON, as an interface renders it, and exit. Reads records;",
     "  spends nothing.",
@@ -58,7 +59,11 @@ function usage(): string {
     "                           work-explorer: judge an outstanding instruction",
     "                           stalled after N seconds, rather than after each",
     "                           repository's own threshold",
-    "  --follow                 print the view as one line of JSON, then print it",
+    "  --engine E, --authoring-model M, --reviewer-transport T",
+    "                           configuration: read the choices for this engine,",
+    "                           authoring model or reviewing vehicle, as a start",
+    "                           naming them for one session would; written nowhere",
+    "  --follow               print the view as one line of JSON, then print it",
     "                           again, whole, whenever a file it is read from",
     "                           changes, until interrupted; changes close together",
     "                           print once",
@@ -73,7 +78,16 @@ interface Parsed {
   readonly follow: boolean;
   /** work-explorer only; undefined lets each repository's own threshold decide. */
   readonly stalledAfterSeconds?: number;
+  /** configuration only: the call's flag layer for the reading. */
+  readonly reading?: { engine?: string; authoringModel?: string; reviewerTransport?: string };
 }
+
+/** The configuration reading's flags, by the reading option each one sets. */
+const READING_FLAGS: Record<string, "engine" | "authoringModel" | "reviewerTransport"> = {
+  "--engine": "engine",
+  "--authoring-model": "authoringModel",
+  "--reviewer-transport": "reviewerTransport",
+};
 
 /** The arguments, or the one sentence saying why they are not arguments. */
 export function parseViewArgs(argv: readonly string[]): Parsed | string {
@@ -83,10 +97,20 @@ export function parseViewArgs(argv: readonly string[]): Parsed | string {
   const roots: string[] = [];
   let follow = false;
   let stalledAfterSeconds: number | undefined;
+  const reading: NonNullable<Parsed["reading"]> = {};
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
     if (token === "--follow") {
       follow = true;
+      continue;
+    }
+    const option = READING_FLAGS[token];
+    if (option !== undefined) {
+      if (view !== "configuration") return `${token} is configuration's: the Work Explorer is not read for a choice`;
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith("--") || value.trim() === "") return `${token} takes a value`;
+      reading[option] = value.trim();
+      index += 1;
       continue;
     }
     if (token === "--stalled-after-seconds") {
@@ -113,6 +137,7 @@ export function parseViewArgs(argv: readonly string[]): Parsed | string {
     roots,
     follow,
     ...(stalledAfterSeconds === undefined ? {} : { stalledAfterSeconds }),
+    ...(Object.keys(reading).length === 0 ? {} : { reading }),
   };
 }
 
@@ -146,7 +171,7 @@ export function viewVerb(argv: string[]): Promise<number> {
   const render = (): unknown => {
     if (parsed.view === "configuration") {
       const root = parsed.roots[0] ?? null;
-      return configurationView(root, readConfiguration(root));
+      return configurationView(root, readConfiguration(root, parsed.reading));
     }
     return workExplorerTree(
       parsed.roots.filter((root) => hasSessionsRoot(root)).map((root) => entryFor(root, parsed.stalledAfterSeconds)),

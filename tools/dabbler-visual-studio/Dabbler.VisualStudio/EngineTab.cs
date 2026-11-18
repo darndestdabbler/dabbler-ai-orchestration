@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -85,6 +86,28 @@ namespace Dabbler.VisualStudio
             await package.JoinableTaskFactory.SwitchToMainThreadAsync();
             Clipboard.SetText(launch.Typed);
             await SayAsync($"{launch.Title} has no way to be given its first sentence, so it is on the clipboard. Paste it at the engine's prompt and press Enter:\n\n{launch.Typed}", OLEMSGICON.OLEMSGICON_INFO);
+        }
+
+        /// <summary>
+        /// Opens the router's own command, `dabbler` with <paramref name="args"/>,
+        /// as a tab titled <paramref name="title"/> in the Dabbler window of
+        /// Windows Terminal, or a console of its own where there is none.
+        /// Says why where it could not be opened; true where it was.
+        /// </summary>
+        public async Task<bool> OpenRouterAsync(string folder, string title, IReadOnlyList<string> args)
+        {
+            var router = package.Router;
+            if (router == null) return false;
+            await TaskScheduler.Default;
+            var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+            var dabblerFolder = Path.GetDirectoryName(router.BundlePath)!;
+            var started = Start(WindowsTerminal.RouterTabStartInfo(folder, title, args, dabblerFolder, path), out var notStarted);
+            if (!started && notStarted?.NativeErrorCode == FileNotFound)
+            {
+                started = Start(WindowsTerminal.RouterConsoleStartInfo(folder, args, dabblerFolder, path), out notStarted);
+            }
+            if (!started) await SayAsync($"{title} could not be opened: {notStarted?.Message}", OLEMSGICON.OLEMSGICON_WARNING);
+            return started;
         }
 
         private static bool Start(ProcessStartInfo info, out Win32Exception? error)

@@ -11,6 +11,7 @@ import * as path from "node:path";
 
 import { currentCatalogPath } from "../catalog.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
+import { currentCredentialsPath } from "../credentials.ts";
 import { ACTIVITY_LOG_FILENAME, SESSION_PLAN_FILENAME, STATE_FILENAME } from "../evidence.ts";
 import { RUNS_DIRNAME } from "../journal.ts";
 import { currentPreferencesPath } from "../preferences.ts";
@@ -69,7 +70,9 @@ function latestRun(root: string): number | null {
  */
 function userConfigurationFiles(): string[] {
   const files: string[] = [];
-  for (const placed of [currentCatalogPath, currentPreferencesPath]) {
+  // The credentials index too: the API Keys rows say which keys this
+  // machine holds, and `dabbler auth set` writes nothing else a view reads.
+  for (const placed of [currentCatalogPath, currentPreferencesPath, currentCredentialsPath]) {
     try {
       files.push(placed());
     } catch {

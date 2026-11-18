@@ -24,6 +24,9 @@ namespace Dabbler.VisualStudio
         /// </summary>
         public event EventHandler<(WorkExplorerNode Node, WorkExplorerAction Action)>? ActionChosen;
 
+        /// <summary>Start Session with Different Models was clicked: the row's Start Session, to be run with other answers.</summary>
+        public event EventHandler<WorkExplorerAction>? DifferentModelsChosen;
+
         private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
         {
             var row = (FrameworkElement)sender;
@@ -39,6 +42,11 @@ namespace Dabbler.VisualStudio
                 var item = new MenuItem { Header = action.Title };
                 item.Click += (_, _) => ActionChosen?.Invoke(this, (node, action));
                 row.ContextMenu.Items.Add(item);
+                // The same start, asked: offered wherever Start Session is, as VS Code offers it.
+                if (action.Id != ActionIds.StartSession) continue;
+                var different = new MenuItem { Header = "Start Session with Different Models" };
+                different.Click += (_, _) => DifferentModelsChosen?.Invoke(this, action);
+                row.ContextMenu.Items.Add(different);
             }
         }
 

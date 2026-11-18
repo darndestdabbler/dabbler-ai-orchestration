@@ -7,9 +7,10 @@ namespace Dabbler.VisualStudio.Core
     /// <summary>One line of a picker: a choice the router offers, or one it withholds.</summary>
     public sealed class PickItem
     {
-        internal PickItem(string label, string? description, string? detail, string? reason, IReadOnlyList<string>? arguments)
+        internal PickItem(string label, string? value, string? description, string? detail, string? reason, IReadOnlyList<string>? arguments)
         {
             Label = label;
+            Value = value;
             Description = description;
             Detail = detail;
             Reason = reason;
@@ -17,6 +18,9 @@ namespace Dabbler.VisualStudio.Core
         }
 
         public string Label { get; }
+
+        /// <summary>The value choosing it sets, such as an engine or a model id; null on a withheld entry.</summary>
+        public string? Value { get; }
 
         public string? Description { get; }
 
@@ -41,6 +45,26 @@ namespace Dabbler.VisualStudio.Core
     /// </summary>
     public static class ConfigurationAsk
     {
+        /// <summary>Update the Catalog: the root row's action, which runs `dabbler discovery refresh`.</summary>
+        public const string RefreshRecord = "dabblerSolution.refreshRecord";
+
+        /// <summary>Store a Key on This Machine: `dabbler auth set`, which asks for the key in its own terminal.</summary>
+        public const string StoreCredential = "dabblerSolution.storeCredential";
+
+        /// <summary>
+        /// The arguments Update the Catalog runs without its confirmation,
+        /// where <paramref name="document"/> says a transport this machine
+        /// reaches has never been read -- reading it is free and sends no
+        /// prompt, and every model choice on it fails until it is; null where
+        /// none is unread or the root offers no refresh it can run.
+        /// </summary>
+        public static IReadOnlyList<string>? UnreadRefresh(ConfigurationDocument document)
+        {
+            if (document.Unread.Count == 0) return null;
+            var refresh = document.Configuration.Actions.FirstOrDefault(action => action.Id == RefreshRecord);
+            return refresh == null ? null : Arguments(refresh, _ => true);
+        }
+
         /// <summary>
         /// The picker's list: each choice in the router's order, an
         /// unreachable one marked with its reason and still choosable, then
@@ -48,8 +72,8 @@ namespace Dabbler.VisualStudio.Core
         /// </summary>
         public static IReadOnlyList<PickItem> Items(ConfigurationPick pick)
         {
-            var offered = pick.Choices.Select(choice => new PickItem(choice.Label, choice.Description, choice.Detail, choice.Unreachable, WithoutProgram(choice.Argv)));
-            var withheld = pick.Withheld.Select(entry => new PickItem(entry.Label, null, null, entry.Reason, null));
+            var offered = pick.Choices.Select(choice => new PickItem(choice.Label, choice.Value, choice.Description, choice.Detail, choice.Unreachable, WithoutProgram(choice.Argv)));
+            var withheld = pick.Withheld.Select(entry => new PickItem(entry.Label, null, null, null, entry.Reason, null));
             return offered.Concat(withheld).ToList();
         }
 

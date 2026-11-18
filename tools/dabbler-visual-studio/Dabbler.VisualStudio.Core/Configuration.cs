@@ -22,6 +22,10 @@ namespace Dabbler.VisualStudio.Core
         [JsonProperty("machineOnly")]
         public bool MachineOnly { get; private set; }
 
+        /// <summary>The transports this machine can reach and has never read: every model choice on one fails until the catalog is read.</summary>
+        [JsonProperty("unread")]
+        public IReadOnlyList<string> Unread { get; private set; } = Array.Empty<string>();
+
         /// <summary>The Configuration root; its tooltip carries the model catalog's age.</summary>
         [JsonProperty("configuration")]
         public ConfigurationRow Configuration { get; private set; } = null!;
@@ -196,11 +200,27 @@ namespace Dabbler.VisualStudio.Core
     /// </summary>
     public sealed class ConfiguredChoice
     {
-        private ConfiguredChoice(string? engine, string? authoringModel, string? mechanicModel)
+        private ConfiguredChoice(string? engine, string? authoringModel, string? mechanicModel, string? reviewerTransport, string? primaryReviewerModel, string? auxiliaryReviewerModel)
         {
             Engine = engine;
             AuthoringModel = authoringModel;
             MechanicModel = mechanicModel;
+            ReviewerTransport = reviewerTransport;
+            PrimaryReviewerModel = primaryReviewerModel;
+            AuxiliaryReviewerModel = auxiliaryReviewerModel;
+        }
+
+        /// <summary>The vehicle the reviewers are reached through, or null where none is chosen.</summary>
+        public string? ReviewerTransport { get; }
+
+        public string? PrimaryReviewerModel { get; }
+
+        public string? AuxiliaryReviewerModel { get; }
+
+        /// <summary>The same choice with another engine and authoring model, for one session.</summary>
+        internal ConfiguredChoice With(string? engine, string? authoringModel)
+        {
+            return new ConfiguredChoice(engine, authoringModel, MechanicModel, ReviewerTransport, PrimaryReviewerModel, AuxiliaryReviewerModel);
         }
 
         /// <summary>The engine that authors, or null where none is chosen.</summary>
@@ -233,7 +253,13 @@ namespace Dabbler.VisualStudio.Core
             var values = new Dictionary<string, string?>();
             Collect(ConfigurationDocument.Parse(json).Configuration, values);
             string? Value(string id) => values.TryGetValue(id, out var value) ? value : null;
-            return new ConfiguredChoice(Value("config:vehicle:authoring"), Value("config:role:authoring"), Value("config:role:mechanic"));
+            return new ConfiguredChoice(
+                Value("config:vehicle:authoring"),
+                Value("config:role:authoring"),
+                Value("config:role:mechanic"),
+                Value("config:vehicle:reviewing"),
+                Value("config:role:primaryReviewer"),
+                Value("config:role:auxiliaryReviewer"));
         }
 
         private static void Collect(ConfigurationRow row, Dictionary<string, string?> values)

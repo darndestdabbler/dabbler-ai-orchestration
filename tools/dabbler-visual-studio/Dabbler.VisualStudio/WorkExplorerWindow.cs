@@ -39,7 +39,16 @@ namespace Dabbler.VisualStudio
             Caption = "Dabbler Work Explorer";
             var control = new WorkExplorerControl { DataContext = tree };
             control.ActionChosen += OnActionChosen;
+            control.DifferentModelsChosen += OnDifferentModelsChosen;
             Content = control;
+        }
+
+        private void OnDifferentModelsChosen(object sender, WorkExplorerAction start)
+        {
+            var root = repositoryRoot;
+            if (root == null) return;
+            Dabbler.JoinableTaskFactory.RunAsync(() => new SessionStarter(Dabbler).StartWithDifferentModelsAsync(root, start))
+                .FileAndForget("dabbler/work-explorer/different-models");
         }
 
         private void OnActionChosen(object sender, (WorkExplorerNode Node, WorkExplorerAction Action) chosen)

@@ -23,6 +23,8 @@ namespace Dabbler.VisualStudio.Core
             "dabblerSolution.setPrimaryReviewerModel",
             "dabblerSolution.setAuxiliaryReviewerModel",
             "dabblerSolution.setAsMyDefault",
+            ConfigurationAsk.RefreshRecord,
+            ConfigurationAsk.StoreCredential,
         };
 
         private bool isExpanded;
@@ -91,6 +93,9 @@ namespace Dabbler.VisualStudio.Core
 
         public ObservableCollection<ConfigurationNode> Roots { get; } = new ObservableCollection<ConfigurationNode>();
 
+        /// <summary>The root row's actions this extension runs, such as Update the Catalog: the buttons under the header.</summary>
+        public ObservableCollection<ConfigurationAction> Actions { get; } = new ObservableCollection<ConfigurationAction>();
+
         /// <summary>The root's description and tooltip, which carries the model catalog's age; null before a document.</summary>
         public string? Header
         {
@@ -127,6 +132,8 @@ namespace Dabbler.VisualStudio.Core
             }
             Roots.Clear();
             foreach (var node in nodes) Roots.Add(node);
+            Actions.Clear();
+            foreach (var action in root.Actions.Where(action => ConfigurationNode.RunnableActions.Contains(action.Id))) Actions.Add(action);
             var parts = new[] { root.Description, root.Tooltip }.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim());
             Header = string.Join("\n\n", parts);
         }
@@ -135,6 +142,7 @@ namespace Dabbler.VisualStudio.Core
         public void Clear()
         {
             Roots.Clear();
+            Actions.Clear();
             Header = null;
         }
 

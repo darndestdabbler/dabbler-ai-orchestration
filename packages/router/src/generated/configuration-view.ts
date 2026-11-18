@@ -163,6 +163,10 @@ export type ConfigurationView = {
    */
   machineOnly: boolean;
   /**
+   * The transports this machine can reach and has never read, such as `copilot-cli` or `api`. Every model choice on one fails until the catalog is read, which is free and sends no prompt, so an interface may run the root's Update the Catalog once without asking while this is not empty.
+   */
+  unread: string[];
+  /**
    * The Configuration root. A reading that could not be taken is this row with no children, its tooltip saying why.
    */
   configuration: ConfigurationViewRow;

@@ -3,7 +3,7 @@
   "title": "dabbler view configuration (the Configuration section's rows)",
   "description": "The Configuration section as `dabbler view configuration` prints it: who authors, who reviews, the vehicle each is reached through, each model, the Mechanic and the keys, each with the value in force and the layer that decided it. It is a read, not a record: nothing on disk is written in this shape. Every rule that decides a row -- its words, its icon, which actions it offers and what each one runs -- is the router's, so an interface renders these rows and works none of them out again. Every level is present in the data, whatever starts collapsed on screen.",
   "type": "object",
-  "required": ["schemaVersion", "machineOnly", "configuration"],
+  "required": ["schemaVersion", "machineOnly", "unread", "configuration"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
@@ -14,6 +14,11 @@
     "machineOnly": {
       "type": "boolean",
       "description": "No repository was named, so every row is this machine's default and every choice writes the machine's default."
+    },
+    "unread": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The transports this machine can reach and has never read, such as `copilot-cli` or `api`. Every model choice on one fails until the catalog is read, which is free and sends no prompt, so an interface may run the root's Update the Catalog once without asking while this is not empty."
     },
     "configuration": {
       "$ref": "#/$defs/row",

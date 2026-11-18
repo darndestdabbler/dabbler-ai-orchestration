@@ -46,7 +46,7 @@ namespace Dabbler.VisualStudio.Core.Tests
                 children = new[]
                 {
                     Row("config:authoring", "Authoring AI", "claude-code · claude-opus-5-5", Array.Empty<object>(),
-                        Row("config:vehicle:authoring", "Vehicle", "claude-code · machine default", Array.Empty<object>())),
+                        Row("config:vehicle:authoring", "Vehicle", "claude-code · machine default", new[] { Action("dabblerSolution.notBuiltHere") })),
                     Row("config:keys", "API Keys", "3 of 3 available", Array.Empty<object>(),
                         Row("config:credential:anthropic", "Anthropic key", "DABBLER_ANTHROPIC_API_KEY is set", new[] { Action("dabblerSolution.storeCredential") })),
                 },
@@ -63,14 +63,18 @@ namespace Dabbler.VisualStudio.Core.Tests
             Assert.Equal("claude-code · api\n\nWhat a session is run with.\n\nai-model-catalog: 7h old", tree.Header);
             Assert.Equal(new[] { "Authoring AI", "API Keys" }, tree.Roots.Select(node => node.Label));
             Assert.All(tree.Roots, node => Assert.True(node.IsExpanded));
+            // The root's own action is a button under the header.
+            Assert.Equal(new[] { "dabblerSolution.refreshRecord" }, tree.Actions.Select(action => action.Id));
             var vehicle = Assert.Single(tree.Roots[0].Children);
             Assert.Equal("claude-code · machine default", vehicle.Description);
             Assert.False(vehicle.IsExpanded);
+            // An action this extension has not built is no menu item and no click.
+            Assert.Empty(vehicle.Actions);
+            Assert.Null(vehicle.Click);
 
-            // Store a Key is not built here yet: no menu item, and no click.
             var key = Assert.Single(tree.Roots[1].Children);
-            Assert.Empty(key.Actions);
-            Assert.Null(key.Click);
+            Assert.Equal("dabblerSolution.storeCredential", Assert.Single(key.Actions).Id);
+            Assert.Equal("dabblerSolution.storeCredential", key.Click!.Id);
         }
 
         [Fact]

@@ -155,6 +155,11 @@ suite("configuration view: what a session is run with", () => {
     assert.strictEqual(configurationDescriptor({ kind: "configMechanic" }, configured()).description, "not read");
   });
 
+  test("the document says which transports this machine reaches and has never read", () => {
+    assert.deepStrictEqual(configurationView("R", configured({ unread: ["copilot-cli", "api"] })).unread, ["copilot-cli", "api"]);
+    assert.deepStrictEqual(configurationView(null, configured()).unread, []);
+  });
+
   test("renders every row from the dated record, and derives nothing while it does", () => {
     // The claim is not only that the rows are right: it is that drawing them
     // costs a disk read the router already did. The network is trapped for

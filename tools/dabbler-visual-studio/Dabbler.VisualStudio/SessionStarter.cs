@@ -44,6 +44,85 @@ namespace Dabbler.VisualStudio
             IReadOnlyList<string> args = action.Argv.Skip(1)
                 .Concat(new[] { "--engine", choice.Engine!, "--model", choice.AuthoringModel!, "--json" })
                 .ToList();
+            await RunAsync(router, repositoryRoot, action, args, choice);
+        }
+
+        /// <summary>
+        /// Start Session with Different Models: the engine, the authoring
+        /// model, the reviewing vehicle and the two reviewers asked in turn,
+        /// each from the pick the router prints for the answers before it,
+        /// and the start run with them for this one session. A dismissed
+        /// question starts nothing.
+        /// </summary>
+        public async Task StartWithDifferentModelsAsync(string repositoryRoot, WorkExplorerAction action)
+        {
+            if (action.Argv == null || !await package.EnsureNodeAsync()) return;
+            var router = package.Router;
+            if (router == null) return;
+            await TaskScheduler.Default;
+            var configured = ReadConfiguration(router, repositoryRoot, out var unreadable);
+            if (configured == null)
+            {
+                await SayAsync(unreadable!, OLEMSGICON.OLEMSGICON_WARNING);
+                return;
+            }
+            var answers = new DifferentModelsAnswers();
+            for (var at = 0; at < DifferentModels.Questions.Count; at++)
+            {
+                ConfigurationDocument document;
+                try
+                {
+                    document = ConfigurationDocument.Parse(router.Run(repositoryRoot, DifferentModels.ViewArguments(repositoryRoot, answers)));
+                }
+                catch (Exception error) when (error is RouterFailure || error is FormatException)
+                {
+                    await SayAsync(error.Message, OLEMSGICON.OLEMSGICON_WARNING);
+                    return;
+                }
+                var question = DifferentModels.ActionFor(document, DifferentModels.Questions[at]);
+                if (question == null) continue;
+                if (question.Unavailable != null)
+                {
+                    await SayAsync(question.Unavailable, OLEMSGICON.OLEMSGICON_WARNING);
+                    return;
+                }
+                if (question.Pick == null) continue;
+                await package.JoinableTaskFactory.SwitchToMainThreadAsync();
+                if (!Ask(question.Pick, out var answer)) return;
+                switch (at)
+                {
+                    case 0: answers.Engine = answer; break;
+                    case 1: answers.AuthoringModel = answer; break;
+                    case 2: answers.ReviewerTransport = answer; break;
+                    case 3: answers.PrimaryReviewerModel = answer; break;
+                    default: answers.AuxiliaryReviewerModel = answer; break;
+                }
+                await TaskScheduler.Default;
+            }
+            var args = DifferentModels.Arguments(action.Argv.Skip(1).ToList(), configured, answers);
+            await RunAsync(router, repositoryRoot, action, args, DifferentModels.Launching(configured, answers));
+        }
+
+        /// <summary>
+        /// One question: the chosen choice's value, or a typed model id (blank
+        /// leaves it at its default); false where the developer dismissed it.
+        /// </summary>
+        private static bool Ask(ConfigurationPick pick, out string? answer)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (pick.Typed != null)
+            {
+                answer = PickDialog.Type(pick);
+                return answer != null;
+            }
+            var item = PickDialog.Choose(pick);
+            answer = item?.Value;
+            return item != null;
+        }
+
+        /// <summary>Runs the start with <paramref name="args"/>, offers a refusal's ways on, and opens the engine with <paramref name="choice"/> once it registers.</summary>
+        private async Task RunAsync(Router router, string repositoryRoot, WorkExplorerAction action, IReadOnlyList<string> args, ConfiguredChoice choice)
+        {
             while (true)
             {
                 var answer = Start(router, repositoryRoot, args, out var words);

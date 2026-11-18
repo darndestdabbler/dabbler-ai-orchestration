@@ -40,6 +40,11 @@ namespace Dabbler.VisualStudio
             }
         }
 
+        private void OnRootActionClick(object sender, RoutedEventArgs e)
+        {
+            if (((FrameworkElement)sender).DataContext is ConfigurationAction action) ActionChosen?.Invoke(this, action);
+        }
+
         private void OnRowMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount != 2 || !(((FrameworkElement)sender).DataContext is ConfigurationNode node)) return;

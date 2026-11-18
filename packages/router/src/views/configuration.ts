@@ -20,7 +20,7 @@ import type {
   ConfigurationViewIcon,
   ConfigurationViewRow,
 } from "../generated/configuration-view.ts";
-import { configurationNode } from "../projection.ts";
+import { configurationNode, type ConfigurationReadingOptions } from "../projection.ts";
 
 /** Which transport is effective, and which layer decided it. */
 export interface ConfigurationTransport {
@@ -1452,6 +1452,7 @@ export function configurationView(
   return {
     schemaVersion: 1,
     machineOnly: root === null,
+    unread: [...(config.unread ?? [])],
     configuration: viewRowOf({ kind: "configuration" }, config, context, root),
   };
 }
@@ -1499,11 +1500,16 @@ export function settableRows(
 /**
  * The router's configuration reading for a root, taken in-process. Never
  * throws: a configuration this router cannot load is a real state, and it
- * carries its own sentence saying how to fix it.
+ * carries its own sentence saying how to fix it. `options` is the call's own
+ * flag layer -- an engine, an authoring model or a reviewing vehicle about to
+ * be used and written nowhere -- so the choices read are the ones for them.
  */
-export function readConfiguration(root: string | null): ProjectionConfiguration {
+export function readConfiguration(
+  root: string | null,
+  options: Pick<ConfigurationReadingOptions, "engine" | "authoringModel" | "reviewerTransport"> = {},
+): ProjectionConfiguration {
   try {
-    return configurationNode(root) as ProjectionConfiguration;
+    return configurationNode(root, options) as ProjectionConfiguration;
   } catch (error) {
     return { unavailable: error instanceof Error ? error.message : String(error) };
   }

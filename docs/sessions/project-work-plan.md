@@ -393,7 +393,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | no | 2026-11-18 |
 | 354 | Rollback and the ways on from a stop, from Visual Studio | no | 2026-11-18 |
 | 355 | The Configuration window in Visual Studio | no | 2026-11-18 |
-| 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | — | not declared |
+| 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | no | 2026-11-18 |
 | 357 | Set up Dabbler in the solution that is open | — | not declared |
 | 358 | Visual Studio says when a session needs a person | — | not declared |
 | 359 | Before a session starts and after it ends, beside the IDE | — | not declared |
@@ -3981,3 +3981,14 @@ Give a developer in Visual Studio Rollback to Start of This Session and the ways
 **Releasable: no.**
 
 Give Visual Studio a dockable Dabbler Configuration tool window that shows the rows `dabbler view configuration --follow` prints, and lets a developer change them. The window follows the open solution's repository. Where no solution is open it follows this machine's defaults alone (no --repo-root). It shows Authoring AI, Reviewing AI and API Keys with their rows. Each row shows its label, and its description, which carries the value and the layer that decided it. The root's description and tooltip head the window, and the tooltip carries the model catalog's age. The window is drawn again whole each time the router prints. A row's context menu offers its actions, and activating a row runs its click. An action the router marks unavailable says why on the window and runs nothing. A setting action opens a picker dialog listing its pick's choices as the router gave them, each with its description and detail. A choice this machine cannot reach is marked with its reason. What the router withholds is listed disabled, with its reason. Choosing one runs the command that choice names. A pick with a `typed` member asks for the model id in a box and runs its argv with the id appended. Keep as Machine Default asks the router's confirmation and runs its command once accepted. After any change, the router's sentence, or its refusal, is shown in an information bar on the window. The library holds the parts that decide. The configuration document types live in Configuration.cs, and ConfiguredChoice reads through them. The window's view model is ConfigurationTree. ConfigurationAsk turns a pick into the dialog's list, gives a choice's or a typed id's arguments, and gives an action's arguments after its confirmation. Each part has its tests.
+
+### Session 356 — The catalog, a key, and Start Session with Different Models, from Visual Studio
+
+**Releasable: no.**
+
+Give the Visual Studio extension the last three things a developer on a new machine needs before a first session. Update the Catalog: after its confirmation, the router's own `dabbler discovery refresh` runs and what it printed is shown in the Dabbler Session pane; where a transport this machine can reach has never been read, it runs once without being asked, as VS Code does. Store a Key: the router's `dabbler auth set <provider>` opens in a tab of the Dabbler window of Windows Terminal, which asks for the key itself, so the key never passes through Visual Studio or the extension. Start Session with Different Models: on a row offering Start Session, the engine, the authoring model, the reviewing vehicle and the two reviewers are asked in turn from the router's own choices, each list read again for the answers before it, and the start runs with them for that one session, writing none of them down. Two small router changes make this possible without the extension working any rule out for itself: `dabbler view configuration` says which transports are unread (VS Code reads the same fact off the projection), takes `--engine`, `--authoring-model` and `--reviewer-transport` as the reading's flag layer so a later list follows an earlier answer, and follows the credentials index so a stored key repaints the API Keys row.
+
+**Amended after acceptance:**
+
+- 2026-11-18 — step 'update-the-catalog': its files: Update the Catalog is the root row's action, and the window shows the root only as a header with no menu: the control needs a place for the root's actions, or the action is unreachable (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-18 — step 'store-a-key': its files: the Store a Key action id is named once, beside Update the Catalog's in ConfigurationAsk, where the extension and the tree both read it (claude-code (anthropic, claude-opus-5-5))

@@ -40,6 +40,8 @@ namespace Dabbler.VisualStudio.Core.Tests
 
             Assert.Equal(new[] { "claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-4" }, items.Select(item => item.Label));
             Assert.Null(items[0].Reason);
+            Assert.Equal("claude-opus-5-5", items[0].Value);
+            Assert.Null(items[2].Value);
             Assert.Equal("what you chose", items[0].Detail);
             Assert.Equal("the Claude CLI is not on PATH", items[1].Reason);
             Assert.True(items[1].Choosable);
@@ -72,6 +74,26 @@ namespace Dabbler.VisualStudio.Core.Tests
             });
             Assert.Equal("Keep as Machine Default", asked!.Accept);
             Assert.Equal(new[] { "configure", "--repo-root", "R", "--engine", "claude-code", "--mine" }, args);
+        }
+
+        [Fact]
+        public void UnreadRefresh_runs_the_refresh_without_its_confirmation_only_where_a_transport_is_unread()
+        {
+            var refresh = new
+            {
+                id = "dabblerSolution.refreshRecord",
+                title = "Update the Catalog",
+                argv = new[] { "dabbler", "discovery", "refresh" },
+                pick = (object?)null,
+                confirm = new { title = "Refresh ai-model-catalog?", detail = "Nothing.", accept = "Refresh", keep = (string?)null },
+                unavailable = (string?)null,
+            };
+            var root = new { id = "configuration", kind = "configuration", label = "Configuration", actions = new[] { refresh }, children = new object[0] };
+            ConfigurationDocument Document(string[] unread) =>
+                ConfigurationDocument.Parse(JsonConvert.SerializeObject(new { schemaVersion = 1, machineOnly = false, unread, configuration = root }));
+
+            Assert.Equal(new[] { "discovery", "refresh" }, ConfigurationAsk.UnreadRefresh(Document(new[] { "copilot-cli" })));
+            Assert.Null(ConfigurationAsk.UnreadRefresh(Document(new string[0])));
         }
 
         [Fact]

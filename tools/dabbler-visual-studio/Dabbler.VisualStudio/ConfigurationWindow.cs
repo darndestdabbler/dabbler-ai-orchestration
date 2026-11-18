@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
@@ -22,6 +23,9 @@ namespace Dabbler.VisualStudio
     [Guid("e8b5f0d2-7c41-4a9e-b3d6-2f1a8c94e605")]
     public sealed class ConfigurationWindow : ToolWindowPane
     {
+        // Whether this Visual Studio has read an unread catalog without being asked; main thread only.
+        private static bool unreadTaken;
+
         private readonly ConfigurationTree tree = new ConfigurationTree();
 
         private RouterFollow? follow;
@@ -148,8 +152,27 @@ namespace Dabbler.VisualStudio
             Dabbler.JoinableTaskFactory.RunAsync(async () =>
             {
                 await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-                if (mine == generation) tree.Show(document);
+                if (mine != generation) return;
+                tree.Show(document);
+                await ReadUnreadCatalogAsync(document);
             }).FileAndForget("dabbler/configuration/show");
+        }
+
+        /// <summary>
+        /// The first time a document says a transport this machine reaches has
+        /// never been read, Update the Catalog runs without being asked, once
+        /// in this Visual Studio: it is free, and every model choice on that
+        /// transport fails until it has run.
+        /// </summary>
+        private async Task ReadUnreadCatalogAsync(ConfigurationDocument document)
+        {
+            await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
+            var where = folder;
+            var args = ConfigurationAsk.UnreadRefresh(document);
+            if (unreadTaken || where == null || args == null) return;
+            unreadTaken = true;
+            var title = document.Configuration.Actions.First(action => action.Id == ConfigurationAsk.RefreshRecord).Title;
+            await new ConfigurationActions(Dabbler, this).RefreshAsync(where, title, args);
         }
 
         private void Stop()

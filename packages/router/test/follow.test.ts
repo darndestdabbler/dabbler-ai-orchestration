@@ -7,6 +7,7 @@ import * as path from "node:path";
 import { after, before, suite, test } from "node:test";
 
 import { setCatalogPath } from "../src/catalog.ts";
+import { setCredentialsPath } from "../src/credentials.ts";
 import { setPreferencesPath } from "../src/preferences.ts";
 import { follow, followedPaths } from "../src/views/follow.ts";
 
@@ -37,6 +38,16 @@ suite("follow: followedPaths", () => {
     assert.ok(!paths.some((p) => p.includes("/s10/")));
     assert.ok(!paths.some((p) => p.startsWith(`${slash(user)}/`)));
     assert.ok(followedPaths("configuration", [root]).map(slash).includes(`${slash(user)}/preferences.json`));
+  });
+
+  test("the configuration follows the credentials index, so a stored key repaints the API Keys rows", () => {
+    setCredentialsPath(path.join(user, "credentials.json"));
+    try {
+      assert.ok(followedPaths("configuration", [root]).map(slash).includes(`${slash(user)}/credentials.json`));
+      assert.ok(!followedPaths("work-explorer", [root]).map(slash).includes(`${slash(user)}/credentials.json`));
+    } finally {
+      setCredentialsPath(null);
+    }
   });
 
   test("with no session named, the Work Explorer follows the highest run", () => {

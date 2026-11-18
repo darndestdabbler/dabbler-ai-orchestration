@@ -24,17 +24,51 @@ namespace Dabbler.VisualStudio.Core
         /// </summary>
         public static ProcessStartInfo TabStartInfo(EngineLaunch launch, string programPath, string dabblerFolder, string currentPath)
         {
-            var args = new[] { "-w", WindowName, "new-tab", "-d", launch.Cwd, "--title", launch.Title, programPath }.Concat(launch.Args);
-            // A bare `;` separates wt's own subcommands.
-            var info = new ProcessStartInfo("wt.exe", string.Join(" ", args.Select(arg => Router.Quote(arg).Replace(";", "\\;"))));
-            return WithEnvironment(info, launch, dabblerFolder, currentPath);
+            return Tab(launch.Cwd, launch.Title, programPath, launch.Args, launch.Env, dabblerFolder, currentPath);
         }
 
         /// <summary>The same program, folder and environment, started directly: for a machine where wt.exe cannot be started.</summary>
         public static ProcessStartInfo ConsoleStartInfo(EngineLaunch launch, string programPath, string dabblerFolder, string currentPath)
         {
-            var info = new ProcessStartInfo(programPath, string.Join(" ", launch.Args.Select(Router.Quote)));
-            return WithEnvironment(info, launch, dabblerFolder, currentPath);
+            return Console(launch.Cwd, programPath, launch.Args, launch.Env, dabblerFolder, currentPath);
+        }
+
+        /// <summary>
+        /// A tab in the Dabbler window running the router's own command: the
+        /// dabbler.cmd in <paramref name="dabblerFolder"/> with <paramref name="args"/>,
+        /// in <paramref name="folder"/>. For a verb that asks its own question
+        /// in a terminal, such as `auth set`, which reads a key with the echo off.
+        /// </summary>
+        public static ProcessStartInfo RouterTabStartInfo(string folder, string title, IReadOnlyList<string> args, string dabblerFolder, string currentPath)
+        {
+            return Tab(folder, title, RouterProgram(dabblerFolder), args, NoEnvironment, dabblerFolder, currentPath);
+        }
+
+        /// <summary>The same router command started directly, in a console of its own: for a machine where wt.exe cannot be started.</summary>
+        public static ProcessStartInfo RouterConsoleStartInfo(string folder, IReadOnlyList<string> args, string dabblerFolder, string currentPath)
+        {
+            return Console(folder, RouterProgram(dabblerFolder), args, NoEnvironment, dabblerFolder, currentPath);
+        }
+
+        private static readonly IReadOnlyDictionary<string, string> NoEnvironment = new Dictionary<string, string>();
+
+        private static string RouterProgram(string dabblerFolder)
+        {
+            return Path.Combine(dabblerFolder, "dabbler.cmd");
+        }
+
+        private static ProcessStartInfo Tab(string folder, string title, string programPath, IEnumerable<string> programArgs, IReadOnlyDictionary<string, string> env, string dabblerFolder, string currentPath)
+        {
+            var args = new[] { "-w", WindowName, "new-tab", "-d", folder, "--title", title, programPath }.Concat(programArgs);
+            // A bare `;` separates wt's own subcommands.
+            var info = new ProcessStartInfo("wt.exe", string.Join(" ", args.Select(arg => Router.Quote(arg).Replace(";", "\\;"))));
+            return WithEnvironment(info, folder, env, dabblerFolder, currentPath);
+        }
+
+        private static ProcessStartInfo Console(string folder, string programPath, IEnumerable<string> programArgs, IReadOnlyDictionary<string, string> env, string dabblerFolder, string currentPath)
+        {
+            var info = new ProcessStartInfo(programPath, string.Join(" ", programArgs.Select(Router.Quote)));
+            return WithEnvironment(info, folder, env, dabblerFolder, currentPath);
         }
 
         /// <summary>
@@ -62,11 +96,11 @@ namespace Dabbler.VisualStudio.Core
             return program;
         }
 
-        private static ProcessStartInfo WithEnvironment(ProcessStartInfo info, EngineLaunch launch, string dabblerFolder, string currentPath)
+        private static ProcessStartInfo WithEnvironment(ProcessStartInfo info, string folder, IReadOnlyDictionary<string, string> env, string dabblerFolder, string currentPath)
         {
             info.UseShellExecute = false;
-            info.WorkingDirectory = launch.Cwd;
-            foreach (var pair in launch.Env) info.Environment[pair.Key] = pair.Value;
+            info.WorkingDirectory = folder;
+            foreach (var pair in env) info.Environment[pair.Key] = pair.Value;
             info.Environment["PATH"] = dabblerFolder + ";" + currentPath;
             return info;
         }

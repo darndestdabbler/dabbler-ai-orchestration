@@ -1620,6 +1620,19 @@ suite("workExplorer: dabbler view work-explorer", () => {
     assert.strictEqual(typeof parseViewArgs(["configuration", "--stalled-after-seconds", "90"]), "string");
   });
 
+  test("parseViewArgs takes the reading's engine, authoring model and reviewing vehicle for the configuration only", () => {
+    const parsed = parseViewArgs([
+      "configuration", "--engine", "copilot", "--authoring-model", "claude-sonnet-5.5", "--reviewer-transport", "api",
+    ]);
+    assert.ok(typeof parsed !== "string");
+    assert.deepStrictEqual(parsed.reading, { engine: "copilot", authoringModel: "claude-sonnet-5.5", reviewerTransport: "api" });
+    const plain = parseViewArgs(["configuration"]);
+    assert.ok(typeof plain !== "string");
+    assert.strictEqual(plain.reading, undefined);
+    assert.strictEqual(typeof parseViewArgs(["work-explorer", "--repo-root", ".", "--engine", "copilot"]), "string");
+    assert.strictEqual(typeof parseViewArgs(["configuration", "--engine"]), "string");
+  });
+
   async function printed(argv: string[]): Promise<{ code: number; out: string }> {
     const out: string[] = [];
     const write = process.stdout.write.bind(process.stdout);

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Everything the extension does that does not need Visual Studio, so it
+       can be tested without Visual Studio. netstandard2.0 because the
+       extension that loads it runs on .NET Framework. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Dabbler.VisualStudio.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The version Visual Studio 17.14 carries and loads for every extension. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

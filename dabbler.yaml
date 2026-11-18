@@ -52,8 +52,11 @@ schema_version: 1
 # work landed and its release notes written.
 #
 # `release: tag` says: this repository's release is an annotated `vsix-v*`
-# tag, `dabbler release` makes it, and `.github/workflows/publish-vscode.yml`
-# publishes from it. The packaging run then RECORDS whether that tag reached
+# tag, `dabbler release` makes it, and two workflows publish from it:
+# `.github/workflows/publish-vscode.yml` the VS Code extension to the VS Code
+# Marketplace, and `.github/workflows/publish-visual-studio.yml` the Visual
+# Studio extension to the Visual Studio Marketplace. One tag, because the
+# repository has one version. The packaging run then RECORDS whether that tag reached
 # origin -- it never makes it, because a tag published to everyone the moment
 # CI sees it is the one act that waits on the operator's own `publication`
 # decision rather than on a phase advancing.

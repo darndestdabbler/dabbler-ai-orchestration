@@ -12,6 +12,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.37.0] — 2026-11-18
+
+### Added
+
+- **Dabbler in Visual Studio.** A second extension, *Dabbler AI
+  Orchestration for Visual Studio*, carries the same router into Visual
+  Studio 2026, beside the solution you have open. It decides nothing of its
+  own: it shows what `dabbler` prints and runs the verbs it names. See
+  [Dabbler in Visual Studio](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/visual-studio.md).
+  - **Three windows** under View > Other Windows: the **Dabbler Work
+    Explorer** (sessions, steps, review and findings, with each row's
+    actions on its right-click menu), **Dabbler Configuration** (who writes,
+    who reviews, through what and with which model; Update the Catalog and
+    Store a Key are there too), and the **Dabbler Terminal** (the
+    framework's own lines for the session in flight).
+  - **Set Up Dabbler in This Solution** reads the open solution's build and
+    tests and commits the files Dabbler needs, then offers to start
+    session 1.
+  - **Start Session** opens the engine, Claude Code or the GitHub Copilot
+    CLI, in a Windows Terminal tab. Before a start it asks about unsaved
+    documents, a running debugger or a build in progress, and offers Save
+    All and Go On. **Start Session with Different Models** chooses the
+    engine and the models for that one session.
+  - **At a stop**, a bar across the editor says the session is paused and
+    closes itself once the session moves on. The session's row offers Check
+    this stop, Review exception, Report this stop to Dabbler, Rollback to
+    Start of This Session (showing what it will do first), Consult with AI
+    and Open a Mechanic. Stop, Continue, Close, Cancel and Restore are
+    there too.
+  - **Compare With Its Start** lists the files a session changed and opens
+    Visual Studio's own comparison window on each.
+  - Walked on Visual Studio 2026 with an ASP.NET MVC 5 solution on .NET
+    Framework 4.8.1. It installs on Visual Studio 2022 17.14 and later, but
+    nobody has walked a session there yet.
+- **`dabbler view configuration`** takes `--engine`, `--authoring-model` and
+  `--reviewer-transport`, reading the choices as a start that names them for
+  one session would, and says which transports this machine has never read.
+- **`dabbler bootstrap --refuse-uncommitted`** sets up only a git repository
+  with nothing uncommitted, and refuses before writing anything otherwise.
+- **A rollback's dry run** prints a `detail` sentence, the one the
+  confirmation shows.
+
+### Changed
+
+- **The Work Explorer offers Review exception only on a stop that `session
+  waive` accepts.** A `blocked` step has no gate to go past, and the menu
+  item used to be offered on it and then refused. The progress projection
+  says so as `stopWaivable`.
+- **The session in flight offers Continue Session wherever no stop
+  stands**, so an engine's closed terminal can be reopened from the
+  session's own row and not only from the repository's.
+
 ## [3.36.0] — 2026-11-17
 
 ### Added

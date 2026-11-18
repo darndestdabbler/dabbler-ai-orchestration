@@ -30,3 +30,7 @@ link to for their proof. To run a session, read
   where a session calls a model and who starts each call, what decides the
   cost and where to see it, where each company's prices are, what a
   reviewer is sent and may read, and which companies receive the code.
+- [Dabbler in Visual Studio](visual-studio.md): what to install, the three
+  windows, starting a session and answering a stop from Visual Studio, what
+  Visual Studio itself does while the engine works beside an open solution,
+  and what is not there.

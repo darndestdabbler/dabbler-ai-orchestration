@@ -1,8 +1,9 @@
 // One version, stamped into every manifest that has to carry it.
 //
 // npm and the VS Code Marketplace each require a literal `version` in their
-// own `package.json`, and the extension names the router as a dependency, so
-// three literals have to agree. Keeping them in step by hand is what put an
+// own `package.json`, the extension names the router as a dependency, and the
+// Visual Studio extension's `source.extension.vsixmanifest` carries one in its
+// `<Identity>`, so four literals have to agree. Keeping them in step by hand is what put an
 // install of router 2.0.0 beside extension 2.7.0 in front of the operator --
 // two things where they have one.
 //
@@ -16,11 +17,19 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+// `--root <folder>` stamps or checks a copy of the repository instead of this
+// one, which is how its test runs it.
+const rootFlag = process.argv.indexOf("--root");
+const repoRoot =
+  rootFlag !== -1 && process.argv[rootFlag + 1]
+    ? process.argv[rootFlag + 1]
+    : join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const check = process.argv.includes("--check");
 
 const ROUTER_MANIFEST = "packages/router/package.json";
 const EXTENSION_MANIFEST = "tools/dabbler-ai-orchestration/package.json";
+const VISUAL_STUDIO_MANIFEST =
+  "tools/dabbler-visual-studio/Dabbler.VisualStudio/source.extension.vsixmanifest";
 const LOCKFILE = "package-lock.json";
 const ROUTER_PACKAGE = "dabbler-ai-router";
 
@@ -50,6 +59,21 @@ function stampDependency(text: string, version: string): string {
   return text.replace(
     new RegExp(`("${ROUTER_PACKAGE}":\\s*")[^"]+(")`),
     `$1${version}$2`,
+  );
+}
+
+/**
+ * The Visual Studio extension's version: the `Version` of its `<Identity>`.
+ * The `<PackageManifest Version="2.0.0">` above it is the manifest schema's
+ * own version, and stamping that would make the file unreadable to Visual
+ * Studio.
+ */
+function stampIdentityVersion(text: string, version: string): string {
+  // Either quote: XML allows both, and a check that read only one would pass
+  // a stale manifest written with the other.
+  return text.replace(
+    /(<Identity\b[^>]*?\bVersion=)(["'])[^"']+\2/,
+    (_whole, head: string, quote: string) => `${head}${quote}${version}${quote}`,
   );
 }
 
@@ -97,6 +121,10 @@ function main(): number {
     {
       path: EXTENSION_MANIFEST,
       text: stampDependency(stampVersionField(read(EXTENSION_MANIFEST), version), version),
+    },
+    {
+      path: VISUAL_STUDIO_MANIFEST,
+      text: stampIdentityVersion(read(VISUAL_STUDIO_MANIFEST), version),
     },
     { path: LOCKFILE, text: stampLock(read(LOCKFILE), version) },
   ];

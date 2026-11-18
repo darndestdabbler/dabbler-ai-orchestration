@@ -14,6 +14,10 @@ document or a comment that names `python -m ai_router.<module>` is describing
 something that no longer exists — the equivalent is `dabbler <verb>`, with
 the same arguments.
 
+**C# lives in `tools/dabbler-visual-studio/` and nowhere else.** That is the
+Visual Studio extension: it renders what `dabbler` prints and runs the verbs
+it names, and it never decides — a rule belongs in the router, once.
+
 ## Working branch
 
 **Work happens on `master`**, per the standing trunk-based directive. Commit

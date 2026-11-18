@@ -400,7 +400,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 360 | A session is walked in Visual Studio, on an old-style solution | no | 2026-11-18 |
 | 361 | The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop | no | 2026-11-18 |
 | 362 | The Visual Studio extension is documented and made ready to publish | no | 2026-11-18 |
-| 363 | Release 3.37.0 (release: 3.37.0) | — | not declared |
+| 363 | Release 3.37.0 (release: 3.37.0) | yes | 2026-11-18 |
 | 364 | Microsoft's own models can author and review | — | not declared |
 | 365 | Release 3.38.0 (release: 3.38.0) | — | not declared |
 
@@ -4050,3 +4050,9 @@ Fix the three things session 360's walk in Visual Studio found at a stop. The pr
 **Releasable: no.**
 
 Session 360's page ends in Publish, so this session makes the Visual Studio extension ready to publish as 3.37.0 in session 363. It writes one guide page, docs/guide/visual-studio.md, linked from the guide's index. The page covers what to install (Node, an engine CLI, Windows Terminal, the extension), the three windows, starting a session, answering a stop and working beside an open solution, all taken from sessions 359 and 360, and it says plainly that there is no terminal inside Visual Studio and no new-project set-up. It writes the Visual Studio Marketplace listing for a .NET developer: a README.md overview and a publishManifest.json for Microsoft's VsixPublisher beside the extension, with the vsixmanifest's display name, description, tags and icon. The listing claims Visual Studio 2026, the only version walked, and says 2022 has not been walked yet. stamp-version.ts learns the vsixmanifest's Identity version, so `npm run stamp:version` writes it and `npm run check:version` fails when it is stale, and a test proves the failure. A new tag-driven workflow, .github/workflows/publish-visual-studio.yml, builds the .vsix on a Windows runner on the same vsix-v* tag the VS Code extension's workflow fires on. RC tags only build. On a final tag it publishes with VsixPublisher behind the same green-Test gate and the `marketplace` environment's approval, reusing the existing DarndestDabbler publisher and its VSCE_PAT Marketplace-publish token, and its header says exactly what the operator must confirm or create before session 363. dabbler.yaml's `packaging` comment names both workflows. AGENTS.md says in two lines that C# lives only in tools/dabbler-visual-studio/ and that it renders and never decides. version.json goes to 3.37.0, stamped into every manifest, and the changelog's 3.37.0 section says what a developer in Visual Studio now has.
+
+### Session 363 — Release 3.37.0 (release: 3.37.0)
+
+**Releasable: yes.**
+
+Release 3.37.0: the framework packs and publishes what is on the trunk.

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 335 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 335 transcript</h1>
+<p class="stamp">Rendered 2026-11-16T17:09:21.610Z by dabbler-ai-router 3.34.1 at 635fe897be7b88479a1bfd4975375478660d964d.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-16T11:45:47.700-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 335 of 342: A session's section of the plan is read one way</h3>
+<p>Scope: <code>packages/router/src/session.ts</code> (<code>extractSpecExcerpt</code>), <code>packages/router/src/verify/prompts.ts</code> (<code>specExcerpt</code>, <code>buildTaskBlock</code>), <code>packages/router/src/approvedPlan.ts</code> (<code>approvedContractChange</code>), <code>packages/router/src/transcript.ts</code> (<code>readPlanSection</code>), <code>packages/router/src/drive.ts</code> (<code>planAsk</code>), <code>session.test.ts</code>, <code>prompts.test.ts</code>, <code>approvedPlan.test.ts</code>, <code>transcript.test.ts</code></p>
+<p><strong>Why.</strong> The same investigation, and confirmed in this tree: what the author is asked to plan from and what the reviewer holds the session to can be different text, and neither is told.</p>
+<ul><li><code>extractSpecExcerpt</code> returns the whole plan when no heading matches the session. <code>planAsk</code> expects nothing in that case and has words for it that are never reached; the reviewer is handed every session in the file as &quot;the session's plan, verbatim&quot;.</li><li>Three functions find a session's section, each by its own rule. <code>extractSpecExcerpt</code> and <code>approvedContractChange</code> run to the next session heading, so a heading that is not a session's is swept into the section before it: in this plan, the part headings between sessions; in the staff repository, a &quot;Proposed follow-up&quot; the session itself appended. <code>readPlanSection</code>, for the transcript, stops at any <code>###</code>.</li><li>The reviewer reads the section from the working tree. A session that edits the plan, as session 140 of the staff repository was asked to, is reviewed against the text it wrote. The contract control already reads the plan as committed at the session's start, for this reason.</li></ul>
+<p><strong>Step 1 -- one reader.</strong> One function takes the plan's text and a session's number and returns that session's section, or nothing. A section ends at the next heading of level three or above, and a line inside a fenced block is not a heading: this plan has one such line today. The plan ask, the reviewer's prompt, the contract control and the transcript all call it, and the private copies are deleted. For the contract control this is a change, in the direction of refusing: a <code>**Contract change.**</code> paragraph under a level-three heading of its own, below the session's, is no longer in the section, where the transcript already left it out. The changelog says so.</p>
+<p><strong>Step 2 -- no section is said, never the whole file.</strong> The plan ask says what it already has the words for. The reviewer's prompt says the plan has no section for this session.</p>
+<p><strong>Step 3 -- author and reviewer are given the section as it stood at the start.</strong> The plan ask and <code>specExcerpt</code> both read the plan at the session's start commit. Where the section in the tree differs from it, the reviewer's prompt carries both, and says which is which: the text at the start is what the session is held to, and the other is what the section reads now. It says that a difference relaxes nothing by being there: where the later text removes or weakens something the start text asked for, the reviewer reports that as a finding, and a person decides it by the ways a finding already has. It says too that nothing shown grants a contract change, which is the control's alone to read.</p>
+<p><strong>Non-goals.</strong> The work plan block the reviewer is also given: where it disagrees with the session's section, saying so is the reviewer's job. Showing the session's section again in each step's ask. Writing <code>sessions.json</code> or <code>project-work-plan.md</code> when the plan is committed: <code>dabbler status</code> already reads a not-started session's title from the plan. <code>healTitle</code>. Which transcript pages a rollback keeps: the page the investigation found stale was put back by a revert made by hand, and <code>dabbler transcript --from 140 --to 140</code> in that repository renders it again. <code>version.json</code>: session 336 stamps it.</p>
+<p><strong>Tests.</strong> In <code>session.test.ts</code>: a number with no heading reads as nothing; a section stops at a heading that is not a session's, and does not stop at one inside a fenced block. In <code>prompts.test.ts</code>: the prompt carries the section as committed at the start, and both versions, each named, where the tree's differs. In <code>approvedPlan.test.ts</code>: a contract change written into the tree's section after the start grants nothing, as now. The transcript's existing tests hold through the one reader.</p>
+<p><strong>Releasable.</strong> Yes, as 3.35.0 in session 338.</p>
+<h2>Work Plan</h2>
+<p>Make a session's section of the plan read one way. One function, <code>planSection(planText, sessionNumber)</code>, returns that session's section or null: it starts at the session's <code>### Session N</code> heading and ends at the next heading of level three or above, and a line inside a fenced block is not a heading. It lives in <code>evidence.ts</code>, beside <code>SESSION_PLAN_FILENAME</code>, because all four callers already import that module and <code>transcript.ts</code> cannot import <code>session.ts</code> (session imports transcript, and the boundary control refuses a new import cycle); its tests are therefore in <code>evidence.test.ts</code>, named after it. The contract control (<code>approvedContractChange</code>), the transcript (<code>readPlanSection</code>, deleted), the reviewer's prompt (<code>specExcerpt</code>) and the plan ask (<code>planAsk</code>) all call it, and <code>extractSpecExcerpt</code> is deleted. Where no section exists the plan ask uses the words it already has and the reviewer's prompt says the plan has no section for this session -- never the whole file. The plan ask and the reviewer's prompt read the plan as committed at the session's start commit (one helper in <code>approvedPlan.ts</code>, beside <code>sessionStartCommit</code>, which the contract control also uses); where the plan file is not in that commit at all, the tree's text is the only one and is named as such. Where the tree's section differs from the start's, the reviewer is given both, each named: the start text is what the session is held to; a difference relaxes nothing, and a later text that removes or weakens what the start asked for is reported as a finding; nothing shown grants a contract change, which is the control's alone to read. An <code>## [Unreleased]</code> entry in the extension's CHANGELOG says the contract control no longer reads a <code>**Contract change.**</code> paragraph under a level-three heading of its own below the session's.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/ab569191f1c76ef680506fa3e2c5cb14d424ec3a"><code>ab569191f1c76ef680506fa3e2c5cb14d424ec3a</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>One reader</td><td><p>Add <code>planSection(planText, sessionNumber): string | null</code> to <code>packages/router/src/evidence.ts</code>: the session's <code>### Session N</code> heading line through to the line before the next heading of level one to three, skipping lines inside <code></code><code> or ~~~ fences, trimmed; null where no heading names the session. Make </code>approvedContractChange<code> (approvedPlan.ts) and the transcript's plan section (transcript.ts, deleting its private </code>readPlanSection<code> rule) call it. Tests in </code>evidence.test.ts<code>: a number with no heading reads as null; a section stops at a level-three heading that is not a session's; it does not stop at a heading-shaped line inside a fenced block. In </code>approvedPlan.test.ts<code>: a </code><strong>Contract change.</strong><code> paragraph under its own level-three heading below the session's grants nothing. Add an </code>## [Unreleased]<code>` section to the extension's CHANGELOG.md saying so.</code></p></td><td><span class="mono">packages/router/src/evidence.ts</span><br><span class="mono">packages/router/test/evidence.test.ts</span><br><span class="mono">packages/router/src/approvedPlan.ts</span><br><span class="mono">packages/router/test/approvedPlan.test.ts</span><br><span class="mono">packages/router/src/transcript.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>node node_modules/typescript/bin/tsc -p packages/router --noEmit</code><br><code>node packages/router/scripts/run-ts.mjs packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/evidence.test.ts packages/router/test/approvedPlan.test.ts packages/router/test/transcript.test.ts</code></td><td>yes</td></tr>
+<tr><td>No section</td><td><p>Make the reviewer's prompt (<code>specExcerpt</code> in verify/prompts.ts) and the plan ask (<code>planAsk</code> in drive.ts) call <code>planSection</code>, and delete <code>extractSpecExcerpt</code> from session.ts. Where there is no section, the plan ask uses its existing words and the reviewer's prompt says the session plan has no section for this session -- never the whole file. Test in <code>prompts.test.ts</code>: a plan with no section for the session gives that sentence and not the other sessions' text.</p></td><td><span class="mono">packages/router/src/verify/prompts.ts</span><br><span class="mono">packages/router/test/prompts.test.ts</span><br><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/src/session.ts</span></td><td><code>node node_modules/typescript/bin/tsc -p packages/router --noEmit</code><br><code>node packages/router/scripts/run-ts.mjs packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/prompts.test.ts</code></td><td>yes</td></tr>
+<tr><td>Start commit</td><td><p>Add one helper beside <code>sessionStartCommit</code> in approvedPlan.ts that reads the plan as committed at the session's start commit (null where the file is not in that commit) and use it in <code>approvedContractChange</code>. The plan ask reads the session's section from that text, falling back to the tree's only where the plan was not in the start commit. <code>specExcerpt</code> takes the repository root and does the same; where the tree's section differs from the start's, the reviewer's prompt carries both, each named: the text at the start is what the session is held to, the other is what the section reads now; a difference relaxes nothing, a later text that removes or weakens what the start asked for is reported as a finding and a person decides it by the ways a finding already has; and nothing shown grants a contract change, which is the contract control's alone to read. Tests in <code>prompts.test.ts</code>: the prompt carries the section as committed at the start, and both versions, each named, where the tree's differs. In <code>approvedPlan.test.ts</code>: confirm a contract change written into the tree's section after the start grants nothing.</p></td><td><span class="mono">packages/router/src/approvedPlan.ts</span><br><span class="mono">packages/router/test/approvedPlan.test.ts</span><br><span class="mono">packages/router/src/verify/prompts.ts</span><br><span class="mono">packages/router/test/prompts.test.ts</span><br><span class="mono">packages/router/src/drive.ts</span></td><td><code>node node_modules/typescript/bin/tsc -p packages/router --noEmit</code><br><code>node packages/router/scripts/run-ts.mjs packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/prompts.test.ts packages/router/test/approvedPlan.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The work plan block the reviewer is also given: where it disagrees with the session's section, saying so is the reviewer's job.</li><li>Showing the session's section again in each step's ask.</li><li>Writing sessions.json or project-work-plan.md when the plan is committed, and healTitle.</li><li>Which transcript pages a rollback keeps.</li><li>version.json and the 3.35.0 version section: session 336 stamps them, session 338 releases.</li><li>parseSessionPlans and the other heading readers in session.ts and progress.ts that list sessions rather than read one section.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[16:45:47]</span> <span class="muted">run-started</span> session=335 mode=pull</div>
+<div class="line"><span class="at">[16:45:47]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[16:49:44]</span> <span class="muted">run-resumed</span> session=335 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[16:49:44]</span> <span class="muted">plan-accepted</span> steps=[&quot;one-reader&quot;,&quot;no-section&quot;,&quot;start-commit&quot;] non_goals=6</div>
+<div class="line"><span class="at">[16:49:54]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[16:49:54]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=one-reader</div>
+<div class="line"><span class="at">[16:52:02]</span> <span class="muted">run-resumed</span> session=335 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:52:22]</span> <span class="muted">check-passed</span> step=one-reader argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;-p&quot;,&quot;packages/router&quot;,&quot;--noEmit&quot;]</div>
+<div class="line"><span class="at">[16:52:22]</span> <span class="muted">check-passed</span> step=one-reader argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[16:52:22]</span> <span class="muted">check-passed</span> step=one-reader argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/evidence.test.ts&quot;,&quot;packages/router/test/approvedPlan.test.ts&quot;,&quot;packages/router/test/transcript.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:52:33]</span> <span class="muted">named-tests-passed</span> step=one-reader suite=typescript command=node scripts/suite.mjs container packages/router/test/approvedPlan.test.ts packages/router/test/evidence.test.ts packages/router/test/transcript.test.ts</div>
+<div class="line"><span class="at">[16:52:36]</span> <span class="muted">report-accepted</span> seq=2 step=one-reader files=[&quot;packages/router/src/evidence.ts&quot;,&quot;packages/router/test/evidence.test.ts&quot;,&quot;packages/router/src/approvedPlan.ts&quot;,&quot;packages/router/test/approvedPlan.test.ts&quot;,&quot;packages/router/src/transcript.ts&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=planSection in evidence.ts; contract control and transcript read through it; changelog Unreleased entry</div>
+<div class="line"><span class="at">[16:52:36]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=no-section</div>
+<div class="line"><span class="at">[16:53:48]</span> <span class="muted">run-resumed</span> session=335 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:54:02]</span> <span class="muted">check-passed</span> step=no-section argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;-p&quot;,&quot;packages/router&quot;,&quot;--noEmit&quot;]</div>
+<div class="line"><span class="at">[16:54:02]</span> <span class="muted">check-passed</span> step=no-section argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[16:54:02]</span> <span class="muted">check-passed</span> step=no-section argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:55:04]</span> <span class="muted">named-tests-passed</span> step=no-section suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/prompts.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[16:55:06]</span> <span class="muted">report-accepted</span> seq=3 step=no-section files=[&quot;packages/router/src/verify/prompts.ts&quot;,&quot;packages/router/test/prompts.test.ts&quot;,&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/src/session.ts&quot;] notes=specExcerpt and planAsk read through planSection; no section is said; extractSpecExcerpt deleted</div>
+<div class="line"><span class="at">[16:55:06]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=start-commit</div>
+<div class="line"><span class="at">[16:57:34]</span> <span class="muted">run-resumed</span> session=335 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:57:56]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;-p&quot;,&quot;packages/router&quot;,&quot;--noEmit&quot;]</div>
+<div class="line"><span class="at">[16:57:56]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[16:57:56]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;,&quot;packages/router/test/approvedPlan.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:58:58]</span> <span class="muted">check-failed</span> step=start-commit suite=typescript command=node scripts/suite.mjs container packages/router/test/approvedPlan.test.ts packages/router/test/drive.test.ts packages/router/test/prompts.test.ts</div>
+<div class="line"><span class="at">[16:58:58]</span> <span class="muted">report-rejected</span> seq=4 step=start-commit rejection=1 reasons=[&quot;[check-failed] named tests failed: node scripts/suite.mjs container packages/router/test/approvedPlan.test.ts packages/router/test/drive.test.ts packages/router/test/prompts.test.ts -&gt; exit 1\nich then needs its own\n      ---\n      duration_ms: 49.908297\n      type: 'test'\n      ...\n    # Subtest: goes on from a waived verification to the run of record with the verdict and findings as they stood\n    ok 3 - goes on from a waived verification to the run of record with the verdict and findings as they stood\n      ---\n      duration_ms: 43.683457\n      type: 'test'\n      ...\n    1..3\nok 78 - a stop a person waived, gone past\n  ---\n  duration_ms: 188.852183\n  type: 'suite'\n  ...\n1..78\n# tests 175\n# suites 78\n# pass 167\n# fail 8\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 53228.49158&quot;]</div>
+<div class="line"><span class="at">[16:58:58]</span> <span class="muted">instruction-issued</span> seq=5 kind=rejection step=start-commit reasons=1</div>
+<div class="line"><span class="at">[17:04:02]</span> <span class="muted">run-resumed</span> session=335 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:04:14]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;-p&quot;,&quot;packages/router&quot;,&quot;--noEmit&quot;]</div>
+<div class="line"><span class="at">[17:04:14]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[17:04:14]</span> <span class="muted">check-passed</span> step=start-commit argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/prompts.test.ts&quot;,&quot;packages/router/test/approvedPlan.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:05:12]</span> <span class="muted">named-tests-passed</span> step=start-commit suite=typescript command=node scripts/suite.mjs container packages/router/test/approvedPlan.test.ts packages/router/test/drive.test.ts packages/router/test/prompts.test.ts</div>
+<div class="line"><span class="at">[17:05:13]</span> <span class="muted">report-accepted</span> seq=5 step=start-commit files=[&quot;packages/router/src/approvedPlan.ts&quot;,&quot;packages/router/test/approvedPlan.test.ts&quot;,&quot;packages/router/src/verify/prompts.ts&quot;,&quot;packages/router/test/prompts.test.ts&quot;,&quot;packages/router/src/drive.ts&quot;] notes=startPlanText at the start commit for plan ask, reviewer and contract control; task-block tests now stub git show (container forbids real git)</div>
+<div class="line"><span class="at">[17:05:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:05:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:05:17]</span> <span class="muted">job-started</span> name=verification pid=40808 log=.dabbler/runs/s335/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:06:59]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s335/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:06:59]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:06:59]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:07:00]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:07:00]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=4936 log=.dabbler/runs/s335/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:07:07]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s335/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:07:07]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:07:08]</span> <span class="muted">job-started</span> name=run of record: typescript pid=51272 log=.dabbler/runs/s335/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:08:29]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s335/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:08:30]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:08:30]</span> <span class="muted">job-started</span> name=run of record: extension pid=61176 log=.dabbler/runs/s335/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:08:54]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s335/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:08:54]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:09:03]</span> <span class="muted">landed</span> commit=ab569191f1c76ef680506fa3e2c5cb14d424ec3a</div>
+<div class="line"><span class="at">[17:09:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:09:03]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:09:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:09:04]</span> <span class="muted">job-started</span> name=close pid=18468 log=.dabbler/runs/s335/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:09:21]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s335/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:09:21]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** Fence handling is not Markdown-correct for fence-like content. → **Location:** `packages/router/src/evidence.ts` (`FENCE`, `planSection`) → **Fix:** Track the opening fence character and length, and close it only with the same character, at least that length, and no trailing non-whitespace. Proposed test: given a four-backtick fence containing a three-backtick line followed by `### Embedded heading`, `planSection` should retain that heading and subsequent fenced content; today it ends the section at that embedded heading.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** Tree-only plan text is not named as tree text, contrary to “the tree's text is the only one and is named as such.” → **Location:** `packages/router/src/verify/prompts.ts` (`specExcerpt`), `packages/router/src/drive.ts` (`planAsk`) → **Fix:** Prefix the fallback section with an explicit working-tree label. Proposed test: with `git show &lt;start&gt;:docs/sessions/session-plan.md` reporting the path absent and the working tree containing the session section, assert the reviewer prompt identifies it as working-tree text; today it returns the section without identifying its source.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** A missing plan at the start commit and any other `git show` failure are treated identically. → **Location:** `packages/router/src/approvedPlan.ts` (`startPlanText`), `packages/router/src/verify/prompts.ts`, `packages/router/src/drive.ts` → **Fix:** Distinguish “path absent in a valid start commit” from an invalid/unreadable commit and report baseline unavailability for the latter rather than silently using mutable tree text. Proposed test: with a nonexistent recorded `startCommit`, a weakened working-tree section must not be presented as the session’s fallback plan; today `startPlanText` returns `null` and both author/reviewer paths use it.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>4s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>78s</td><td>1514</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>21s</td><td>328</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

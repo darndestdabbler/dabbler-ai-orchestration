@@ -394,12 +394,14 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 354 | Rollback and the ways on from a stop, from Visual Studio | no | 2026-11-18 |
 | 355 | The Configuration window in Visual Studio | no | 2026-11-18 |
 | 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | no | 2026-11-18 |
-| 357 | Set up Dabbler in the solution that is open | — | not declared |
+| 357 | Set up Dabbler in the solution that is open | no | 2026-11-18 |
 | 358 | Visual Studio says when a session needs a person | — | not declared |
 | 359 | Before a session starts and after it ends, beside the IDE | — | not declared |
 | 360 | A session is walked in Visual Studio, on an old-style solution | — | not declared |
 | 361 | The Visual Studio extension is documented and made ready to publish | — | not declared |
 | 362 | Release 3.37.0 (release: 3.37.0) | — | not declared |
+| 363 | Microsoft's own models can author and review | — | not declared |
+| 364 | Release 3.38.0 (release: 3.38.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -3992,3 +3994,9 @@ Give the Visual Studio extension the last three things a developer on a new mach
 
 - 2026-11-18 — step 'update-the-catalog': its files: Update the Catalog is the root row's action, and the window shows the root only as a header with no menu: the control needs a place for the root's actions, or the action is unreachable (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-18 — step 'store-a-key': its files: the Store a Key action id is named once, beside Update the Catalog's in ConfigurationAsk, where the extension and the tree both read it (claude-code (anthropic, claude-opus-5-5))
+
+### Session 357 — Set up Dabbler in the solution that is open
+
+**Releasable: no.**
+
+Let a developer set Dabbler up in the solution open in Visual Studio. Where the open solution's git repository has no session plan (the router's Work Explorer document names no repository), the Work Explorer window's sentence carries a button, Set Up Dabbler in This Solution; where the solution is in no git repository the window says so and offers no button, because the router's bootstrap would `git init` it and initialising a repository is not the extension's. The button runs the router's own `dabbler bootstrap --project-dir <repository root>` under a wait dialog. What it printed -- the files it wrote and committed, and what it read the repository as (its posture and the suites it declares) -- is shown in the router's words in the Dabbler Session pane; a refusal or failure is shown in the router's words in a dialog. The window then follows the repository again, and session 1 is offered as VS Code offers it: Start Session 1 or Later, where Start Session 1 runs the Start Session action the router's Work Explorer document gives session 1, through the existing Start flow. That flow is where uncommitted changes are refused: bootstrap commits only the files it wrote, and `session start` refuses a tree with uncommitted changes with the router's sentence and its ways through, which the Start flow already shows as buttons. The library decides only which document yields the offer and which action is the first session's start; every sentence and every refusal is the router's.

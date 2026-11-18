@@ -11,6 +11,7 @@
   <UserControl.Resources>
     <utilities:BrushToColorConverter x:Key="BrushToColor" />
     <local:StatusPictures x:Key="StatusPictures" />
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
   </UserControl.Resources>
 
   <Grid>
@@ -48,16 +49,24 @@
     </TreeView.ItemTemplate>
   </TreeView>
   <!-- Where there is nothing to show, what is missing and what to do, as VS Code's welcome text says it. -->
-  <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="12">
-    <TextBlock.Style>
-      <Style TargetType="TextBlock">
+  <StackPanel Margin="12">
+    <StackPanel.Style>
+      <Style TargetType="StackPanel">
         <Style.Triggers>
           <DataTrigger Binding="{Binding Message}" Value="{x:Null}">
             <Setter Property="Visibility" Value="Collapsed" />
           </DataTrigger>
         </Style.Triggers>
       </Style>
-    </TextBlock.Style>
-  </TextBlock>
+    </StackPanel.Style>
+    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+    <!-- Offered only where the repository has no session plan: the sentence's button, as VS Code's welcome carries one. -->
+    <Button Content="Set Up Dabbler in This Solution"
+            Click="OnSetUpClick"
+            HorizontalAlignment="Left"
+            Margin="0,10,0,0"
+            Padding="10,3,10,3"
+            Visibility="{Binding OffersSetUp, Converter={StaticResource BooleanToVisibility}}" />
+  </StackPanel>
   </Grid>
 </UserControl>

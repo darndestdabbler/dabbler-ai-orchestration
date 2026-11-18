@@ -121,16 +121,14 @@ namespace Dabbler.VisualStudio.Core
     {
         private const string WhatThisShows = "This shows the work: which session is running, which step it is on, and anything waiting on you.";
 
-        private const string HowToSetUp = "Set Dabbler up there: run dabbler bootstrap at the repository's root, or Set Up Dabbler in This Folder in VS Code.";
-
         /// <summary>Shown where no solution is open.</summary>
         public const string NoSolution = WhatThisShows + "\n\nNo solution is open. Open a solution that is in a git repository to see its sessions.";
 
         /// <summary>Shown where the open solution is in no git repository.</summary>
-        public const string NotInRepository = WhatThisShows + "\n\nThis solution is not in a git repository, so it has no sessions to show. Put it in one (git init in the solution's folder). " + HowToSetUp;
+        public const string NotInRepository = WhatThisShows + "\n\nThis solution is not in a git repository, so it has no sessions to show. Put it in one first (git init in the solution's folder, then commit), and Set Up Dabbler in This Solution is offered here.";
 
-        /// <summary>Shown where the repository has no session plan.</summary>
-        public const string NoSessionPlan = WhatThisShows + "\n\nThis repository has no session plan yet. " + HowToSetUp;
+        /// <summary>Shown where the repository has no session plan: the one sentence that carries the set-up button.</summary>
+        public const string NoSessionPlan = WhatThisShows + "\n\nThis repository is not set up for Dabbler yet. Setting it up installs nothing: it writes the guidance files, the ignore rule and the first two sessions, and commits them.";
 
         private string? message;
 
@@ -147,6 +145,31 @@ namespace Dabbler.VisualStudio.Core
                 if (message == value) return;
                 message = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Message)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OffersSetUp)));
+            }
+        }
+
+        /// <summary>Whether the window offers Set Up Dabbler in This Solution: exactly while the repository has no session plan.</summary>
+        public bool OffersSetUp => Message == NoSessionPlan;
+
+        /// <summary>
+        /// The first Start Session action in <paramref name="document"/>, its
+        /// rows walked in order: once a repository is set up, session 1's.
+        /// Null where no row offers one.
+        /// </summary>
+        public static WorkExplorerAction? FirstStart(WorkExplorerDocument document)
+        {
+            return WalkRows(document.Repositories)
+                .SelectMany(row => row.Actions)
+                .FirstOrDefault(action => action.Id == ActionIds.StartSession);
+        }
+
+        private static IEnumerable<WorkExplorerRow> WalkRows(IEnumerable<WorkExplorerRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                yield return row;
+                foreach (var below in WalkRows(row.Children)) yield return below;
             }
         }
 

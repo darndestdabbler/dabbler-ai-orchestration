@@ -735,6 +735,20 @@ describe("what setup does about the operator's typing", () => {
     assert.match(after.stdout, /its land is what commits them/);
   });
 
+  it("with --refuse-uncommitted, refuses uncommitted work before writing anything", async () => {
+    const answered = makeAnsweredRepo({ "App.cs": "class App {}\n" });
+    answered.status(" M App.cs\n");
+    const run = await capture(() => bootstrapVerb(["--project-dir", answered.repo, "--refuse-uncommitted"]));
+    assert.equal(run.value, 1);
+    assert.match(run.stderr, /refused -- working tree has uncommitted changes: App\.cs/);
+    assert.ok(!existsSync(join(answered.repo, "AGENTS.md")));
+
+    answered.status("");
+    const clean = await capture(() => bootstrapVerb(["--project-dir", answered.repo, "--refuse-uncommitted"]));
+    assert.equal(clean.value, 0, clean.stderr);
+    assert.ok(existsSync(join(answered.repo, "AGENTS.md")));
+  });
+
   it("says a repository with no remote is local-only, and asks nobody", async () => {
     // The close used to print `git push --set-upstream <remote> main` for a
     // remote nobody had created; then setup asked where to push. Now the

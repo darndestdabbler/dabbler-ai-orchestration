@@ -40,7 +40,30 @@ namespace Dabbler.VisualStudio
             var control = new WorkExplorerControl { DataContext = tree };
             control.ActionChosen += OnActionChosen;
             control.DifferentModelsChosen += OnDifferentModelsChosen;
+            control.SetUpChosen += OnSetUpChosen;
             Content = control;
+        }
+
+        // Whether a set-up is running, so a second click does not start another; main thread only.
+        private bool settingUp;
+
+        private void OnSetUpChosen(object sender, EventArgs e)
+        {
+            var root = repositoryRoot;
+            if (root == null || settingUp) return;
+            settingUp = true;
+            Dabbler.JoinableTaskFactory.RunAsync(async () =>
+            {
+                try
+                {
+                    await new SolutionSetUp(Dabbler).RunAsync(root, Restart);
+                }
+                finally
+                {
+                    await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    settingUp = false;
+                }
+            }).FileAndForget("dabbler/work-explorer/set-up");
         }
 
         private void OnDifferentModelsChosen(object sender, WorkExplorerAction start)

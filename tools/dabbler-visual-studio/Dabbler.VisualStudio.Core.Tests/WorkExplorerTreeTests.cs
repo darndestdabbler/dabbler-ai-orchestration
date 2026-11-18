@@ -104,10 +104,47 @@ namespace Dabbler.VisualStudio.Core.Tests
 
             Assert.Empty(tree.Roots);
             Assert.Equal(WorkExplorerTree.NoSessionPlan, tree.Message);
-            Assert.Contains("dabbler bootstrap", tree.Message);
+            Assert.Contains("not set up for Dabbler", tree.Message);
 
             tree.Show(TwoBuckets());
             Assert.Null(tree.Message);
+        }
+
+        [Fact]
+        public void OffersSetUp_only_for_a_document_with_no_plan()
+        {
+            var tree = new WorkExplorerTree();
+            tree.Show(Document());
+            Assert.True(tree.OffersSetUp);
+
+            tree.Show(TwoBuckets());
+            Assert.False(tree.OffersSetUp);
+
+            tree.Message = WorkExplorerTree.NotInRepository;
+            Assert.False(tree.OffersSetUp);
+        }
+
+        [Fact]
+        public void FirstStart_finds_session_1s_start_session()
+        {
+            var start = new { id = "dabblerSessionSets.startSession", title = "Start Session", argv = new[] { "dabbler", "session", "start", "--sessions-dir", "docs/sessions" } };
+            var session1 = new
+            {
+                id = "session:R/1",
+                kind = "session",
+                label = "1: Plan",
+                collapsible = "none",
+                actions = new object[] { new { id = "dabbler.consultWithAi", title = "Consult with AI", argv = new[] { "dabbler", "consult" } }, start },
+            };
+            var document = Document(Row("repository:R", "repository", "repo", null, null, "expanded",
+                new { id = "bucket:R/not-started", kind = "bucket", label = "Not Started", collapsible = "expanded", children = new[] { session1 } }));
+
+            var found = WorkExplorerTree.FirstStart(document);
+
+            Assert.NotNull(found);
+            Assert.Equal("Start Session", found!.Title);
+            Assert.Equal(start.argv, found.Argv);
+            Assert.Null(WorkExplorerTree.FirstStart(TwoBuckets()));
         }
 
         [Fact]

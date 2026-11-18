@@ -25,6 +25,7 @@ import {
   writeConfigurationChoice,
 } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
+import { checkWorkingTreeClean } from "../gates.ts";
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { haveCommonHistory, reconcileWithOrigin, remoteDefaultBranch, repoRelativePath, runGit } from "../journal.ts";
 import { originHoldsWorkRefusal } from "../session.ts";
@@ -92,6 +93,10 @@ function usage(): string {
     "  --commit-existing     commit the files already in the folder as the",
     "                        project's starting point, before anything is",
     "                        written.",
+    "  --refuse-uncommitted  set up only a git repository with nothing",
+    "                        uncommitted: anything else is refused before",
+    "                        anything is written, and no repository is",
+    "                        initialised.",
     "  --transport {" + CHOICES.join(",") + "}",
     `                        how a provider is reached from this checkout,`,
     `                        written to ${SETTINGS_RELPATH}. Nothing outside`,
@@ -109,6 +114,7 @@ const BARE_FLAGS = new Set([
   "--print-decomposition-prompt",
   "--from-origin",
   "--commit-existing",
+  "--refuse-uncommitted",
 ]);
 
 interface Parsed {
@@ -118,6 +124,7 @@ interface Parsed {
   readonly branch: string | null;
   readonly fromOrigin: boolean;
   readonly commitExisting: boolean;
+  readonly refuseUncommitted: boolean;
   readonly printPlanPrompt: boolean;
   readonly printDecompositionPrompt: boolean;
   readonly transport: string | null;
@@ -152,6 +159,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     branch: values.get("--branch") ?? null,
     fromOrigin: flags.has("--from-origin"),
     commitExisting: flags.has("--commit-existing"),
+    refuseUncommitted: flags.has("--refuse-uncommitted"),
     printPlanPrompt: flags.has("--print-plan-prompt"),
     printDecompositionPrompt: flags.has("--print-decomposition-prompt"),
     transport: values.get("--transport") ?? null,
@@ -222,6 +230,20 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   if (!isDirectory(project)) {
     writeErr(`bootstrap: not a directory: ${project}\n`);
     return EXIT_USAGE;
+  }
+  // A set-up offered on a repository a person already maintains: their
+  // uncommitted work is not folded into a set-up commit, and a folder in no
+  // repository is not initialised. Refused in the close's own words, before
+  // anything is written.
+  if (parsed.refuseUncommitted) {
+    const [clean, why] = checkWorkingTreeClean(project);
+    if (!clean) {
+      writeErr(
+        `dabbler bootstrap: refused -- ${why}. Nothing has been written: ` +
+          "commit or undo the changes, then set up again.\n",
+      );
+      return EXIT_ERROR;
+    }
   }
   const refusal = branchRefusal(project, parsed);
   if (refusal !== null) {

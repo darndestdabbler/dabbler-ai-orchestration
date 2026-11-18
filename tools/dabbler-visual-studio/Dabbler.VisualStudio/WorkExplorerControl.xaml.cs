@@ -27,6 +27,14 @@ namespace Dabbler.VisualStudio
         /// <summary>Start Session with Different Models was clicked: the row's Start Session, to be run with other answers.</summary>
         public event EventHandler<WorkExplorerAction>? DifferentModelsChosen;
 
+        /// <summary>Set Up Dabbler in This Solution was clicked, under the sentence saying the repository has no session plan.</summary>
+        public event EventHandler? SetUpChosen;
+
+        private void OnSetUpClick(object sender, RoutedEventArgs e)
+        {
+            SetUpChosen?.Invoke(this, EventArgs.Empty);
+        }
+
         private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
         {
             var row = (FrameworkElement)sender;

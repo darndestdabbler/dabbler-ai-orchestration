@@ -13594,6 +13594,13 @@
       "what": "step 'store-a-key': its files",
       "reason": "the Store a Key action id is named once, beside Update the Catalog's in ConfigurationAsk, where the extension and the tree both read it",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 357,
+      "dateTime": "2026-11-18T09:40:03.680000-05:00",
+      "task": "Let a developer set Dabbler up in the solution open in Visual Studio. Where the open solution's git repository has no session plan (the router's Work Explorer document names no repository), the Work Explorer window's sentence carries a button, Set Up Dabbler in This Solution; where the solution is in no git repository the window says so and offers no button, because the router's bootstrap would `git init` it and initialising a repository is not the extension's. The button runs the router's own `dabbler bootstrap --project-dir <repository root>` under a wait dialog. What it printed -- the files it wrote and committed, and what it read the repository as (its posture and the suites it declares) -- is shown in the router's words in the Dabbler Session pane; a refusal or failure is shown in the router's words in a dialog. The window then follows the repository again, and session 1 is offered as VS Code offers it: Start Session 1 or Later, where Start Session 1 runs the Start Session action the router's Work Explorer document gives session 1, through the existing Start flow. That flow is where uncommitted changes are refused: bootstrap commits only the files it wrote, and `session start` refuses a tree with uncommitted changes with the router's sentence and its ways through, which the Start flow already shows as buttons. The library decides only which document yields the offer and which action is the first session's start; every sentence and every refusal is the router's.",
+      "releasable": false
     }
   ]
 }

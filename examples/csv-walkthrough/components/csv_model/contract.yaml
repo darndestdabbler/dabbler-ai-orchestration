@@ -1,0 +1,64 @@
+component: csv-model
+version: 1.0.0
+summary: >
+  The record a valid CSV row becomes, and the rules that decide whether a row
+  can become one. Knows nothing about files, commas, or headers.
+
+operations:
+  - name: PersonRecord(name, email, age, active)
+    summary: A complete person. There is no partly-filled record.
+    preconditions:
+      - "name: non-empty once surrounding spaces are removed"
+      - "email: exactly one '@', neither first nor last character"
+      - "age: whole number, 0 <= age <= 150"
+      - "active: already true or false, decided by the caller"
+    postconditions:
+      - Every field is populated; no field is ever null or missing.
+      - Fields are read-only once the record exists.
+    retained:
+      - The four field names, in this order. Everything that needs to know
+        the column order reads FIELDS from here rather than repeating it.
+    errors:
+      - Any precondition violated raises InvalidField, naming the field and
+        the value rejected. Callers catch this per row; it is a normal
+        outcome, not a bug.
+    notPromised:
+      - The exact wording of a rejection reason. It is written for people and
+        it will be reworded.
+      - That PersonRecord stays a class rather than becoming something else
+        with the same four readable fields.
+    tests:
+      preconditions:
+        - test_rejects_blank_name
+        - test_rejects_email_without_one_interior_at
+        - test_rejects_age_outside_zero_to_150
+      postconditions: test_every_field_is_populated
+      retained: test_fields_lists_the_four_names_in_order
+      errors: test_invalid_field_names_the_field_and_value
+
+  - name: check_field(field, raw)
+    summary: >
+      The one place a field's rule lives, so the parser and the record cannot
+      disagree about what valid means.
+    preconditions:
+      - "field is one of: name, email, age, active"
+      - raw is the text as it appeared in the file, spaces included
+    postconditions:
+      - Surrounding spaces are removed before any rule is applied.
+      - "active accepts true/false/yes/no/1/0 in any case; true, yes and 1
+        mean true, the rest mean false"
+      - Returns the cleaned, converted value ready to put in a record.
+    sideEffects:
+      - None. No input, no output, no globals, no clock.
+    errors:
+      - InvalidField, carrying a one-sentence reason fit to show a person.
+    notPromised:
+      - That checking is the only validation that will ever exist.
+      - Any ordering guarantee between fields beyond the declared check order.
+    tests:
+      preconditions: test_unknown_field_name_is_rejected
+      postconditions:
+        - test_surrounding_spaces_are_removed_first
+        - test_active_accepts_every_declared_spelling
+      sideEffects: test_check_field_touches_nothing_outside_itself
+      errors: test_reason_is_one_sentence

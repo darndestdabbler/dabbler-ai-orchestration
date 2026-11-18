@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 337 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 337 transcript</h1>
+<p class="stamp">Rendered 2026-11-16T18:26:53.485Z by dabbler-ai-router 3.34.1 at 24d712b3d2d70d67fcc8b846e771f5ce96e8f618.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-16T13:04:59.171-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 337 of 342: The Dabbler Terminal says what is happening</h3>
+<p>Scope: <code>packages/router/src/drive.ts</code> (<code>runStepChecks</code>, the named-test run, the answer intake, <code>setWaiting</code>), <code>packages/router/src/progress.ts</code> (<code>renderWaiting</code>), <code>scripts/suite.mjs</code> (the run of a list of test files), <code>tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts</code> (the lines it renders), <code>drive.test.ts</code>, <code>progress.test.ts</code>, <code>dabblerTerminal.test.ts</code>, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Ahead of the release, and with 334 to 336.</strong> The operator, 2026-11-16, watching session 334: &quot;Between the framework output and the AI output, we shouldn't leave human operators wondering what is going on.&quot; Step 2 of that session sat for more than half an hour with the terminal's last line <code>waiting-on says=Author owes step answer-says-whose - 0:01</code>, though the answer had been given and the framework was running its checks. The operator asked whether it was stuck, and the only way to tell was to list the machine's processes. It ships with sessions 334 to 336 as 3.35.0.</p>
+<p><strong>Why.</strong> Two silences, both measured in that session:</p>
+<ul><li><strong>An answer arriving says nothing.</strong> The event log has <code>run-resumed</code> and nothing more until the checks end, and the waiting record still names the author, so the terminal goes on saying the author owes an answer the author has given.</li><li><strong>A step's checks are logged only once all of them have run.</strong> <code>runStepChecks</code> runs every check and then the loop logs each result, so a step whose checks take twenty minutes prints nothing for twenty minutes and then everything at once. Nothing is logged when a check starts, and the named tests after it are the same.</li></ul>
+<p><strong>Step 1 -- an answer says it has arrived.</strong> When the driver takes up an answer from the author -- a plan, a step's report, a round's dispositions -- it logs one line before judging it: what was answered (the step's id, or the round), its status, and its notes. The waiting record moves off the author at the same moment, to the framework's own work, so the <code>waiting-on</code> line says what the framework is doing rather than what the author owes. The answers the framework already logs when they arrive -- a verdict, an adjudication, the Mechanic's -- are confirmed to have a line each, and one that has none gets one.</p>
+<p><strong>Step 2 -- each check says when it starts and when it ends.</strong> A step's checks are logged one by one: a line as each starts, naming its argv, and a line as each ends, passed or failed, with how long it took. The named tests after them are logged the same way. While a check is running, the waiting record names it, so the <code>waiting-on</code> line reads like a job's, with the check and the time it has run against its time limit.</p>
+<p><strong>Step 3 -- a long list of test files reports progress.</strong> <code>suite.mjs</code> runs a list of test files in batches rather than in one <code>node --test</code> call, and prints one line as each batch ends: how many files of how many are done, and how many tests passed and failed so far. The batches run one after another, so a run takes somewhat longer; the operator prefers progress that costs a little time to speed that says nothing. A failure is still reported once, at the end, with the whole output it has today.</p>
+<p><strong>Step 4 -- the terminal renders them.</strong> The Dabbler Terminal shows the new lines in the format it uses for every other line (<code>hh:mm:ss</code>, the event, its fields, a hanging indent). Nothing from a check's or a batch's own output is copied into the terminal: what a person reads is that it started, that it is still running, and how it ended.</p>
+<p><strong>Step 5 -- the other quiet stretches.</strong> Read the driver for any other place where the framework starts work and logs nothing until it ends, and give each one a line as it starts. Anything found that is larger than a line is written into this plan as a session of its own, not done here. The changelog's 3.35.0 section gains a paragraph saying what a person now sees.</p>
+<p><strong>Non-goals.</strong> Copying a check's, a test's or a job's output into the terminal: the job's log already holds it and is named. A progress bar or any other widget. Changing what a check, a test run or a job decides, or any time limit. Running batches in parallel, which would put back the silence this session removes. Breaking a single test file into pieces: a batch is a group of whole files. <code>version.json</code>: session 336 stamps 3.35.0, and this session changes no version.</p>
+<p><strong>Tests.</strong> In <code>drive.test.ts</code>: an answer is logged before it is judged, and the waiting record leaves the author when it is taken up; a step with two checks logs a start and an end for each, in order, the second start after the first end. In <code>progress.test.ts</code>: the waiting sentence for a running check names the check and its time. In <code>dabblerTerminal.test.ts</code>: the new lines render in the terminal's one line format. <code>suite.mjs</code>'s batching is checked by running it over a short list and reading one line per batch.</p>
+<p><strong>Releasable.</strong> Yes, as 3.35.0 in session 338.</p>
+<h2>Work Plan</h2>
+<p>Make the Dabbler Terminal say what the framework is doing between an answer and the next instruction. When the driver takes up an author's answer -- a plan, a step's report, a round's dispositions -- it logs one <code>answer-taken</code> line before judging it (the step id or the round, the status, the notes) and moves the waiting record off the author to the framework's own work (owner <code>job</code>, so <code>waiting-on</code> reads like a job's: &quot;Judging the report of step x -- 0:12&quot;); the verdict, adjudication and Mechanic answers are confirmed to log on arrival, and one that does not gets a line. <code>runStepChecks</code> takes an optional observer so each check logs <code>check-started</code> (step, argv) as it begins and <code>check-ended</code> (step, argv, outcome passed|failed, seconds) as it ends, and the named-test run after them logs the same pair; while a check runs the waiting record names it with its time limit as <code>by</code>, so <code>renderWaiting</code> says the check and its time against its limit. <code>scripts/suite.mjs</code> runs a list of router test files in sequential batches of whole files, streaming each batch's output untouched as today and printing one router-format progress line per batch (files done of total, tests passed and failed so far), the exit status the worst of the batches and the cancelled-test guard applied per batch. The Dabbler Terminal renders the new lines in its one line format with no check or batch output copied into it. Finally the driver is read for other places where work starts and nothing is logged until it ends, each gets a line as it starts, anything larger than a line becomes a session of its own in the plan, and the 3.35.0 changelog section gains a paragraph saying what a person now sees.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/08ba06e8fba30f3a52b8aa6b9f9e1074088891b1"><code>08ba06e8fba30f3a52b8aa6b9f9e1074088891b1</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Answer arrives</td><td><p>In packages/router/src/drive.ts, where the driver takes up an author's answer -- the work plan read after its instruction, a step report that is not spent (askForStep, before <code>judge</code>), and a disposition set that answers its round -- log one <code>answer-taken</code> line before judging it, with <code>seq</code>, <code>step</code> (or <code>round</code>), <code>status</code> and <code>notes</code> where the answer carries them, and at the same moment call setWaiting with owner <code>job</code> and a <code>for</code> naming the framework's work (e.g. <code>judging the report of step &lt;id&gt;</code>, <code>judging the work plan</code>, <code>judging the dispositions of round &lt;n&gt;</code>), by null. Confirm the verdict, adjudication and Mechanic answers each already log a line on arrival (<code>verify</code>/<code>verification-*</code>, adjudication, <code>mechanic-fixed</code>/<code>mechanic-handed-back</code>) and give one that has none a line. In packages/router/test/drive.test.ts, one test: an answer is logged before it is judged and the waiting record leaves the author when it is taken up.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Checks start and end</td><td><p>Give <code>runStepChecks</code> in packages/router/src/drive.ts an optional observer with <code>started(check, index)</code> and <code>ended(check, run, seconds)</code>, called around each check in order; the driver's <code>judge</code> and <code>acceptWaivedStep</code> pass one that logs <code>check-started</code> (step, argv) and <code>check-ended</code> (step, argv, outcome=passed|failed, seconds) and, on start, sets the waiting record to owner <code>job</code>, <code>for</code> naming the check (<code>check &lt;argv&gt; of step &lt;id&gt;</code>) and <code>by</code> the check's time limit from now. The existing <code>check-passed</code>/check-failed line after each check is replaced by <code>check-ended</code>, keeping the RULE.checkFailed name on the refusal. <code>namedTestRefusals</code> logs the same pair around each suite's named-test run (with <code>suite</code> and <code>command</code>) and sets the waiting record the same way. In packages/router/test/drive.test.ts, one test: a step with two checks reports a start and an end for each, in order, the second start after the first end. In packages/router/test/progress.test.ts, one test: <code>renderWaiting</code> for a running check names the check and its elapsed time against its limit.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span><br><span class="mono">packages/router/test/progress.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/progress.test.ts</code></td><td>yes</td></tr>
+<tr><td>Suite batches</td><td><p>In scripts/suite.mjs, run a list of router test files (container and host modes) in batches of whole files, one batch after another: an exported <code>runBatches(tests, runOne, size)</code> splits the list in order, awaits <code>runOne(batch)</code> for each (which runs <code>node --test</code> over the batch as today, streaming its output untouched and applying the cancelled-test guard), reads the batch's TAP <code># pass</code> and <code># fail</code> summary, and prints one line per batch in the router's line format, <code>dabbler [hh:mm:ss] suite-batch files=&lt;done&gt;/&lt;total&gt; passed=&lt;n&gt; failed=&lt;n&gt;</code>; the run's status is the worst batch's. The container is prepared once, not per batch. The extension mode is unchanged. Add scripts/check-suite-batches.mjs, which runs <code>runBatches</code> over a short list with a canned <code>runOne</code> and asserts one progress line per batch with the running counts and the worst status.</p></td><td><span class="mono">scripts/suite.mjs</span><br><span class="mono">scripts/check-suite-batches.mjs</span></td><td><code>node scripts/check-suite-batches.mjs</code><br><code>node scripts/check-cancelled-guard.mjs</code><br><code>node scripts/check-suite-membership.mjs</code></td><td>yes</td></tr>
+<tr><td>Terminal renders</td><td><p>Confirm the Dabbler Terminal (tools/dabbler-ai-orchestration/src/router/dabblerTerminal.ts) renders <code>answer-taken</code>, <code>check-started</code>, <code>check-ended</code> and <code>suite-batch</code> router lines in its one line format (<code>hh:mm:ss</code>, the event, its fields, a hanging indent), with <code>outcome</code> toned as it is everywhere, and change it only where it does not; nothing from a check's or a batch's own output is copied in. In tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts, one test: a job or loop log carrying those router lines is shown in the terminal's one line format.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts</code></td><td>yes</td></tr>
+<tr><td>Other quiet stretches</td><td><p>Read packages/router/src/drive.ts for any other place where the framework starts work and logs nothing until it ends (for example the land's commit and push, the publish, the transcript render, the root-files write) and give each one a line as it starts. Anything found that is larger than a line is written into docs/sessions/session-plan.md as a session of its own rather than done here (leave the plan untouched if nothing is). Add a paragraph to the 3.35.0 section of tools/dabbler-ai-orchestration/CHANGELOG.md saying what a person now sees in the Dabbler Terminal: an answer arriving, each check and named-test run starting and ending, a waiting line naming the running check, and a long test run's progress by batch.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');const s=t.slice(t.indexOf('## [3.35.0]'));const e=s.indexOf('\n## [',5);const sec=e&lt;0?s:s.slice(0,e);if(!/Dabbler Terminal/.test(sec)||!/check/.test(sec))process.exit(1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Copying a check's, a test's or a job's output into the terminal: the job's log already holds it and is named.</li><li>A progress bar or any other widget.</li><li>Changing what a check, a test run or a job decides, or any time limit.</li><li>Running batches in parallel.</li><li>Breaking a single test file into pieces: a batch is a group of whole files.</li><li>Changing <code>version.json</code>: session 336 stamped 3.35.0 and session 338 releases it.</li><li>A new waiting owner in the run or projection schemas: the framework's own work is said through the existing <code>job</code> owner.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[18:04:59]</span> <span class="muted">run-started</span> session=337 mode=pull</div>
+<div class="line"><span class="at">[18:04:59]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[18:07:49]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[18:07:49]</span> <span class="muted">plan-accepted</span> steps=[&quot;answer-arrives&quot;,&quot;checks-start-and-end&quot;,&quot;suite-batches&quot;,&quot;terminal-renders&quot;,&quot;other-quiet-stretches&quot;] non_goals=7</div>
+<div class="line"><span class="at">[18:07:50]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[18:07:50]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=answer-arrives</div>
+<div class="line"><span class="at">[18:10:12]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:10:18]</span> <span class="muted">check-passed</span> step=answer-arrives argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:11:14]</span> <span class="muted">named-tests-passed</span> step=answer-arrives suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[18:11:14]</span> <span class="muted">report-accepted</span> seq=2 step=answer-arrives files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=answer-taken logged and waiting moved to the framework for plans, step reports and dispositions (stored and fresh); verification, adjudication and Mechanic already log on arrival</div>
+<div class="line"><span class="at">[18:11:14]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=checks-start-and-end</div>
+<div class="line"><span class="at">[18:13:03]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:13:11]</span> <span class="muted">check-passed</span> step=checks-start-and-end argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:13:11]</span> <span class="muted">check-passed</span> step=checks-start-and-end argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/progress.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:14:04]</span> <span class="muted">named-tests-passed</span> step=checks-start-and-end suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/progress.test.ts</div>
+<div class="line"><span class="at">[18:14:05]</span> <span class="muted">report-accepted</span> seq=3 step=checks-start-and-end files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;,&quot;packages/router/test/progress.test.ts&quot;] notes=runStepChecks takes a CheckObserver; step checks and named tests log check-started/check-ended (outcome, seconds) and wait as a job with their time limit; check-passed/named-tests-passed lines replaced</div>
+<div class="line"><span class="at">[18:14:05]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=suite-batches</div>
+<div class="line"><span class="at">[18:15:27]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:15:30]</span> <span class="muted">check-passed</span> step=suite-batches argv=[&quot;node&quot;,&quot;scripts/check-suite-batches.mjs&quot;]</div>
+<div class="line"><span class="at">[18:15:30]</span> <span class="muted">check-passed</span> step=suite-batches argv=[&quot;node&quot;,&quot;scripts/check-cancelled-guard.mjs&quot;]</div>
+<div class="line"><span class="at">[18:15:30]</span> <span class="muted">check-passed</span> step=suite-batches argv=[&quot;node&quot;,&quot;scripts/check-suite-membership.mjs&quot;]</div>
+<div class="line"><span class="at">[18:15:31]</span> <span class="muted">report-accepted</span> seq=4 step=suite-batches files=[&quot;scripts/suite.mjs&quot;,&quot;scripts/check-suite-batches.mjs&quot;] notes=container and host runs go through runBatches (10 whole files per batch, sequential, worst status), one dabbler-format suite-batch line per batch; check-suite-batches proves it on a canned run</div>
+<div class="line"><span class="at">[18:15:31]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=terminal-renders</div>
+<div class="line"><span class="at">[18:16:12]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:16:23]</span> <span class="muted">check-passed</span> step=terminal-renders argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[18:16:23]</span> <span class="muted">check-passed</span> step=terminal-renders argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:16:31]</span> <span class="muted">named-tests-passed</span> step=terminal-renders suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts</div>
+<div class="line"><span class="at">[18:16:31]</span> <span class="muted">report-accepted</span> seq=5 step=terminal-renders files=[&quot;tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts&quot;] notes=the terminal already draws the new router lines in its one line format with outcome toned; no change to dabblerTerminal.ts, one test proves it</div>
+<div class="line"><span class="at">[18:16:31]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=other-quiet-stretches</div>
+<div class="line"><span class="at">[18:17:33]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:17:39]</span> <span class="muted">check-passed</span> step=other-quiet-stretches argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:17:39]</span> <span class="muted">check-passed</span> step=other-quiet-stretches argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');const s=t.slice(t.indexOf('## [3.35.0]'));const e=s.indexOf('\\n## [',5);const sec=e&lt;0?s:s.slice(0,e);if(!/Dabbler Terminal/.test(sec)||!/check/.test(sec))process.exit(1)&quot;]</div>
+<div class="line"><span class="at">[18:18:33]</span> <span class="muted">named-tests-passed</span> step=other-quiet-stretches suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[18:18:33]</span> <span class="muted">report-accepted</span> seq=6 step=other-quiet-stretches files=[&quot;packages/router/src/drive.ts&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=land logs committing and pushing (trunk and candidate), the Log phase logs transcript-rendering and pushing; jobs, engine calls and the Mechanic already log at start, root files are a quick write; nothing larger than a line found, so the plan is unchanged; changelog 3.35.0 gains the terminal paragraph</div>
+<div class="line"><span class="at">[18:18:33]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[18:18:34]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[18:18:35]</span> <span class="muted">job-started</span> name=verification pid=49156 log=.dabbler/runs/s337/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:20:49]</span> <span class="muted">job-finished</span> name=verification exit=<span class="bad">4</span> log=.dabbler/runs/s337/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:20:49]</span> <span class="muted">verification-blocking</span></div>
+<div class="line"><span class="at">[18:20:49]</span> <span class="milestone">phase</span> phase=<span class="milestone">dispositions</span></div>
+<div class="line"><span class="at">[18:20:49]</span> <span class="muted">instruction-issued</span> seq=7 kind=rejection reasons=3</div>
+<div class="line"><span class="at">[18:22:10]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">dispositions</span> mode=pull</div>
+<div class="line"><span class="at">[18:22:10]</span> <span class="muted">dispute-recorded</span> round=1 finding=0</div>
+<div class="line"><span class="at">[18:22:10]</span> <span class="muted">dispositions-accepted</span> round=1 fix=[1] reject=[0] answers=[{&quot;finding&quot;:0,&quot;action&quot;:&quot;reject&quot;,&quot;reason&quot;:&quot;The TAP in a run-of-record job's log reaching the terminal is not something this session added: every job's log has always passed through the terminal byte for byte under its own voice rule, a settled operator ruling (dabblerTerminal.ts header, 'a job's bytes inside its group are the runner's own, untouched'), and suite.mjs has always streamed the run of record's output untouched because that output IS the record. The session plan's sentence in Step 4 and its non-goal constrain what this session adds: the new lines (answer-taken, check-started, check-ended, suite-batch) copy nothing of a check's or a batch's output, and a step's check output is never shown at all. The non-goal reads 'Copying a check's, a test's or a job's output into the terminal: the job's log already holds it and is named' -- which rules OUT building copying, and equally keeps the job's log holding the output, which buffering or filtering it would break. Hiding job output from the terminal would reverse a standing ruling on how every job is shown and is not in this session's section; batching changes the volume of TAP not at all.&quot;},{&quot;finding&quot;:1,&quot;action&quot;:&quot;fix&quot;}]</div>
+<div class="line"><span class="at">[18:22:10]</span> <span class="milestone">phase</span> phase=<span class="milestone">fix</span></div>
+<div class="line"><span class="at">[18:22:10]</span> <span class="muted">instruction-issued</span> seq=8 kind=step step=fix-round-1</div>
+<div class="line"><span class="at">[18:22:44]</span> <span class="muted">run-resumed</span> session=337 phase=<span class="milestone">fix</span> mode=pull</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=answer-arrives</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=checks-start-and-end</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/progress.test.ts&quot;] owner=checks-start-and-end</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;scripts/check-suite-batches.mjs&quot;] owner=suite-batches</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;scripts/check-cancelled-guard.mjs&quot;] owner=suite-batches</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;scripts/check-suite-membership.mjs&quot;] owner=suite-batches</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;] owner=terminal-renders</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts&quot;] owner=terminal-renders</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] owner=other-quiet-stretches</div>
+<div class="line"><span class="at">[18:23:12]</span> <span class="muted">check-passed</span> step=fix-round-1 argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');const s=t.slice(t.indexOf('## [3.35.0]'));const e=s.indexOf('\\n## [',5);const sec=e&lt;0?s:s.slice(0,e);if(!/Dabbler Terminal/.test(sec)||!/check/.test(sec))process.exit(1)&quot;] owner=other-quiet-stretches</div>
+<div class="line"><span class="at">[18:24:06]</span> <span class="muted">named-tests-passed</span> step=fix-round-1 suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[18:24:06]</span> <span class="muted">report-accepted</span> seq=8 step=fix-round-1 files=[&quot;packages/router/src/drive.ts&quot;] notes=checkEnded moves the wait back to judging the report of the step, so a finished check is no longer named as running</div>
+<div class="line"><span class="at">[18:24:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[18:24:07]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[18:24:08]</span> <span class="muted">job-started</span> name=verification pid=33364 log=.dabbler/runs/s337/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:24:43]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s337/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:24:43]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[18:24:43]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[18:24:43]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[18:24:44]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=62496 log=.dabbler/runs/s337/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:24:48]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s337/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:24:48]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[18:24:49]</span> <span class="muted">job-started</span> name=run of record: typescript pid=67992 log=.dabbler/runs/s337/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:26:17]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s337/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:26:17]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[18:26:17]</span> <span class="muted">job-started</span> name=run of record: extension pid=49080 log=.dabbler/runs/s337/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:26:39]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s337/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:26:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[18:26:44]</span> <span class="muted">landed</span> commit=08ba06e8fba30f3a52b8aa6b9f9e1074088891b1</div>
+<div class="line"><span class="at">[18:26:44]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[18:26:44]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[18:26:44]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[18:26:45]</span> <span class="muted">job-started</span> name=close pid=32764 log=.dabbler/runs/s337/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:26:53]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s337/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:26:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="bad">ISSUES_FOUND</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details open><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>major</strong> <span class="bad">blocking</span></td><td>Raw test output is still rendered in the Dabbler Terminal**</td><td>disputed — The TAP in a run-of-record job's log reaching the terminal is not something this session added: every job's log has always passed through the terminal byte for byte under its own voice rule, a settled operator ruling (dabblerTerminal.ts header, 'a job's bytes inside its group are the runner's own, untouched'), and suite.mjs has always streamed the run of record's output untouched because that output IS the record. The session plan's sentence in Step 4 and its non-goal constrain what this session adds: the new lines (answer-taken, check-started, check-ended, suite-batch) copy nothing of a check's or a batch's output, and a step's check output is never shown at all. The non-goal reads 'Copying a check's, a test's or a job's output into the terminal: the job's log already holds it and is named' -- which rules OUT building copying, and equally keeps the job's log holding the output, which buffering or filtering it would break. Hiding job output from the terminal would reverse a standing ruling on how every job is shown and is not in this session's section; batching changes the volume of TAP not at all.</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** `checkEnded` only logs the ending event; it does not move the waiting record back to the enclosing judging work. After the final check or named-test run, `waiting-on` can continue describing that completed check and its expired deadline while post-check processing runs. This is normally brief, so it is non-blocking.</td><td>fixed — checkEnded moves the wait back to judging the report of the step, so a finished check is no longer named as running — (packages/router/src/drive.ts)</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The batching check stubs `runOne` rather than exercising the shipped suite path. A useful integration case would start with more than one batch of real temporary test files, invoke `scripts/suite.mjs`, and assert sequential batch lines, cumulative counts, preserved child output, and a final nonzero status when an early batch fails.</td><td>not answered</td></tr>
+</table></td></tr>
+<tr><td>2</td><td>fix-delta</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>The prior batching-test nit remains: the visible fix delta does not add an integration case exercising `scripts/suite.mjs` with real temporary files, multiple batches, cumulative counts, preserved output, and an early failing batch.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>3s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>86s</td><td>1518</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>20s</td><td>333</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

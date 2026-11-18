@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 292 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 292 transcript</h1>
+<p class="stamp">Rendered 2026-10-27T15:48:21.985Z by dabbler-ai-router 3.23.0 at f34a1662b2103e62a652c7050bd08e8489c7e8ab.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-27T11:25:15.582-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 292 of 294: .NET build output is ignored from the first project</h3>
+<p>Scope: <code>packages/router/src/projectGraph.ts</code> (<code>solutionProjects</code>, <code>readProjectGraph</code>), <code>packages/router/src/ecosystem.ts</code> (<code>ignoreBuildOutput</code>, <code>ensureIgnoreRules</code>), <code>packages/router/src/facts.ts</code> (the evidence cap's refusal), <code>packages/router/src/gates.ts</code> and <code>packages/router/src/evidence.ts</code> (the refusal when the state-writes ledger is absent); their tests</p>
+<p><strong>Why.</strong> A staff member's .NET 10 sample (dave-csv-parser-test, router 3.22.1, claude-haiku-4.5 on the Copilot seat) ended session 4 wedged, and a field report traced it, checked against this source and reviewed by GPT-5.6 Sol on 2026-10-27, to one detection bug. On .NET 10 <code>dotnet new sln</code> writes an empty <code>.slnx</code>; <code>solutionProjects</code> returns <code>[]</code> rather than null, so <code>listed ?? buildFilesIn(root)</code> never scans for the <code>.csproj</code> files, the repository reads as no ecosystem, and <code>bin/</code> and <code>obj/</code> were never ignored. The review bundle then inlined 667 build files and went over the cap; the cap's refusal said &quot;split the session or raise AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS&quot;; the operator raised it, and 680 build files landed on <code>main</code>. Once tracked, <code>.gitignore</code> cannot help: every later build changed tracked files, checks failed as having changed the tree, session 4's bundle was 1.39M chars, and the run of record regenerated 1,165 files after round 7 verified a tree without them, so the close refused. The Authoring AI then committed by hand and deleted <code>.dabbler/</code>, and the close now refuses with &quot;no sanctioned-writer record exists for sessions.json (state-writes ledger absent)&quot;, naming no way forward.</p>
+<p><strong>Step 1 -- an empty solution does not hide the projects.</strong> A solution file that lists no projects falls back to the <code>.csproj</code> scan; where a <code>.sln</code> and a <code>.slnx</code> both stand at the root, the one that lists projects is read.</p>
+<p><strong>Step 2 -- the framework's ignore rules are enforced, not only written.</strong> Whenever the framework ensures its build-output rules -- not only when it first writes the line -- files those rules match that are already tracked are untracked and left on disk. The deletions land with the session, as the <code>.gitignore</code> line does. Nothing a person wrote in <code>.gitignore</code> is interpreted.</p>
+<p><strong>Step 3 -- the cap's refusal says what is large.</strong> It names the largest contributors to the bundle and points at <code>.gitignore</code> before the environment variable.</p>
+<p><strong>Step 4 -- an absent ledger names the way out.</strong> The close's refusal says the run records are gone and that the way forward is a person's <code>dabbler session rollback</code>. The gate itself is unchanged: <code>sessions.json</code> matching a commit is never taken as a sanctioned write.</p>
+<p><strong>Non-goals.</strong> Build directories in the review bundle's excludes (a second copy of the ignore rule, and a global <code>bin</code> hides real source elsewhere). Reconstructing the ledger. <code>MSB1011</code> handling for two solution files. Any change to a Mechanic.</p>
+<p><strong>Tests.</strong> In <code>projectGraph.test.ts</code>, an empty <code>.slnx</code> beside <code>.csproj</code> files reads as .NET, and of a <code>.sln</code> and a <code>.slnx</code> the one listing projects is read. In <code>ecosystem.test.ts</code>, tracked <code>bin/</code> output is untracked when the rule already stands. In <code>facts.test.ts</code>, the cap's refusal names the largest file. In <code>gates.test.ts</code>, an absent ledger's refusal names rollback.</p>
+<p><strong>Releasable.</strong> Yes -- with 293, as 3.27.0 in session 294.</p>
+<h2>Work Plan</h2>
+<p>Fix the .NET detection bug that let build output reach a repository, and make the stops it caused say what to do. An empty root solution file (.slnx or .sln listing no projects) falls back to the .csproj scan, and where both a .sln and a .slnx stand at the root the one that lists projects is read (projectGraph.ts). Whenever the framework ensures its own ignore rules it also untracks already-tracked files those rules match, leaving them on disk, so the deletions land with the session as the .gitignore line does (ecosystem.ts). The evidence cap's refusal names the largest contributors to the bundle and points at .gitignore before the environment variable (facts.ts). The close's refusal for an absent state-writes ledger says the run records are gone and that the way forward is a person's <code>dabbler session rollback</code>; the gate itself is unchanged (evidence.ts, surfaced through gates.ts).</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/31b105bc86d555ecb7ff8851a5c17ff87da146c3"><code>31b105bc86d555ecb7ff8851a5c17ff87da146c3</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Empty solution</td><td><p>In solutionProjects, read every root .slnx and .sln and return the projects of the first that lists any; return null when none lists a project, so readProjectGraph falls back to the .csproj scan. Add tests in projectGraph.test.ts: an empty .slnx beside .csproj files reads as .NET, and of a .sln and a .slnx the one listing projects is read.</p></td><td><span class="mono">packages/router/src/projectGraph.ts</span><br><span class="mono">packages/router/test/projectGraph.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Enforce ignore rules</td><td><p>In ensureIgnoreRules, after the rules stand, untrack (git rm --cached, files left on disk) the tracked files that the framework's own rules match, matched with git ls-files against those rules alone, and report the untracked paths with the .gitignore change so they land with the session. Add a test in ecosystem.test.ts: tracked bin/ output is untracked when the rule already stands, and stays on disk.</p></td><td><span class="mono">packages/router/src/ecosystem.ts</span><br><span class="mono">packages/router/test/ecosystem.test.ts</span><br><span class="mono">packages/router/src/journal.ts</span><br><span class="mono">packages/router/src/drive.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Cap names largest</td><td><p>Make checkEvidenceCap's refusal name the largest files in the bundle by size and say to ignore build output in .gitignore (untracking it) before raising AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS. Add a test in facts.test.ts that the refusal names the largest file.</p></td><td><span class="mono">packages/router/src/facts.ts</span><br><span class="mono">packages/router/test/facts.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Absent ledger way out</td><td><p>Make the absent-ledger refusal from detectOutOfBandWrite (requireRecord mode) say the run records are gone and that the way forward is a person's <code>dabbler session rollback</code>; the gate stays as it is. Add a test in gates.test.ts that checkVerificationClean's refusal for an absent ledger names rollback.</p></td><td><span class="mono">packages/router/src/evidence.ts</span><br><span class="mono">packages/router/test/gates.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Build directories in the review bundle's excludes</li><li>Reconstructing the state-writes ledger, or accepting sessions.json matching a commit as a sanctioned write</li><li>MSB1011 handling for two solution files</li><li>Interpreting any rule a person wrote in .gitignore</li><li>Any change to a Mechanic</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[15:25:15]</span> <span class="muted">run-started</span> session=292 mode=pull</div>
+<div class="line"><span class="at">[15:25:15]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[15:26:08]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[15:26:08]</span> <span class="muted">plan-accepted</span> steps=[&quot;empty-solution&quot;,&quot;enforce-ignore-rules&quot;,&quot;cap-names-largest&quot;,&quot;absent-ledger-way-out&quot;] non_goals=5</div>
+<div class="line"><span class="at">[15:26:09]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[15:26:09]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=empty-solution</div>
+<div class="line"><span class="at">[15:26:46]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:26:53]</span> <span class="muted">check-passed</span> step=empty-solution argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[15:26:57]</span> <span class="muted">named-tests-passed</span> step=empty-solution suite=typescript command=node scripts/suite.mjs container packages/router/test/projectGraph.test.ts</div>
+<div class="line"><span class="at">[15:26:58]</span> <span class="muted">report-accepted</span> seq=2 step=empty-solution files=[&quot;packages/router/src/projectGraph.ts&quot;,&quot;packages/router/test/projectGraph.test.ts&quot;] notes=An empty root solution falls back to the .csproj scan; the solution file listing projects is read</div>
+<div class="line"><span class="at">[15:26:58]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=enforce-ignore-rules</div>
+<div class="line"><span class="at">[15:36:20]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:36:25]</span> <span class="muted">check-passed</span> step=enforce-ignore-rules argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[15:37:14]</span> <span class="muted">check-failed</span> step=enforce-ignore-rules suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/ecosystem.test.ts packages/router/test/journal.test.ts</div>
+<div class="line"><span class="at">[15:37:14]</span> <span class="muted">report-rejected</span> seq=3 step=enforce-ignore-rules rejection=1 reasons=[&quot;[check-failed] named tests failed: node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/ecosystem.test.ts packages/router/test/journal.test.ts -&gt; exit 1\n--\n      duration_ms: 52.689875\n      type: 'test'\n      ...\n    # Subtest: puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n    ok 5 - puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n      ---\n      duration_ms: 239.693621\n      type: 'test'\n      ...\n    1..5\nok 69 - the Mechanic, called in without the person, on a real checkout\n  ---\n  duration_ms: 602.032044\n  type: 'suite'\n  ...\n1..69\n# tests 146\n# suites 69\n# pass 135\n# fail 11\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 46187.635787&quot;]</div>
+<div class="line"><span class="at">[15:37:14]</span> <span class="muted">instruction-issued</span> seq=4 kind=rejection step=enforce-ignore-rules reasons=1</div>
+<div class="line"><span class="at">[15:42:01]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:42:06]</span> <span class="muted">check-passed</span> step=enforce-ignore-rules argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[15:42:56]</span> <span class="muted">named-tests-passed</span> step=enforce-ignore-rules suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/ecosystem.test.ts packages/router/test/journal.test.ts</div>
+<div class="line"><span class="at">[15:42:56]</span> <span class="muted">report-accepted</span> seq=4 step=enforce-ignore-rules files=[&quot;packages/router/src/ecosystem.ts&quot;,&quot;packages/router/test/ecosystem.test.ts&quot;,&quot;packages/router/src/journal.ts&quot;,&quot;packages/router/src/drive.ts&quot;] notes=Rule enforcement skips a directory that is not a repository and its test answers git from a table; the snapshot's index copy keeps the index's timestamps so git's racy-clean check still sees a same-second edit</div>
+<div class="line"><span class="at">[15:42:56]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=cap-names-largest</div>
+<div class="line"><span class="at">[15:43:48]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:43:54]</span> <span class="muted">check-passed</span> step=cap-names-largest argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[15:43:57]</span> <span class="muted">named-tests-passed</span> step=cap-names-largest suite=typescript command=node scripts/suite.mjs container packages/router/test/facts.test.ts</div>
+<div class="line"><span class="at">[15:43:58]</span> <span class="muted">report-accepted</span> seq=5 step=cap-names-largest files=[&quot;packages/router/src/facts.ts&quot;,&quot;packages/router/test/facts.test.ts&quot;] notes=The cap's refusal names the five largest files in the bundle and points at .gitignore and git rm --cached before the environment variable</div>
+<div class="line"><span class="at">[15:43:58]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=absent-ledger-way-out</div>
+<div class="line"><span class="at">[15:44:52]</span> <span class="muted">run-resumed</span> session=292 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[15:44:57]</span> <span class="muted">check-passed</span> step=absent-ledger-way-out argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[15:45:01]</span> <span class="muted">named-tests-passed</span> step=absent-ledger-way-out suite=typescript command=node scripts/suite.mjs container packages/router/test/evidence.test.ts packages/router/test/gates.test.ts</div>
+<div class="line"><span class="at">[15:45:02]</span> <span class="muted">report-accepted</span> seq=6 step=absent-ledger-way-out files=[&quot;packages/router/src/evidence.ts&quot;,&quot;packages/router/test/gates.test.ts&quot;] notes=The absent-ledger refusal says the run records are gone and names a person's dabbler session rollback and the Work Explorer command; the gate is unchanged</div>
+<div class="line"><span class="at">[15:45:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[15:45:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[15:45:03]</span> <span class="muted">job-started</span> name=verification pid=13528 log=.dabbler/runs/s292/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[15:46:40]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s292/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[15:46:40]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[15:46:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[15:46:40]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[15:46:40]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=40796 log=.dabbler/runs/s292/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[15:46:42]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s292/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[15:46:42]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[15:46:42]</span> <span class="muted">job-started</span> name=run of record: typescript pid=43492 log=.dabbler/runs/s292/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[15:47:50]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s292/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[15:47:50]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[15:47:50]</span> <span class="muted">job-started</span> name=run of record: extension pid=41756 log=.dabbler/runs/s292/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[15:48:08]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s292/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[15:48:08]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[15:48:13]</span> <span class="muted">landed</span> commit=31b105bc86d555ecb7ff8851a5c17ff87da146c3</div>
+<div class="line"><span class="at">[15:48:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[15:48:13]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[15:48:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[15:48:13]</span> <span class="muted">job-started</span> name=close pid=23920 log=.dabbler/runs/s292/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:48:21]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s292/driver/jobs/close.log</div>
+<div class="line"><span class="at">[15:48:21]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `packages/router/test/ecosystem.test.ts` mocks both Git calls and never creates the returned build files, so “stays on disk” is not directly asserted. A stronger case would initialize a real temporary repository with a tracked `src/Csv/bin/Debug/Csv.dll`, drive `ignoreBuildOutput`, then assert `git ls-files` omits it while the filesystem file still exists.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** `packages/router/src/journal.ts` finds the index only at `.git/index`. In a linked worktree, `.git` is a file, so `snapshotWorktreeTree` starts from `HEAD` and can reintroduce ignored files that were removed from the real index. A linked-worktree test should untrack an ignored `bin/` file, snapshot the tree, and assert the resulting tree omits it.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** `packages/router/src/facts.ts` does not recognize Git’s quoted `diff --git &quot;a/path with spaces&quot; &quot;b/path with spaces&quot;` headers. A cap test with a largest file whose path contains spaces should assert that file is named; today `largestFiles` can omit it.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>66s</td><td>1399</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>296</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

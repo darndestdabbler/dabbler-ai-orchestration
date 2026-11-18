@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verification-request.schema.json",
+  "title": "VerificationRequest (round-<n>-request.json)",
+  "type": "object",
+  "required": [
+    "schema_version", "request_id", "run_id", "round", "tree_digest",
+    "policy_version", "orchestrator_identity", "excluded_providers",
+    "evidence_manifest", "output_contract", "timeout_seconds", "budget"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "round": { "type": "integer", "minimum": 1 },
+    "tree_digest": { "type": "string", "minLength": 1 },
+    "policy_version": { "const": "run-core-1" },
+    "orchestrator_identity": {
+      "type": "object",
+      "required": ["engine", "provider", "model", "identityProvenance"],
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "identityProvenance": { "type": ["string", "null"] }
+      }
+    },
+    "excluded_providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "evidence_manifest": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["diff", "check", "ask", "checkpoints", "findings"] },
+          "ref": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string", "minLength": 1 },
+          "inline": { "type": "string" },
+          "base_commit": { "type": ["string", "null"] },
+          "tree_digest": { "type": "string", "minLength": 1 }
+        },
+        "anyOf": [
+          { "required": ["ref", "digest"] },
+          { "required": ["inline"] }
+        ]
+      }
+    },
+    "output_contract": { "const": "verdict-v2" },
+    "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 },
+    "budget": {
+      "type": "object",
+      "required": [
+        "max_rounds", "model_dispatches_remaining", "model_usd_remaining",
+        "elapsed_seconds_remaining"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_rounds": { "type": "integer", "minimum": 1 },
+        "model_dispatches_remaining": { "type": "integer", "minimum": 0 },
+        "model_usd_remaining": { "type": ["number", "null"] },
+        "elapsed_seconds_remaining": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

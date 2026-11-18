@@ -2159,6 +2159,14 @@ export function renderAmendmentProposal(
   return `The proposal, which is yours to make or to refuse:\n${parts.join("\n")}`;
 }
 
+/** The stops a person may authorise going past: each has something to go past. */
+export const WAIVABLE_STOP_KINDS: ReadonlySet<string> = new Set([
+  "rejected-thrice",
+  "tests",
+  "verification",
+  "close",
+]);
+
 /**
  * A stop, as a person reads it. Pure: the record is the input and words are
  * the output, and nothing here reads a file or decides a lifecycle rule.

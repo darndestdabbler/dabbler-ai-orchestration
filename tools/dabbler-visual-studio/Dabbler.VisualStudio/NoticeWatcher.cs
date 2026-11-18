@@ -20,7 +20,8 @@ namespace Dabbler.VisualStudio
     /// needs a person: paused, an instruction overdue, or closed. It follows
     /// the open solution's repository, and keeps following one whose session
     /// is still open after the developer moves to another solution, so its
-    /// close still reaches them.
+    /// close still reaches them. A paused bar closes itself once its session
+    /// is past the stop or closed.
     /// </summary>
     internal sealed class NoticeWatcher : IDisposable
     {
@@ -108,13 +109,14 @@ namespace Dabbler.VisualStudio
             package.JoinableTaskFactory.RunAsync(async () =>
             {
                 await package.JoinableTaskFactory.SwitchToMainThreadAsync();
-                await ShowAsync(root, notice);
+                if (notice.Kind == TerminalNotice.MovedOn || notice.Kind == TerminalNotice.SessionClosed) entry.ClosePause(notice.Session);
+                if (notice.Kind != TerminalNotice.MovedOn) await ShowAsync(root, entry, notice);
                 if (notice.Kind == TerminalNotice.SessionClosed) Prune();
             }).FileAndForget("dabbler/notices/show");
         }
 
         /// <summary>The notice as an information bar in the main window, with a button to the session in the Work Explorer.</summary>
-        private async Task ShowAsync(string root, TerminalNotice notice)
+        private async Task ShowAsync(string root, Watched entry, TerminalNotice notice)
         {
             await package.JoinableTaskFactory.SwitchToMainThreadAsync();
             if (!(await package.GetServiceAsync(typeof(SVsShell)) is IVsShell shell)) return;
@@ -132,17 +134,23 @@ namespace Dabbler.VisualStudio
                 icon,
                 isCloseButtonVisible: true);
             var bar = factory.CreateInfoBar(model);
-            var events = new BarEvents(() => package.JoinableTaskFactory
-                .RunAsync(() => package.ShowWorkExplorerAtAsync(root, notice.Session))
-                .FileAndForget("dabbler/notices/show-work-explorer"));
+            var events = new BarEvents(
+                () => package.JoinableTaskFactory
+                    .RunAsync(() => package.ShowWorkExplorerAtAsync(root, notice.Session))
+                    .FileAndForget("dabbler/notices/show-work-explorer"),
+                entry.Forget);
             bar.Advise(events, out events.Cookie);
             host.AddInfoBar(bar);
+            if (notice.Kind == TerminalNotice.Paused && notice.Session != null) entry.KeepPause(notice.Session, bar);
         }
 
         /// <summary>One repository followed, with the notices its stream raises.</summary>
         private sealed class Watched : IDisposable
         {
             private readonly TerminalNotices notices;
+
+            // The paused bar shown for each session, by its label; main thread only.
+            private readonly Dictionary<string, IVsInfoBarUIElement> pauses = new Dictionary<string, IVsInfoBarUIElement>(StringComparer.Ordinal);
 
             public Watched(TerminalNotices notices)
             {
@@ -165,6 +173,28 @@ namespace Dabbler.VisualStudio
                 lock (notices) return notices.Read(line);
             }
 
+            /// <summary>Keeps the bar shown for a session's pause, closing the one an earlier pause left.</summary>
+            public void KeepPause(string session, IVsInfoBarUIElement bar)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                ClosePause(session);
+                pauses[session] = bar;
+            }
+
+            /// <summary>Closes the bar of a session's pause, where one is shown.</summary>
+            public void ClosePause(string? session)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (session != null && pauses.TryGetValue(session, out var bar)) bar.Close();
+            }
+
+            /// <summary>A bar closed, by hand or by its session moving on, is no longer kept.</summary>
+            public void Forget(IVsInfoBarUIElement bar)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                foreach (var session in pauses.Where(pause => pause.Value == bar).Select(pause => pause.Key).ToList()) pauses.Remove(session);
+            }
+
             public void Dispose()
             {
                 Follow?.Dispose();
@@ -172,14 +202,16 @@ namespace Dabbler.VisualStudio
             }
         }
 
-        /// <summary>A bar's button shows the session and closes the bar; a closed bar stops listening.</summary>
+        /// <summary>A bar's button shows the session and closes the bar; a closed bar stops listening and is forgotten.</summary>
         private sealed class BarEvents : IVsInfoBarUIEvents
         {
             private readonly Action show;
+            private readonly Action<IVsInfoBarUIElement> closed;
 
-            public BarEvents(Action show)
+            public BarEvents(Action show, Action<IVsInfoBarUIElement> closed)
             {
                 this.show = show;
+                this.closed = closed;
             }
 
             public uint Cookie;
@@ -195,6 +227,7 @@ namespace Dabbler.VisualStudio
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 infoBarUIElement.Unadvise(Cookie);
+                closed(infoBarUIElement);
             }
         }
     }

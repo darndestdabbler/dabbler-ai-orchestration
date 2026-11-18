@@ -299,6 +299,10 @@ export type ProgressProjectionSession = {
    * Who the stop standing over this session is for, from the router's one reading of it: the engine clears it by answering again, the operator clears it, or -- under the pull, where the framework cannot see the engine -- whoever calls `next` next. Present only while a stop stands on an in-flight session; absent means nothing has stopped, or the run record could not be read (`tasksRefused` says which). A surface offers a person the engine's own command only where this does not say `engine`: two callers on one instruction is what the lease exists to catch and what a button should never invite.
    */
   stopActor?: "engine" | "operator" | "either";
+  /**
+   * Whether the stop standing over this session is of a kind `session waive` takes, read from the router's one list of them. Present exactly where `stopActor` is. A surface offers Review exception only where this is true: a stop of another kind has its own ways on, and the verb refuses it.
+   */
+  stopWaivable?: boolean;
   tasks: ProgressProjectionTask[];
   /**
    * Why the execution record could not be read. A refusal is not an empty task list: the view must say it cannot tell which step is open rather than render the last row it could read.

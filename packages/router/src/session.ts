@@ -106,6 +106,7 @@ import {
   writeWorkPlan,
   appendSupervision,
   waiverConsequence,
+  WAIVABLE_STOP_KINDS,
 } from "./driver.ts";
 import type { DriverInstruction, DriverRun } from "./generated/index.ts";
 import type { RollbackFacts } from "./contracts/router.ts";
@@ -4369,14 +4370,6 @@ export interface WaiveCliOptions {
   /** The caller is an engine (`callerIsEngine`); a waiver is a person's. */
   readonly engine?: boolean;
 }
-
-/** The stops a person may authorise going past: each has something to go past. */
-export const WAIVABLE_STOP_KINDS: ReadonlySet<string> = new Set([
-  "rejected-thrice",
-  "tests",
-  "verification",
-  "close",
-]);
 
 /**
  * Why the standing stop cannot be waived, or null where it can. A stop of

@@ -398,10 +398,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 358 | Visual Studio says when a session needs a person | no | 2026-11-18 |
 | 359 | Before a session starts and after it ends, beside the IDE | no | 2026-11-18 |
 | 360 | A session is walked in Visual Studio, on an old-style solution | no | 2026-11-18 |
-| 361 | The Visual Studio extension is documented and made ready to publish | — | not declared |
-| 362 | Release 3.37.0 (release: 3.37.0) | — | not declared |
-| 363 | Microsoft's own models can author and review | — | not declared |
-| 364 | Release 3.38.0 (release: 3.38.0) | — | not declared |
+| 361 | The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop | no | 2026-11-18 |
+| 362 | The Visual Studio extension is documented and made ready to publish | — | not declared |
+| 363 | Release 3.37.0 (release: 3.37.0) | — | not declared |
+| 364 | Microsoft's own models can author and review | — | not declared |
+| 365 | Release 3.38.0 (release: 3.38.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4037,3 +4038,9 @@ Walk the Visual Studio extension the way a developer would, to decide whether it
 - 2026-11-18 — step 'a-stop': its files: The walk found a rollback's result said as raw JSON in the Work Explorer; RollbackAsk.Done now says it in words, tested. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-18 — step 'a-stop': its checks: The rollback wording fix is proven by the library's tests. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-18 — step 'findings': its files: Findings 5-7 need a session of their own before the release: session 361 is inserted into the plan and 361-364 renumbered to 362-365. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 361 — The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop
+
+**Releasable: no.**
+
+Fix the three things session 360's walk in Visual Studio found at a stop. The progress projection says whether the standing stop is one `session waive` accepts, as a `stopWaivable` member present beside `stopActor`. It reads `WAIVABLE_STOP_KINDS`, which moves from session.ts into driver.ts beside `renderStop`, because progress.ts already imports driver.ts and session.ts imports progress.ts. The schema and the generated type gain the member, and the session row offers Review exception only where it says true. The row of the session in flight offers Continue Session, the same start the repository row's Start Session runs, wherever no stop stands, as well as on a wait for funds. In the Visual Studio library, TerminalNotices raises a moved-on notice for a paused session when the stream says it resumed, closed, or moved to another session, which is what a rollback produces. NoticeWatcher keeps each paused bar it shows and closes it on that notice.

@@ -509,12 +509,13 @@ export const SESSION_ACTIONS: SessionAction[] = [
     id: "dabblerSessionSets.continueSession",
     label: "Continue Session",
     group: 899,
-    // A wait for funds is the person's, and its one way on is to carry on
-    // once the account is paid: the same start Start Session runs.
+    // The same start Start Session runs, which re-registers the session in
+    // flight: the way back to an engine whose terminal is gone where no stop
+    // stands, and the one way on from a wait for funds once it is paid.
     when: (repository, session) =>
       repository.currentSession === session.number &&
       session.status === "in-progress" &&
-      fundsVendor(session) !== null,
+      (session.stopActor === undefined || fundsVendor(session) !== null),
     does: (repository) => startSession(repository),
   },
   {
@@ -574,7 +575,9 @@ export const SESSION_ACTIONS: SessionAction[] = [
     id: "dabbler.reviewException",
     label: "Review exception",
     group: 909,
-    when: hasStandingStop,
+    // Only a stop `session waive` takes: any other kind has its own ways on,
+    // and the verb would refuse it.
+    when: (repository, session) => hasStandingStop(repository, session) && session.stopWaivable === true,
     // Without a reason the verb prints the card and writes nothing; the
     // card is what the person reads before they give one.
     does: (repository, session) => ({

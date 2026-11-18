@@ -13,6 +13,9 @@ namespace Dabbler.VisualStudio.Core
         public const string InstructionOverdue = "instruction-overdue";
         public const string SessionClosed = "session-closed";
 
+        /// <summary>A session seen paused is past its stop: resumed, or another session is running. Said to close its pause, never shown.</summary>
+        public const string MovedOn = "moved-on";
+
         public TerminalNotice(string kind, string? session, string message)
         {
             Kind = kind;
@@ -20,7 +23,7 @@ namespace Dabbler.VisualStudio.Core
             Message = message;
         }
 
-        /// <summary><see cref="Paused"/>, <see cref="InstructionOverdue"/> or <see cref="SessionClosed"/>.</summary>
+        /// <summary><see cref="Paused"/>, <see cref="InstructionOverdue"/>, <see cref="SessionClosed"/> or <see cref="MovedOn"/>.</summary>
         public string Kind { get; }
 
         /// <summary>The session's label as the router prints it, such as 358; null where the stream has not named one.</summary>
@@ -47,6 +50,9 @@ namespace Dabbler.VisualStudio.Core
         // has not seen close: only their close is news.
         private readonly HashSet<string> open = new HashSet<string>(StringComparer.Ordinal);
 
+        // The sessions this following saw paused and has not seen move on.
+        private readonly HashSet<string> paused = new HashSet<string>(StringComparer.Ordinal);
+
         // The session the stream last named. A phase line names it only when
         // it changes, and an overdue notice never does.
         private string? session;
@@ -64,7 +70,8 @@ namespace Dabbler.VisualStudio.Core
         /// <summary>
         /// The notice one line the router printed raises; null for every other
         /// line, for one raised before, and for one that is not JSON -- the
-        /// Dabbler Terminal window says what it could not read.
+        /// Dabbler Terminal window says what it could not read. A paused
+        /// session moving on is said every time, being nothing to show.
         /// </summary>
         public TerminalNotice? Read(string json)
         {
@@ -94,10 +101,15 @@ namespace Dabbler.VisualStudio.Core
             switch ((string?)record["notice"])
             {
                 case TerminalNotice.Paused:
-                    var paused = (string?)record["session"] ?? session;
+                    var stopped = (string?)record["session"] ?? session;
                     // A paused session is open, whether or not a phase line named it first.
-                    if (paused != null) open.Add(paused);
-                    return Raise(new TerminalNotice(TerminalNotice.Paused, paused, message), (string?)record["stop"], (string?)record["reason"]);
+                    if (stopped != null)
+                    {
+                        open.Add(stopped);
+                        paused.Add(stopped);
+                        session ??= stopped;
+                    }
+                    return Raise(new TerminalNotice(TerminalNotice.Paused, stopped, message), (string?)record["stop"], (string?)record["reason"]);
                 case TerminalNotice.InstructionOverdue:
                     return Raise(new TerminalNotice(TerminalNotice.InstructionOverdue, session, message), (string?)record["seq"], (string?)record["outstandingSeconds"]);
                 default:
@@ -112,16 +124,29 @@ namespace Dabbler.VisualStudio.Core
             switch ((string?)record["event"])
             {
                 case "phase":
+                    // Another session running is the paused one gone: a rollback says so this way.
+                    var left = named != null && session != null && named != session && paused.Contains(session) ? session : null;
                     if (named != null) session = named;
                     if (session != null && (string?)fields?["now"] != "complete") open.Add(session);
-                    return null;
+                    if (left == null) return null;
+                    open.Remove(left);
+                    return MoveOn(left);
+                case "progress-resumed":
+                    return session != null && paused.Contains(session) ? MoveOn(session) : null;
                 case TerminalNotice.SessionClosed:
                     var closed = named ?? session;
                     if (closed == null || !open.Remove(closed)) return null;
+                    paused.Remove(closed);
                     return Raise(new TerminalNotice(TerminalNotice.SessionClosed, closed, $"Dabbler: session {closed} is closed."));
                 default:
                     return null;
             }
+        }
+
+        private TerminalNotice MoveOn(string moved)
+        {
+            paused.Remove(moved);
+            return new TerminalNotice(TerminalNotice.MovedOn, moved, $"Dabbler: session {moved} is past its stop.");
         }
 
         /// <summary>The notice, where its key has not been raised before; the key is kept as it is raised.</summary>

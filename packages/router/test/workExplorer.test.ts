@@ -1313,17 +1313,23 @@ suite("workExplorer: session actions", () => {
     assert.ok(!applicableSessionActions(idle, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.stopSession"));
   });
 
-  test("Continue Session is offered only on a session waiting for funds", () => {
-    const waiting = (forWhat: string) =>
+  test("Continue Session is offered on the session in flight with no stop, or a stop that waits for funds, and on no other row", () => {
+    const stopped = (forWhat: string) =>
       makeSession({
         number: 2,
         status: "in-progress",
+        stopActor: "operator",
         waiting: { owner: "person", for: forWhat, since: "", by: null, lastProgress: "", says: "" },
       });
     const offered = (session: ReturnType<typeof makeSession>) =>
       applicableSessionActions(makeRepository({ currentSession: 2, sessions: [session] }), session).map((a) => a.id);
-    assert.ok(offered(waiting("waiting for funds: anthropic.")).includes("dabblerSessionSets.continueSession"));
-    assert.ok(!offered(waiting("The tests failed.")).includes("dabblerSessionSets.continueSession"));
+    const id = "dabblerSessionSets.continueSession";
+    assert.ok(offered(makeSession({ number: 2, status: "in-progress" })).includes(id));
+    assert.ok(offered(stopped("waiting for funds: anthropic.")).includes(id));
+    assert.ok(!offered(stopped("The tests failed.")).includes(id));
+    // A row that is not the session in flight starts nothing.
+    const done = makeSession({ number: 1, status: "complete" });
+    assert.ok(!applicableSessionActions(makeRepository({ currentSession: 2, sessions: [done] }), done).map((a) => a.id).includes(id));
   });
 
   test("Open a Mechanic is offered on the session in flight, and on no other row", () => {
@@ -1339,9 +1345,9 @@ suite("workExplorer: session actions", () => {
   });
 
   test("Check this stop, Review exception and Report this stop are offered on the session in flight while a stop stands, and nowhere else", () => {
-    const stopped = makeSession({ number: 2, status: "in-progress", stopActor: "operator" });
+    const stopped = makeSession({ number: 2, status: "in-progress", stopActor: "operator", stopWaivable: true });
     const working = makeSession({ number: 2, status: "in-progress" });
-    const done = makeSession({ number: 1, status: "complete", stopActor: "operator" });
+    const done = makeSession({ number: 1, status: "complete", stopActor: "operator", stopWaivable: true });
     const offered = (session: ReturnType<typeof makeSession>) =>
       applicableSessionActions(makeRepository({ currentSession: 2, sessions: [done, session] }), session).map((a) => a.id);
     for (const id of ["dabbler.checkStop", "dabbler.reviewException", "dabbler.reportStop"]) {
@@ -1349,6 +1355,18 @@ suite("workExplorer: session actions", () => {
       assert.ok(!offered(working).includes(id), id);
       assert.ok(!offered(done).includes(id), id);
     }
+  });
+
+  test("Review exception is offered on a stop `session waive` takes, such as tests, and not on a blocked stop", () => {
+    const offered = (stopWaivable: boolean) => {
+      const session = makeSession({ number: 2, status: "in-progress", stopActor: "operator", stopWaivable });
+      return applicableSessionActions(makeRepository({ currentSession: 2, sessions: [session] }), session).map((a) => a.id);
+    };
+    // As the projection reads them: a `tests` stop is waivable, a `blocked` one is not.
+    assert.ok(offered(true).includes("dabbler.reviewException"));
+    assert.ok(!offered(false).includes("dabbler.reviewException"));
+    // The stop's other actions stay on a blocked stop.
+    assert.ok(offered(false).includes("dabbler.checkStop"));
   });
 
   test("Open Transcript at its Exceptions is offered on a closed session that went past a stop, and on no other row", () => {
@@ -1552,6 +1570,7 @@ suite("workExplorer: an action is the verb a person would type", () => {
     const stopped = makeSession({
       ...atCap,
       stopActor: "operator",
+      stopWaivable: true,
       waiting: {
         owner: "person",
         for: "waiting for funds: openai. Pay the account, then carry on.",

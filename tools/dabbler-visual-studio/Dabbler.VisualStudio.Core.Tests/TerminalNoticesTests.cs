@@ -94,5 +94,32 @@ namespace Dabbler.VisualStudio.Core.Tests
             Assert.Null(restarted.Read(Executing));
             Assert.Null(restarted.Read(Overdue));
         }
+
+        private const string Resumed =
+            "{\"kind\":\"line\",\"at\":null,\"clock\":\"10:20:00\",\"event\":\"progress-resumed\",\"fields\":{\"past\":\"blocked\",\"from\":\"work\",\"phase\":\"verify\"},\"voice\":\"358 ─ framework\",\"spans\":[]}";
+
+        // What the stream says after a rollback: the run it reads now is the session before.
+        private const string Earlier =
+            "{\"kind\":\"line\",\"at\":null,\"clock\":\"10:30:00\",\"event\":\"phase\",\"fields\":{\"session\":\"357\",\"now\":\"complete\"},\"voice\":\"357 ─ framework\",\"spans\":[]}";
+
+        [Fact]
+        public void Read_says_a_paused_session_moved_on_when_it_resumes_or_another_session_runs()
+        {
+            var resumed = new TerminalNotices(Root, raisedFile);
+            Assert.Null(resumed.Read(Resumed));
+            Assert.NotNull(resumed.Read(Paused));
+            var moved = resumed.Read(Resumed);
+            Assert.NotNull(moved);
+            Assert.Equal((TerminalNotice.MovedOn, "358"), (moved!.Kind, moved.Session));
+            Assert.Null(resumed.Read(Resumed));
+
+            var rolledBack = new TerminalNotices(@"C:\work\other", raisedFile);
+            Assert.Null(rolledBack.Read(Executing));
+            Assert.NotNull(rolledBack.Read(Paused));
+            var gone = rolledBack.Read(Earlier);
+            Assert.NotNull(gone);
+            Assert.Equal((TerminalNotice.MovedOn, "358"), (gone!.Kind, gone.Session));
+            Assert.False(rolledBack.SessionOpen);
+        }
     }
 }

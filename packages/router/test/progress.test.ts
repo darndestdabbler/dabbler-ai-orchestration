@@ -248,6 +248,19 @@ describe("the source of a projection's sessions", () => {
     assert.equal(stopped({ kind: "interrupted", reason: "you asked it to stop", at }), "either");
   });
 
+  it("says whether the standing stop is one `session waive` takes, and nothing where nothing stands", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const at = "2026-11-18T12:30:00-05:00";
+    const waivable = (stop: Record<string, unknown> | null) => {
+      writeRun(repo, 1, { ...RUN, engine: "cli", stop });
+      return sessions(sessionsDir)[0]!["stopWaivable"];
+    };
+    assert.equal(waivable(null), undefined);
+    assert.equal(waivable({ kind: "blocked", step_id: "s1", reason: "the engine reported the step blocked", at }), false);
+    assert.equal(waivable({ kind: "tests", reason: "the suite failed", at }), true);
+  });
+
   it("says who the session is waiting on, in one sentence, and says nothing where nothing waits", () => {
     // "in flight" was true of a session being worked on and of the one
     // that waited six hours on nobody. The reading is the router's, so

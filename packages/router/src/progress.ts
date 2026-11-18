@@ -37,6 +37,7 @@ import {
   renderStop,
   renderUncollected,
   uncollectedJob,
+  WAIVABLE_STOP_KINDS,
   waiterSeenSince,
   type StopActor,
 } from "./driver.ts";
@@ -941,19 +942,24 @@ function epoch(value: unknown): number | null {
 }
 
 /**
- * Who the stop standing over a session is for, or null when none stands.
+ * Who the stop standing over a session is for, and whether `session waive`
+ * takes its kind, or null when none stands.
  *
  * The same reading the blocked task row is folded from, named so a surface
  * can key on it: the Work Explorer withholds the engine's own command while
  * the stop is the engine's to clear, because a person clicking it is a
- * second caller on one live instruction. It is the router's rule and not
- * the extension's, for the reason every stop's words are.
+ * second caller on one live instruction; and offers Review exception only on a
+ * kind the verb would not refuse outright. Both are the router's rules and
+ * not the extension's, for the reason every stop's words are.
  *
  * An unreadable run record answers null rather than throwing: what a
  * surface does about damage is say so -- `tasksRefused` carries that -- and
  * a missing actor withholds nothing.
  */
-export function standingStopActor(repoRoot: string, sessionNumber: number): StopActor | null {
+export function standingStop(
+  repoRoot: string,
+  sessionNumber: number,
+): { readonly actor: StopActor; readonly waivable: boolean } | null {
   let run: ReturnType<typeof readRun> = null;
   try {
     run = readRun(repoRoot, sessionNumber);
@@ -962,7 +968,7 @@ export function standingStopActor(repoRoot: string, sessionNumber: number): Stop
     return null;
   }
   if (run === null || !run.stop) return null;
-  return renderStop(run.stop, run).actor;
+  return { actor: renderStop(run.stop, run).actor, waivable: WAIVABLE_STOP_KINDS.has(run.stop.kind) };
 }
 
 /**
@@ -1015,7 +1021,7 @@ function sentenceCase(text: string): string {
  * Who this session is waiting on, as a surface renders it, or null where
  * nothing is waiting or the run record could not be read.
  *
- * An unreadable record answers null for the same reason `standingStopActor`
+ * An unreadable record answers null for the same reason `standingStop`
  * does: what a surface does about damage is say so, and `tasksRefused`
  * carries that.
  */
@@ -1151,7 +1157,7 @@ export function buildTaskRows(
   // the first phase not done is blocked, and its intent says which bound
   // the loop met. Read from the driver's own state rather than inferred,
   // and refused like the rounds ledger when that file does not parse. Who
-  // the stop is FOR is the same reading, named: see `standingStopActor`.
+  // the stop is FOR is the same reading, named: see `standingStop`.
   let driverRun: ReturnType<typeof readRun> = null;
   let driverStop: NonNullable<ReturnType<typeof readRun>>["stop"] = null;
   try {
@@ -1784,8 +1790,11 @@ export function buildProjection(
       // Present only while a stop stands, so a row that projects nothing
       // here is a session with nothing stopped -- which is what a surface
       // needs to know before it offers anybody a command.
-      const actor = standingStopActor(repoRoot, number as number);
-      if (actor !== null) sessionOut["stopActor"] = actor;
+      const stop = standingStop(repoRoot, number as number);
+      if (stop !== null) {
+        sessionOut["stopActor"] = stop.actor;
+        sessionOut["stopWaivable"] = stop.waivable;
+      }
       // Who the session is waiting on, from the loop's one record. Absent
       // means nothing is waiting -- the loop is working -- which is a
       // different thing from a surface that cannot tell.

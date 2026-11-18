@@ -7143,7 +7143,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "5049f204989aba9a1812499c2e6139c9b9af4e13",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.34.1",
+      "startCommit": "5049f204989aba9a1812499c2e6139c9b9af4e13"
+    },
+    {
+      "number": 361,
+      "title": "The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop",
+      "status": "in-progress",
+      "startedAt": "2026-11-18T12:59:19.449000-05:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "b3aa15f12f90f18bab7b51214b7cffb3830a9940",
       "frameworkVersion": "3.34.1",
       "verification": {
         "rounds": 1,
@@ -7153,7 +7175,7 @@
       }
     },
     {
-      "number": 361,
+      "number": 362,
       "title": "The Visual Studio extension is documented and made ready to publish",
       "status": "not-started",
       "startedAt": null,
@@ -7162,7 +7184,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 362,
+      "number": 363,
       "title": "Release 3.37.0 (release: 3.37.0)",
       "status": "not-started",
       "startedAt": null,
@@ -7171,7 +7193,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 363,
+      "number": 364,
       "title": "Microsoft's own models can author and review",
       "status": "not-started",
       "startedAt": null,
@@ -7180,7 +7202,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 364,
+      "number": 365,
       "title": "Release 3.38.0 (release: 3.38.0)",
       "status": "not-started",
       "startedAt": null,

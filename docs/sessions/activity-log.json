@@ -13702,6 +13702,13 @@
       "what": "step 'findings': its files",
       "reason": "Findings 5-7 need a session of their own before the release: session 361 is inserted into the plan and 361-364 renumbered to 362-365.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 361,
+      "dateTime": "2026-11-18T13:02:19.364000-05:00",
+      "task": "Fix the three things session 360's walk in Visual Studio found at a stop. The progress projection says whether the standing stop is one `session waive` accepts, as a `stopWaivable` member present beside `stopActor`. It reads `WAIVABLE_STOP_KINDS`, which moves from session.ts into driver.ts beside `renderStop`, because progress.ts already imports driver.ts and session.ts imports progress.ts. The schema and the generated type gain the member, and the session row offers Review exception only where it says true. The row of the session in flight offers Continue Session, the same start the repository row's Start Session runs, wherever no stop stands, as well as on a wait for funds. In the Visual Studio library, TerminalNotices raises a moved-on notice for a paused session when the stream says it resumed, closed, or moved to another session, which is what a rollback produces. NoticeWatcher keeps each paused bar it shows and closes it on that notice.",
+      "releasable": false
     }
   ]
 }

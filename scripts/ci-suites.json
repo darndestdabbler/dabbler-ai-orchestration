@@ -15,6 +15,10 @@
       "suite": "typescript-windows",
       "workflow_command": "npm run test:unit -w dabbler-ai-router",
       "reason": "The other half of session 153's split, and the same CI command: the host suite is the tests that prove something about Windows, and CI runs the router suite whole on windows-latest, so they are covered there rather than run as a suite of their own. scripts/suite-membership.json names which tests these are and why each is on the host."
+    },
+    {
+      "suite": "visual-studio",
+      "workflow_command": "dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo"
     }
   ]
 }

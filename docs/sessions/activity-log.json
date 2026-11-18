@@ -13498,6 +13498,21 @@
       "dateTime": "2026-11-18T00:47:03.744000-05:00",
       "task": "Release 3.36.0: the framework packs and publishes what is on the trunk.",
       "releasable": true
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 349,
+      "dateTime": "2026-11-18T00:59:16.801000-05:00",
+      "task": "Build the smallest Visual Studio extension that installs and reaches the router, under tools/dabbler-visual-studio/: an in-process C# extension (net472, VSSDK, SDK-style project) whose manifest installs on Visual Studio 2022 17.14 and 2026 and carries the router's built bundle (packages/router/dist/dabbler.cjs) as a file; a netstandard2.0 library with no Visual Studio in it holding the Node check (`node --version` against the router's floor of 22.18, refused in one sentence that names the version to install and says to restart Visual Studio), a Router class that runs `node <bundle> <verb>` and returns what it printed or the router's own words on failure, and a RouterFollow class that keeps a `--follow` verb running and hands on each line-per-document it prints; and a net10.0 xunit test project for that library. The extension echoes every command it runs to a \"Dabbler Commands\" Output pane in the VS Code extension's form (a `[time] Running:` line, the runnable `dabbler ...` line, then the output indented), and offers one command, Dabbler: Version, which runs the Node check and then shows `dabbler version`. Windows Terminal is tried by hand on this machine and written into docs/uat/uat-visual-studio.md: a tab added to a window named for Dabbler (`wt -w`), whether that tab gets the environment wt was started with and, if not, the command form that sets it, and what happens with no Windows Terminal. The library's tests become a `visual-studio` suite in dabbler.yaml, run whole at every close, and a Windows job in .github/workflows/test.yml builds the router bundle and the solution with MSBuild and runs the tests. One placement differs from the plan's scope line: the solution file is `dabbler-visual-studio.slnx` at the repository root rather than inside tools/dabbler-visual-studio/, because the framework that runs this session writes its own root solution, Directory.Build.props and Directory.Build.targets whenever the repository holds two or more .csproj files and no solution file at its root, and those would land in this TypeScript monorepo's root; every project stays under tools/dabbler-visual-studio/.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 349,
+      "dateTime": "2026-11-18T01:11:47.450000-05:00",
+      "what": "step 'suite': its files",
+      "reason": "The lint control check-ci-suites refuses an expensive suite that scripts/ci-suites.json does not name; the new visual-studio suite needs its entry there (same command in CI, so no reason)",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

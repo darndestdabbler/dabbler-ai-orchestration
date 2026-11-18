@@ -91,3 +91,37 @@ jobs:
 
       - name: CLI bundles
         run: npm run build -w dabbler-ai-router
+
+  visual-studio:
+    name: Visual Studio extension (build + library tests)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The .vsix carries this bundle, so it is built before the extension.
+      - name: Router bundle
+        run: npm run build -w dabbler-ai-router
+
+      # The extension is an in-process VSSDK project, which builds with
+      # Visual Studio's MSBuild and not with `dotnet build`.
+      - name: Build the solution
+        shell: pwsh
+        run: |
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          & $msbuild dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal
+          exit $LASTEXITCODE
+
+      - name: Library tests
+        run: dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo

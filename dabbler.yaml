@@ -282,6 +282,28 @@ testing:
       select: node scripts/suite.mjs extension {paths}
       whole_at_close: true
 
+    # The Visual Studio extension's library: starting the router, reading what
+    # it prints, the Node check. `dotnet test` on the test project rather than
+    # MSBuild on the solution, because the library and its tests are SDK
+    # projects with no Visual Studio in them, and only the extension's own
+    # project needs Visual Studio's MSBuild -- which a step's checks and the
+    # test workflow build, and this suite never has to. The tests start
+    # `node` on a stand-in bundle, so Node on PATH is all they need.
+    - name: visual-studio
+      command: dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo
+      expensive: true
+      covers:
+        - tools/dabbler-visual-studio/
+        - dabbler-visual-studio.slnx
+        - dabbler.yaml
+      test_roots:
+        - tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests
+      test_glob: "*Tests.cs"
+      test_name: "{name}Tests.cs"
+      select: dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter {names}
+      select_separator: "|"
+      whole_at_close: true
+
   # Deterministic controls — one entry per kind, from compile, typecheck,
   # lint, analyzer. A declared control runs before verification and its
   # exit code is the fact; `required` sends a red result back to the

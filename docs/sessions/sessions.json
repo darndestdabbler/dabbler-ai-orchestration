@@ -6884,19 +6884,31 @@
         "engine": "framework",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null,
-      "startCommit": "02d02bb445472e66942c6b7ffc723f74e4006416",
       "frameworkVersion": "3.34.1",
-      "noChange": true
+      "startCommit": "02d02bb445472e66942c6b7ffc723f74e4006416",
+      "verificationVerdict": null
     },
     {
       "number": 349,
       "title": "A Visual Studio extension that installs and finds the router",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-11-18T00:54:13.582000-05:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "0140c45988288a4633ce4ee48499a34033ef3dd3",
+      "frameworkVersion": "3.34.1",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 350,

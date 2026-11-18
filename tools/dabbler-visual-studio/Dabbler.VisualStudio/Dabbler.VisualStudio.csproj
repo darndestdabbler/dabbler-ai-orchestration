@@ -1,0 +1,52 @@
+<Project>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- An in-process extension: the later sessions open a file at a line,
+       compare two commits, show an information bar and ask whether a build
+       or a debugger is running, none of which the out-of-process model
+       documents. It builds with Visual Studio's MSBuild, not `dotnet build`. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Dabbler.VisualStudio</RootNamespace>
+    <!-- The Work Explorer's control is XAML. -->
+    <UseWPF>true</UseWPF>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <!-- A command-line build installs nothing into an experimental instance. -->
+    <DeployExtension Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</DeployExtension>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 17.14: the oldest Visual Studio the manifest installs on. -->
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OleMenuCommandService derives from System.Design's MenuCommandService. -->
+    <Reference Include="System.Design" />
+    <ProjectReference Include="..\Dabbler.VisualStudio.Core\Dabbler.VisualStudio.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest" SubType="Designer" />
+    <VSCTCompile Include="DabblerPackage.vsct" ResourceName="Menus.ctmenu" />
+    <!-- The router, built by `npm run build -w dabbler-ai-router` before this. -->
+    <Content Include="..\..\..\packages\router\dist\dabbler.cjs" Link="router\dabbler.cjs" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The status pictures are the VS Code extension's own, one per theme. -->
+    <Content Include="..\..\dabbler-ai-orchestration\media\light\*.svg" Link="media\light\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\media\dark\*.svg" Link="media\dark\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <!-- The VSSDK package sets VSToolsPath and leaves the import to the
+       project; it has to follow the SDK's targets, which it extends. -->
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+
+</Project>

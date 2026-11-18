@@ -7001,9 +7001,9 @@
     {
       "number": 354,
       "title": "Rollback and the ways on from a stop, from Visual Studio",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T07:18:18.274000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T07:37:53.136000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -13744,6 +13744,13 @@
       "dateTime": "2026-11-18T17:23:51.899000-05:00",
       "task": "Make a session whose product is a Word document (or another office file) produce a good one and have its text reviewed. The planning instruction in drive.ts gains, beside its sentence about generators, what a document step is: the author writes the .docx/.pptx/.xlsx/.pdf directly with the best document tooling it has, opens or renders it and reads it before reporting, and its check proves the file is there and opens as the archive it is -- with a generator script only where the plan asks for one; the check it names is confirmed on this host and in a Linux container before the text names it (tar -tf is the candidate). The operator's over-engineering sentence stays word for word in both the planning instruction and the verification template, and each gains one sentence after it: simplicity is asked of how a thing is built, not of what the person who uses it sees or reads, so the finish of an interface or a document is part of what was asked for, while machinery nobody asked for is still over-engineering. facts.ts reads a .docx with what Node ships (zip central directory + zlib inflateRaw, then word/document.xml) into text -- one paragraph to a line, headings marked with their level, table cells in reading order -- and the reviewer's evidence carries that text for every .docx the session created or changed (tracked or not) in round 1, and in a later round's fix delta wherever the file changed since the round before; text over the existing 64 KB inline cap, or a file that is not a readable Word document, is listed with its reason and the round goes on. The verification template says such a block is the document's content and not its appearance, to be held to the plan, with layout left to a person. The managed body's rule about writing files names the binary-document exception, AGENTS.md is refreshed from it, driving-a-session.md and the guide's verification page say in one paragraph what a session does with a Word document, and version.json goes to 3.39.0, stamped, with a changelog entry.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 367,
+      "dateTime": "2026-11-18T17:44:12.930000-05:00",
+      "task": "Release 3.39.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

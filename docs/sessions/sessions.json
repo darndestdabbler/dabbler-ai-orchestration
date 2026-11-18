@@ -7259,23 +7259,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "ee16aef6e4135486c3166707837b54c7f78cf2fb",
-      "frameworkVersion": "3.38.0",
       "verification": {
         "rounds": 1,
         "verifierModel": "mai-code-2",
         "verifierProvider": "microsoft",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "3.38.0",
+      "startCommit": "ee16aef6e4135486c3166707837b54c7f78cf2fb"
     },
     {
       "number": 367,
       "title": "Release 3.39.0 (release: 3.39.0)",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-11-18T17:44:11.401000-05:00",
+      "completedAt": "2026-11-18T17:44:42.302000-05:00",
+      "orchestrator": {
+        "engine": "framework",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "startCommit": "0aa1adfd0f35a93945c69a468340653a00a04f79",
+      "frameworkVersion": "3.38.0",
+      "noChange": true
     }
   ]
 }

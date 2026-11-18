@@ -13,6 +13,11 @@ namespace Dabbler.VisualStudio.Core
         public const string StartSession = "dabblerSessionSets.startSession";
         public const string ConsultWithAi = "dabbler.consultWithAi";
         public const string OpenMechanic = "dabbler.openMechanic";
+        public const string StopSession = "dabblerSessionSets.stopSession";
+        public const string ContinueSession = "dabblerSessionSets.continueSession";
+        public const string CloseSession = "dabblerSessionSets.closeSession";
+        public const string CancelSession = "dabblerSessionSets.cancel";
+        public const string RestoreSession = "dabblerSessionSets.restore";
     }
 
     /// <summary>One row as the tree shows it: the router's words, made plain, and whether it is open or selected.</summary>
@@ -34,6 +39,11 @@ namespace Dabbler.VisualStudio.Core
             ActionIds.StartSession,
             ActionIds.ConsultWithAi,
             ActionIds.OpenMechanic,
+            ActionIds.StopSession,
+            ActionIds.ContinueSession,
+            ActionIds.CloseSession,
+            ActionIds.CancelSession,
+            ActionIds.RestoreSession,
         };
 
         private bool isExpanded;

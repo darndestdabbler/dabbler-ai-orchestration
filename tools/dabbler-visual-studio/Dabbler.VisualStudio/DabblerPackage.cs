@@ -42,6 +42,9 @@ namespace Dabbler.VisualStudio
         /// <summary>The Dabbler Commands pane; null until the package has initialized.</summary>
         internal CommandsPane? Commands { get; private set; }
 
+        /// <summary>The Dabbler Session pane; null until the package has initialized.</summary>
+        internal SessionPane? Session { get; private set; }
+
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
@@ -49,6 +52,7 @@ namespace Dabbler.VisualStudio
                 ?? throw new InvalidOperationException("Visual Studio offered no Output window.");
             var bundle = Path.Combine(Path.GetDirectoryName(typeof(DabblerPackage).Assembly.Location)!, "router", "dabbler.cjs");
             Commands = CommandsPane.Create(output);
+            Session = SessionPane.Create(output);
             router = new Router(bundle, Commands);
             var commands = await GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService
                 ?? throw new InvalidOperationException("Visual Studio offered no menu command service.");
@@ -84,6 +88,18 @@ namespace Dabbler.VisualStudio
             var window = await FindToolWindowAsync(typeof(TerminalWindow), 0, create: true, DisposalToken);
             await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
             if (window?.Frame is IVsWindowFrame frame) frame.ShowNoActivate();
+        }
+
+        /// <summary>
+        /// Says a verb's success in an information bar on the Work Explorer,
+        /// or in a message box where that window is not open.
+        /// </summary>
+        internal async Task SayDoneAsync(string text)
+        {
+            var window = await FindToolWindowAsync(typeof(WorkExplorerWindow), 0, create: false, DisposalToken);
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            if (window is WorkExplorerWindow explorer) explorer.Say(text);
+            else Show(text, OLEMSGICON.OLEMSGICON_INFO);
         }
 
         /// <summary>The open solution's folder, or null where no solution is open.</summary>

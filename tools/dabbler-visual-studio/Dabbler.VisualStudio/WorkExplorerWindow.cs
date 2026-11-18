@@ -2,7 +2,9 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
+using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
 using SolutionEvents = Microsoft.VisualStudio.Shell.Events.SolutionEvents;
 using Task = System.Threading.Tasks.Task;
@@ -28,6 +30,9 @@ namespace Dabbler.VisualStudio
         // an earlier one is dropped; read and written on the main thread only.
         private int generation;
 
+        // The information bar the window shows last; main thread only.
+        private IVsInfoBarUIElement? infoBar;
+
         public WorkExplorerWindow()
             : base(null)
         {
@@ -46,6 +51,20 @@ namespace Dabbler.VisualStudio
         }
 
         private DabblerPackage Dabbler => (DabblerPackage)Package;
+
+        /// <summary>
+        /// Says <paramref name="text"/> in an information bar across the top
+        /// of the window, in place of the one it said last.
+        /// </summary>
+        internal void Say(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            infoBar?.Close();
+            infoBar = null;
+            if (!(GetService(typeof(SVsInfoBarUIFactory)) is IVsInfoBarUIFactory factory)) return;
+            infoBar = factory.CreateInfoBar(new InfoBarModel(text, KnownMonikers.StatusInformation));
+            AddInfoBar(infoBar);
+        }
 
         public override void OnToolWindowCreated()
         {

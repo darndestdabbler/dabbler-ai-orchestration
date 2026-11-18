@@ -390,7 +390,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 350 | The Work Explorer in Visual Studio | no | 2026-11-18 |
 | 351 | Start Session from Visual Studio, with the engine in Windows Terminal | no | 2026-11-18 |
 | 352 | The Dabbler Terminal's output in Visual Studio | no | 2026-11-18 |
-| 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | — | not declared |
+| 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | no | 2026-11-18 |
 | 354 | Rollback and the ways on from a stop, from Visual Studio | — | not declared |
 | 355 | The Configuration window in Visual Studio | — | not declared |
 | 356 | The catalog, a key, and Start Session with Different Models, from Visual Studio | — | not declared |
@@ -3959,3 +3959,13 @@ Give the Visual Studio extension a Dabbler Terminal tool window, docked tabbed w
 **Amended after acceptance:**
 
 - 2026-11-18 — step 'following': its files: Visual Studio turns Ctrl+C in a tool window into its Edit.Copy command before WPF sees the key, so the pane must answer Edit.Copy with the control's copy for the keyboard path to work. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 353 — Stop, Continue, Close, Cancel and Restore from Visual Studio
+
+**Releasable: no.**
+
+Give a developer in Visual Studio the Work Explorer's Stop, Continue, Close, Cancel and Restore, with no terminal and no dialog words written in C#. One piece of code in the library (ActionAsk in Dabbler.VisualStudio.Core) reads what the router said an action needs -- its confirmation (title, detail, accept and keep words), its reason (prompt, placeholder, what a blank or dismissed box means), or nothing -- and returns the command to run, with `--reason <text>` in it, or nothing where the person dismissed what they were asked. The extension shows those words in one dialog class and runs the result: Stop runs the interrupt with its reason, Continue goes Start Session's road (SessionStarter), Close runs with a progress indication and on a refusal writes the gate rows to a new Dabbler Session pane of the Output window and says to read it, and Cancel and Restore each ask their confirmation and reason. Each outcome is shown in the router's words: an information bar on the Work Explorer window for success, a dialog for a refusal. The five ids join RunnableActions so the rows offer them.
+
+**Amended after acceptance:**
+
+- 2026-11-18 — step 'close': its files: Close is now runnable, so WorkExplorerTreeTests' hidden-action example must name actions session 354 builds instead (claude-code (anthropic, claude-opus-5-5))

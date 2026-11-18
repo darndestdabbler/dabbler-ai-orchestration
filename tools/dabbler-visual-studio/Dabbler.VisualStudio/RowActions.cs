@@ -5,7 +5,8 @@ namespace Dabbler.VisualStudio
 {
     /// <summary>
     /// Runs the action a developer chose on a Work Explorer row, by what it
-    /// does: a file it opens, or the session, consult or Mechanic it starts.
+    /// does: a file it opens, the session, consult or Mechanic it starts, or
+    /// a person's verb on a session.
     /// The Work Explorer offers no other action (see WorkExplorerNode.Actions).
     /// </summary>
     internal sealed class RowActions
@@ -29,7 +30,14 @@ namespace Dabbler.VisualStudio
             switch (action.Id)
             {
                 case ActionIds.StartSession:
+                case ActionIds.ContinueSession:
                     await new SessionStarter(package).StartAsync(repositoryRoot, action);
+                    return;
+                case ActionIds.StopSession:
+                case ActionIds.CloseSession:
+                case ActionIds.CancelSession:
+                case ActionIds.RestoreSession:
+                    await new LifecycleActions(package).RunAsync(repositoryRoot, action);
                     return;
                 case ActionIds.ConsultWithAi:
                 case ActionIds.OpenMechanic:

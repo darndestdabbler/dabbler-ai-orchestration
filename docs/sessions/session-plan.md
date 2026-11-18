@@ -21177,7 +21177,7 @@ as its flag; one left at its default carries none.
 
 **Releasable.** No.
 
-### Session 357 of 362: Set up Dabbler in the solution that is open
+### Session 357 of 364: Set up Dabbler in the solution that is open
 
 Scope: `tools/dabbler-visual-studio/` (the command and its dialogs)
 
@@ -21206,7 +21206,7 @@ yields the offer; one with a plan does not.
 
 **Releasable.** No.
 
-### Session 358 of 362: Visual Studio says when a session needs a person
+### Session 358 of 364: Visual Studio says when a session needs a person
 
 Scope: `tools/dabbler-visual-studio/` (notices, themes, the keyboard)
 
@@ -21238,7 +21238,7 @@ same object read again raises none.
 
 **Releasable.** No.
 
-### Session 359 of 362: Before a session starts and after it ends, beside the IDE
+### Session 359 of 364: Before a session starts and after it ends, beside the IDE
 
 Scope: `tools/dabbler-visual-studio/` (the start check, the comparison),
 `docs/uat/uat-visual-studio.md`
@@ -21275,7 +21275,7 @@ yield the dialog naming both; neither yields none.
 
 **Releasable.** No.
 
-### Session 360 of 362: A session is walked in Visual Studio, on an old-style solution
+### Session 360 of 364: A session is walked in Visual Studio, on an old-style solution
 
 Scope: `docs/uat/uat-visual-studio.md`, whatever in
 `tools/dabbler-visual-studio/` or `packages/router/src/` the walk shows
@@ -21318,7 +21318,7 @@ Java, IntelliJ or Eclipse.
 
 **Releasable.** No.
 
-### Session 361 of 362: The Visual Studio extension is documented and made ready to publish
+### Session 361 of 364: The Visual Studio extension is documented and made ready to publish
 
 Scope: `docs/guide/` (a page for Visual Studio, and the index),
 `tools/dabbler-visual-studio/` (the listing's text, the publish
@@ -21367,8 +21367,92 @@ manifest. The docs check reads the new guide page.
 
 **Releasable.** Yes, as 3.37.0 in session 362.
 
-### Session 362 of 362: Release 3.37.0 (release: 3.37.0)
+### Session 362 of 364: Release 3.37.0 (release: 3.37.0)
 
 The framework publishes sessions 349 to 361 as 3.37.0, the Visual Studio
 extension to the Visual Studio Marketplace for the first time, and
 nothing else.
+
+### Session 363 of 364: Microsoft's own models can author and review
+
+Scope: `packages/router/src/transports/copilot.ts` (the vendor a seat
+model's id names), `packages/router/src/identity.ts` (the refusal for a
+model the catalog lists and nobody has placed),
+`packages/router/src/cli/session.ts` (the `--provider` help),
+`packages/router/test/` (the tests named after those files),
+`docs/schema-reference.md`, `docs/model-and-pricing-sources.md`,
+`docs/guide/` (where the vendors are named), `version.json`,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** A Copilot seat now lists three models Microsoft trained itself:
+`mai-code-1.1-flash`, `mai-code-2-flash` and `mai-code-2`. The catalog
+on the operator's machine has read all three, enabled, since 2026-11-18,
+and records each with no vendor, because the seat states none and the
+id-prefix table knows only `claude`, `gpt`, `o1`, `o3`, `o4` and
+`gemini`. A model with no vendor is never offered as a reviewer, and
+Start refuses it as the author with words that say it is not in the
+catalog, which is untrue. Nobody can choose these models for anything.
+
+They are a fourth vendor and not OpenAI under another name. Microsoft's
+model card of 2026-11-17 says both MAI Code 2 models were "pre-trained
+and post-trained by Microsoft from scratch", names Microsoft's own
+MAI-Base-2 as the only dependency, and says the Flash model was
+distilled from "a larger in-house MAI teacher model". That is
+Microsoft's own account and nobody outside can audit it; it is the same
+standing the other three vendors' accounts have.
+
+**What.**
+
+**Step 1 -- the vendor.** An id that begins `mai` names the vendor
+`microsoft`, and `microsoft` is a vendor a seat may front. After a free
+`dabbler discovery refresh`, the three models are recorded with that
+vendor, are offered for the author and for both reviewers on the seat,
+and answer to the cross-vendor rule as any other model does: a
+Microsoft model may review work an Anthropic, OpenAI or Google model
+wrote, and may not review work a Microsoft model wrote.
+
+**Step 2 -- a catalog read before this.** A machine whose catalog was
+read by an older router still records the three with no vendor. A
+person who chooses one there is told that the catalog lists the model
+and names no vendor for it, and that `dabbler discovery refresh` reads
+it again for nothing. The same words are given for any listed model
+whose id names no vendor, where today's say it is not listed. Nothing
+is placed by guessing at the time a session starts.
+
+**Step 3 -- the words.** The `--provider` help of `session start` and
+`session next` names four vendors. `docs/schema-reference.md` and
+`docs/model-and-pricing-sources.md` say that `microsoft` is reached
+through the seat only: there is no key for it, and no direct endpoint.
+The guide names the fourth vendor wherever it names the three.
+
+**Step 4 -- the number.** `version.json` goes to 3.38.0 (a minor: a
+vendor a person could not choose before), stamped, and the changelog
+says what a person with a Copilot seat can now choose.
+
+**Non-goals.** A direct-API transport for Microsoft Foundry, where MAI
+Code 2 Flash is also served. A key or a credential row for Microsoft.
+Any default that picks a Microsoft model for a role nobody chose it for.
+A ranking of the three: which one reviews is the person's choice in
+Configuration. A vendor field read from the seat, which states none.
+Anything in the Visual Studio extension, which prints what the router
+says.
+
+**Tests.** In `copilot.test.ts`: an id beginning `mai` is placed as
+`microsoft`, and a seat entry for one is recorded with that vendor. In
+`identity.test.ts`: a seat session whose model is a `mai` id resolves
+to `microsoft`; a listed model with no vendor is refused with words
+that name the refresh. In `roleSelection.test.ts`: a Microsoft model
+is offered to review an OpenAI author and removed for a Microsoft one.
+The docs check reads the changed pages.
+
+**After it lands, by the operator.** One session whose reviewer is
+`mai-code-2`, chosen in Configuration, is the only proof that it
+reviews well enough to keep. `mai-code-1.1-flash` is reported, by one
+source and not by GitHub, to leave Copilot on 2026-12-18: choose one of
+the other two.
+
+**Releasable.** Yes, as 3.38.0 in session 364.
+
+### Session 364 of 364: Release 3.38.0 (release: 3.38.0)
+
+The framework publishes session 363 as 3.38.0, and nothing else.

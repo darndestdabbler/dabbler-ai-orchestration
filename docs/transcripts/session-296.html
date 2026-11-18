@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 296 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 296 transcript</h1>
+<p class="stamp">Rendered 2026-10-30T16:42:04.068Z by dabbler-ai-router 3.27.0 at 26aa1719efee97b48da510e737f2a43671adfb1c.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-30T12:21:40.683-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 296 of 298: A check is judged on what it changed</h3>
+<p>Scope: <code>packages/router/src/drive.ts</code> (<code>judge</code>, <code>checkFailedRefusal</code>, the files-changed-omits refusal), <code>packages/router/src/checks.ts</code> (<code>executeCheck</code>), <code>packages/router/src/session.ts</code> (<code>rebaseline</code>), <code>packages/router/src/cli/configure.ts</code> (<code>commitChoice</code>), <code>packages/router/src/bootstrap/detect.ts</code> (<code>detectDotnet</code>); their tests</p>
+<p><strong>Why.</strong> The same report. In session 80 the sixth of twelve checks changed the tree, and the six after it, among them <code>ConvertFrom-Json | Out-Null</code> and <code>findstr</code>, all failed &quot;(the check changed the tree)&quot;: <code>judge</code> snapshots the tree once, before the loop, and <code>executeCheck</code> compares every check against that one snapshot. The refusal names no path, so the author cannot tell what moved. The same session's out-of-band planning commit landed in a step's diff; three omits refusals stopped it, and the <code>dabbler session rebaseline</code> that the refusal recommends moved the baseline over the whole tree, so the author's own uncommitted step files were recorded as &quot;repaired outside a step&quot; and the step re-reported <code>files=[]</code>. A <code>dabbler configure</code> made mid-run to recover from <code>provider-unreachable</code> left <code>.vscode/settings.json</code> uncommitted, by design, and the next step was refused for omitting it. Separately, <code>detectDotnet</code> declares <code>test_roots: [&quot;tests&quot;]</code>, so a solution whose test projects sit at its root (<code>X.Tests/</code>) gets named tests selected for none of them, and its regressions surface only at the run of record.</p>
+<p><strong>Step 1 -- each check against the tree it started on.</strong> <code>executeCheck</code> returns the tree it ended on, and <code>judge</code> passes that to the next check as its reference, so a read-only check after a mutating one passes.</p>
+<p><strong>Step 2 -- the refusal names what moved.</strong> &quot;(the check changed the tree)&quot; names up to five paths from <code>changedPathsBetween</code>, and says how many more.</p>
+<p>**Step 3 -- <code>rebaseline --path</code>.** <code>dabbler session rebaseline</code> takes a repeatable <code>--path</code> and moves the baseline over those paths alone with <code>treeWithPaths</code>. The omits refusal prints the exact command for the paths it names, and adds &quot;or delete it, if it is scratch&quot;. The whole-tree form stays, and is refused while the step in flight has uncommitted changes.</p>
+<p><strong>Step 4 -- a configuration change is not the step's.</strong> When <code>commitChoice</code> leaves <code>.vscode/settings.json</code> for a run in flight to commit, it advances that run's step baseline over the file, as <code>treeWithPaths</code> does for the root files. A step that edits the file itself is still judged on it.</p>
+<p><strong>Step 5 -- .NET test roots are the solution's.</strong> <code>detectDotnet</code> declares <code>test_roots: [&quot;.&quot;]</code>, so <code>*Tests.cs</code> is claimed wherever a test project sits. It applies to a suite the bootstrap writes; a suite already declared is not rewritten.</p>
+<p><strong>Non-goals.</strong> Stopping at the first mutating check. Exempting <code>.vscode/settings.json</code> globally. Rewriting a repository's declared suites. Reminding the author to run <code>git status</code> (<code>--files</code> is already optional).</p>
+<p><strong>Tests.</strong> In <code>drive.test.ts</code>, a read-only check after a mutating one passes, and the mutating check's refusal names its path. In <code>session.test.ts</code>, <code>rebaseline --path</code> leaves an uncommitted step file in the step's diff. In <code>configure.test.ts</code>, a choice made during a run does not enter the step's changed files. In <code>detect.test.ts</code>, a .NET solution declares <code>&quot;.&quot;</code> as its test root.</p>
+<p><strong>Releasable.</strong> Yes -- with 295 and 297, as 3.28.0 in session 298.</p>
+<h2>Work Plan</h2>
+<p>Judge each step check on what it changed. executeCheck already returns the tree it ended on (postTreeDigest); judge passes it to the next check as that check's reference, so a read-only check after a mutating one passes, and checkFailedRefusal names up to five paths that moved (from changedPathsBetween) and how many more. <code>dabbler session rebaseline</code> gains a repeatable --path that moves the baseline over those paths alone with treeWithPaths; the omits refusal prints that exact command for the file it names, or says to delete it if it is scratch; the whole-tree form stays and is refused while files the stopped step declares are among the uncommitted changes, naming the --path form. When commitChoice leaves .vscode/settings.json for an in-flight run to commit, it advances that run's step baseline over the file with treeWithPaths, unless the step in flight declares the file itself. detectDotnet declares test_roots [&quot;.&quot;] so *Tests.cs is claimed wherever a test project sits; suites already declared are not rewritten.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/228c5c139de733c78ddcc977e1d7951b6506a844"><code>228c5c139de733c78ddcc977e1d7951b6506a844</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Check own reference</td><td><p>In drive.ts judge, pass each check the tree the previous check ended on (run.postTreeDigest, falling back to the reference when null) instead of the one snapshot taken before the loop; and give checkFailedRefusal the paths that moved (changedPathsBetween between the check's reference and its post tree), naming up to five and how many more after '(the check changed the tree'. Tests in drive.test.ts: a read-only check after a mutating one passes, and the mutating check's refusal names its path.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span><br><span class="mono">packages/router/test/walk-session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Rebaseline path</td><td><p>Give <code>dabbler session rebaseline</code> a repeatable --path (parsed in cli/session.ts, documented in its usage) that moves the baseline over those paths alone with treeWithPaths and records only them. Refuse the whole-tree form while any file the stopped step declares (run.stop.step_id in the work plan) is among the changes since the baseline, naming the --path form. Change the files_changed-omits refusal in drive.ts to print <code>dabbler session rebaseline --path &lt;file&gt; --reason &quot;&lt;what was repaired&gt;&quot;</code> for the path it names, and add 'or delete it, if it is scratch'. Test in session.test.ts: rebaseline --path leaves an uncommitted step file in the step's diff.</p></td><td><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/src/cli/session.ts</span><br><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/session.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Configure advances baseline</td><td><p>In configure.ts commitChoice, when sessions are in flight and the settings file is left for them to commit, advance each in-flight run's baseline_tree over the settings file with treeWithPaths and writeRun, unless the step in flight (the first plan step not yet accepted) declares that file. Test in configure.test.ts: a choice made during a run does not enter the step's changed files.</p></td><td><span class="mono">packages/router/src/cli/configure.ts</span><br><span class="mono">packages/router/test/configure.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>Dotnet test roots</td><td><p>In bootstrap/detect.ts detectDotnet, declare testRoots [&quot;.&quot;] so *Tests.cs is claimed wherever a test project sits. Add detect.test.ts with a test that a .NET solution declares &quot;.&quot; as its test root, and update any existing assertion on the old &quot;tests&quot; root.</p></td><td><span class="mono">packages/router/src/bootstrap/detect.ts</span><br><span class="mono">packages/router/test/detect.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/detect.test.ts</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Stopping at the first mutating check: every check still runs and is reported.</li><li>Exempting .vscode/settings.json globally: only a configure made during a run advances that run's baseline, and a step that declares the file is still judged on it.</li><li>Rewriting a repository's already-declared suites: the .NET test root changes only what bootstrap writes.</li><li>Reminding the author to run git status (--files is already optional).</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[16:21:40]</span> <span class="muted">run-started</span> session=296 mode=pull</div>
+<div class="line"><span class="at">[16:21:40]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[16:23:24]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[16:23:24]</span> <span class="muted">plan-accepted</span> steps=[&quot;check-own-reference&quot;,&quot;rebaseline-path&quot;,&quot;configure-advances-baseline&quot;,&quot;dotnet-test-roots&quot;] non_goals=4</div>
+<div class="line"><span class="at">[16:23:28]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[16:23:28]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=check-own-reference</div>
+<div class="line"><span class="at">[16:26:06]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:26:12]</span> <span class="muted">check-passed</span> step=check-own-reference argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:27:07]</span> <span class="muted">check-failed</span> step=check-own-reference suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[16:27:07]</span> <span class="muted">report-rejected</span> seq=2 step=check-own-reference rejection=1 reasons=[&quot;[check-failed] named tests failed: node scripts/suite.mjs container packages/router/test/drive.test.ts -&gt; exit 1\n ---\n      duration_ms: 50.46744\n      type: 'test'\n      ...\n    # Subtest: puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n    ok 5 - puts the author's work and the step baseline back as they were when a work-phase attempt is undone\n      ---\n      duration_ms: 208.847838\n      type: 'test'\n      ...\n    1..5\nok 61 - the Mechanic, called in without the person, on a real checkout\n  ---\n  duration_ms: 568.240292\n  type: 'suite'\n  ...\n1..61\n# tests 128\n# suites 61\n# pass 127\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 49560.007103&quot;]</div>
+<div class="line"><span class="at">[16:27:07]</span> <span class="muted">instruction-issued</span> seq=3 kind=rejection step=check-own-reference reasons=1</div>
+<div class="line"><span class="at">[16:29:29]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:29:35]</span> <span class="muted">check-passed</span> step=check-own-reference argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:30:29]</span> <span class="muted">named-tests-passed</span> step=check-own-reference suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/walk-session.test.ts</div>
+<div class="line"><span class="at">[16:30:29]</span> <span class="muted">report-accepted</span> seq=3 step=check-own-reference files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;,&quot;packages/router/test/walk-session.test.ts&quot;] notes=walk-session's assertion now expects the moved path in the changed-tree refusal</div>
+<div class="line"><span class="at">[16:30:29]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=rebaseline-path</div>
+<div class="line"><span class="at">[16:33:25]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:33:31]</span> <span class="muted">check-passed</span> step=rebaseline-path argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:34:24]</span> <span class="muted">named-tests-passed</span> step=rebaseline-path suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[16:34:24]</span> <span class="muted">report-accepted</span> seq=4 step=rebaseline-path files=[&quot;packages/router/src/session.ts&quot;,&quot;packages/router/src/cli/session.ts&quot;,&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/session.test.ts&quot;] notes=rebaseline takes repeatable --path (treeWithPaths over those alone); whole-tree form refused while the stopped step's files moved; omits refusal prints the --path command</div>
+<div class="line"><span class="at">[16:34:24]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=configure-advances-baseline</div>
+<div class="line"><span class="at">[16:36:06]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:36:12]</span> <span class="muted">check-passed</span> step=configure-advances-baseline argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:36:19]</span> <span class="muted">named-tests-passed</span> step=configure-advances-baseline suite=typescript command=node scripts/suite.mjs container packages/router/test/configure.test.ts</div>
+<div class="line"><span class="at">[16:36:20]</span> <span class="muted">report-accepted</span> seq=5 step=configure-advances-baseline files=[&quot;packages/router/src/cli/configure.ts&quot;,&quot;packages/router/test/configure.test.ts&quot;] notes=commitChoice advances each in-flight run's baseline over .vscode/settings.json with treeWithPaths unless the step in flight declares it</div>
+<div class="line"><span class="at">[16:36:20]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=dotnet-test-roots</div>
+<div class="line"><span class="at">[16:37:00]</span> <span class="muted">run-resumed</span> session=296 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:37:06]</span> <span class="muted">check-passed</span> step=dotnet-test-roots argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[16:37:06]</span> <span class="muted">check-passed</span> step=dotnet-test-roots argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/detect.test.ts&quot;]</div>
+<div class="line"><span class="at">[16:37:12]</span> <span class="muted">named-tests-passed</span> step=dotnet-test-roots suite=typescript command=node scripts/suite.mjs container packages/router/test/detect.test.ts</div>
+<div class="line"><span class="at">[16:37:13]</span> <span class="muted">report-accepted</span> seq=6 step=dotnet-test-roots files=[&quot;packages/router/src/bootstrap/detect.ts&quot;,&quot;packages/router/test/detect.test.ts&quot;] notes=detectDotnet declares test_roots ['.']; detect.test.ts covers a test project at the solution root</div>
+<div class="line"><span class="at">[16:37:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:37:15]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:37:16]</span> <span class="muted">job-started</span> name=verification pid=51824 log=.dabbler/runs/s296/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:39:51]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s296/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:39:51]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:39:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:39:51]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:39:52]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=66464 log=.dabbler/runs/s296/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:39:57]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s296/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:39:58]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:39:59]</span> <span class="muted">job-started</span> name=run of record: typescript pid=56168 log=.dabbler/runs/s296/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:41:15]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s296/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:41:15]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[16:41:16]</span> <span class="muted">job-started</span> name=run of record: extension pid=63248 log=.dabbler/runs/s296/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:41:37]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s296/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:41:37]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[16:41:44]</span> <span class="muted">landed</span> commit=228c5c139de733c78ddcc977e1d7951b6506a844</div>
+<div class="line"><span class="at">[16:41:44]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[16:41:45]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[16:41:45]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[16:41:47]</span> <span class="muted">job-started</span> name=close pid=5592 log=.dabbler/runs/s296/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:42:04]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s296/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:42:04]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>7 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `rebaseline --path` can still absorb the whole tree when given `--path .` or a directory containing both a repair and step-owned changes. Location → `packages/router/src/session.ts`. Fix → reject directories or expand named paths and apply the step-file overlap guard before calling `treeWithPaths`.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** A run with `baseline_tree: null` and a named `--path` silently uses the current whole-tree snapshot because `tree` remains initialized to `now`. Location → `packages/router/src/session.ts`. Fix → refuse selective rebasing when no baseline exists.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** The omits refusal emits an unquoted path, so copying its “exact command” fails for filenames containing spaces or shell-significant characters. Location → `packages/router/src/drive.ts`. Fix → render the path with command-safe quoting.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Nit:** Useful visible-diff test cases not added:</td><td>not answered</td></tr>
+<tr><td>4</td><td><strong>minor</strong></td><td>Precondition: a stopped step has a declared file changed alongside an external repair. Input: whole-tree `rebaseline` without `--path`. Expectation: `EXIT_BOUNDARY` and an unchanged baseline.</td><td>not answered</td></tr>
+<tr><td>5</td><td><strong>minor</strong></td><td>Precondition: the current step declares `.vscode/settings.json`. Input: run `configure` during that step. Expectation: its baseline remains unchanged so the settings edit is still judged.</td><td>not answered</td></tr>
+<tr><td>6</td><td><strong>minor</strong></td><td>Precondition: a mutating check changes six files. Input: judge the failed check. Expectation: exactly five paths are shown followed by `and 1 more`.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>2s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>74s</td><td>1411</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>297</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

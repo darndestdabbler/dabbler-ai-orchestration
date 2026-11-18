@@ -7155,9 +7155,9 @@
     {
       "number": 361,
       "title": "The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T12:59:19.449000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T13:13:41.854000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

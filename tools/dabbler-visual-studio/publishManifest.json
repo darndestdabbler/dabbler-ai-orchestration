@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": ["coding", "other"],
+  "identity": {
+    "internalName": "dabbler-ai-orchestration-visual-studio"
+  },
+  "overview": "README.md",
+  "priceCategory": "free",
+  "publisher": "DarndestDabbler",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/darndestdabbler/dabbler-ai-orchestration"
+}

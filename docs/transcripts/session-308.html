@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 308 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 308 transcript</h1>
+<p class="stamp">Rendered 2026-11-10T22:59:22.542Z by dabbler-ai-router 3.29.1 at 5e3ba77cf8d4bff17fa6759bd5d6f647f57424b2.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-10T17:46:17.035-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 308 of 311: A person may amend an accepted step's checks, and the engine is told so</h3>
+<p>Scope: <code>packages/router/src/driver.ts</code> (<code>amendPlanStep</code>, the <code>rejected-thrice</code> ways on), <code>packages/router/src/session.ts</code> (<code>planAmend</code>), <code>packages/router/src/drive.ts</code> (<code>CHECK_FAILED_WAYS</code>, the fix step's ask), <code>packages/router/src/cli/session.ts</code> (the help), the tests named after each, <code>docs/driving-a-session.md</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> From the field, 2026-11-10: a session in another repository is stopped and has no way on but a cancel or a rollback. A check an earlier step declared no longer describes the tree -- the later work outgrew it, and the operator agreed it should change -- and <code>dabbler session plan amend --step &lt;id&gt; --checks-file ...</code> refused: *&quot;step '&lt;id&gt;' has already been accepted; its report was measured against the step as it stood, and amending it now would move that bar afterwards&quot;*.</p>
+<p>The framework contradicts itself here. A fix step and a run-of-record fix are measured against <code>allPlanChecks()</code> -- every plan step's checks, each one an accepted step's by the time a fix step exists -- and three of its own sentences send the engine to the verb that refuses: the fix step's ask (*&quot;A check an earlier step declared that your fix outgrows is amended first, not fought&quot;*), <code>CHECK_FAILED_WAYS</code>, and the <code>rejected-thrice</code> ways on. So the check keeps failing, the amendment keeps being refused, the third refusal stops the session, and the stop names the same verb again. The refusal's reason is half right: the accepted report WAS measured against the old checks and nothing may rewrite that. But an accepted step's checks are not only history -- they are run again against every fix -- and a bar that is still being applied has to be movable by someone.</p>
+<p><strong>What.</strong> An accepted step's checks become amendable by a person, with the reason on the record and the row saying the step had been accepted. An engine is still refused, and is told what to do instead.</p>
+<p><strong>Step 1 -- the verb.</strong> <code>amendPlanStep</code> takes whether a person is asking (<code>planAmend</code> passes <code>personIsPresent()</code>, which already separates an engine's shell from a person's terminal or click). For an accepted step: <code>--checks-file</code> from a person is applied exactly as an unaccepted step's is -- through <code>judgeCheckPrograms</code> and <code>writeWorkPlan</code> -- and the <code>amendments.jsonl</code> row carries <code>after_acceptance: true</code> beside the reason, <code>before</code> and <code>after</code>, so the record shows the accepted report was measured against <code>before</code>. The activity-log line says &quot;accepted step&quot;. <code>--files</code> for an accepted step stays refused for everyone, with its own sentence: the files were measured once and nothing measures them again. An engine asking for an accepted step's checks is refused in the words of <code>isAPersonsVerb</code>: report the step blocked, with the proposed checks and the reason in the notes, and the person runs the amendment -- the refusal prints that command whole, sessions directory and step filled in. The verb's success line says the checks every later fix is measured against are the new ones; the help in <code>cli/session.ts</code> stops saying &quot;not-yet-accepted&quot; without the exception.</p>
+<p><strong>Step 2 -- the sentences that named a verb that refused.</strong> The fix step's ask, <code>CHECK_FAILED_WAYS</code> and the <code>rejected-thrice</code> cost each say the true thing: a check of the step in hand is amended by the engine; a check an earlier, accepted step declared is the operator's to amend, and the engine reports blocked with the proposed checks. A failed check already carries its <code>owner</code>, so the rejection can say which of the two it is. The fix step in flight is measured against the amended checks on its next answer, not the ones it was issued with -- <code>allPlanChecks()</code> read again from the plan on disk, as <code>amendedSpec</code> already does for a plan step.</p>
+<p><strong>Step 3 -- the words and the number.</strong> <code>docs/driving-a-session.md</code> says, where it describes amending a step, who may amend an accepted step's checks and what the record keeps. <code>version.json</code> goes to 3.31.0, stamped with <code>npm run stamp:version</code> -- a minor, because the trunk this publishes already carries 305 to 307's maintenance posture -- and the changelog gets a 3.31.0 section saying what changed for a developer across 305 to 308.</p>
+<p><strong>Non-goals.</strong> Amending an accepted step's <code>files</code>, <code>id</code> or <code>ask</code>. Any change to an accepted report, a round or a verdict already written: the amendment moves what later fixes are measured against and nothing behind it. An engine or an unattended Mechanic amending an accepted step's checks. A Work Explorer command for the amendment. Showing amendments to the reviewer. Any new gate.</p>
+<p><strong>Tests.</strong> In <code>driver.test.ts</code>: a person's amendment of an accepted step's checks is written and its row carries <code>after_acceptance</code> and the reason; the same call from an engine is refused naming the person's command; an accepted step's <code>--files</code> is refused for both. In <code>drive.test.ts</code>: a fix step whose earlier step's check was amended is accepted against the amended check. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- with 305 to 307, as 3.31.0 in session 309.</p>
+<h2>Work Plan</h2>
+<p>Let a person amend an accepted step's checks, and tell the engine the truth about who may. <code>amendPlanStep</code> (driver.ts) takes whether a person is asking -- <code>planAmend</code> (session.ts) passes <code>personIsPresent()</code> -- and for an accepted step applies a person's <code>--checks-file</code> exactly as for an unaccepted one (through <code>judgeCheckPrograms</code> and <code>writeWorkPlan</code>), writing an <code>amendments.jsonl</code> row that carries <code>after_acceptance: true</code> beside the reason, <code>before</code> and <code>after</code>; the activity-log line says &quot;accepted step&quot; and the success line says every later fix is measured against the new checks. An accepted step's <code>--files</code> stays refused for everyone with its own sentence, and an engine asking for an accepted step's checks is refused in <code>isAPersonsVerb</code>'s words: report the step blocked with the proposed checks and the reason in the notes, and the person runs the amendment, printed whole with the sessions directory and step filled in. The help in cli/session.ts states the exception. In drive.ts the fix step's ask, <code>CHECK_FAILED_WAYS</code> (with the failed check's <code>owner</code> saying which case it is) and the <code>rejected-thrice</code> way on in driver.ts say that a check of the step in hand is the engine's to amend and an earlier, accepted step's is the operator's; a fix step in flight re-reads <code>allPlanChecks()</code> from the plan on disk on each answer, as <code>amendedSpec</code> does for a plan step. docs/driving-a-session.md says who may amend an accepted step's checks and what the record keeps; version.json goes to 3.31.0, stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.31.0 section covering 305 to 308.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/e198969ebd729da2e8557d8a296e659da0dd6e45"><code>e198969ebd729da2e8557d8a296e659da0dd6e45</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>The verb</td><td><p>In driver.ts give <code>amendPlanStep</code> a <code>byPerson</code> input (on AmendInput). For an accepted step: <code>--files</code> is refused for everyone with its own sentence (the files were measured once and nothing measures them again); checks from an engine are refused with the person's-verb wording -- report the step blocked with the proposed checks and the reason in the notes, and the person runs <code>dabbler session plan amend --sessions-dir &lt;dir&gt; --step &lt;id&gt; --checks-file &lt;path&gt; --reason &quot;&lt;why&gt;&quot;</code> (the refusal is given the sessions directory so it prints the command whole); checks from a person are applied through <code>judgeCheckPrograms</code> and <code>writeWorkPlan</code> as for an unaccepted step, and the amendments.jsonl row carries <code>after_acceptance: true</code>. Update the doc comment. In session.ts <code>planAmend</code> passes <code>personIsPresent()</code> and the sessions directory, the recorded activity line says &quot;accepted step&quot; for such an amendment, and the success line says the checks every later fix is measured against are the new ones. In cli/session.ts the help says a not-yet-accepted step, or an accepted step's checks by a person. Tests in driver.test.ts: a person's amendment of an accepted step's checks is written and its row carries <code>after_acceptance</code> and the reason; the same call from an engine is refused naming the person's command; an accepted step's <code>--files</code> is refused for both.</p></td><td><span class="mono">packages/router/src/driver.ts</span><br><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/src/cli/session.ts</span><br><span class="mono">packages/router/test/driver.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code></td><td>yes</td></tr>
+<tr><td>The sentences</td><td><p>In drive.ts: <code>CHECK_FAILED_WAYS</code> and <code>checkFailedRefusal</code> say, from the failed check's <code>owner</code>, which case it is -- a check of the step in hand is amended by the engine with the amend command; a check an earlier, accepted step declared is the operator's to amend, and the engine reports the step --status blocked with the proposed checks and the reason in --notes. The fix step's ask says the same. A synthesised step measured against every plan step's checks (the fix-round step and the run-of-record fix) re-reads <code>allPlanChecks()</code> from the plan on disk on each answer, alongside <code>amendedSpec</code>, so an amendment made while it is in flight is what its next answer is measured against. In driver.ts the <code>rejected-thrice</code> carry-on cost says the same split. Test in drive.test.ts: a fix step whose earlier step's check was amended by a person is accepted against the amended check.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/src/driver.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code></td><td>yes</td></tr>
+<tr><td>The words and the number</td><td><p>In docs/driving-a-session.md, where it describes amending a step, say who may amend an accepted step's checks (a person, never an engine, which reports blocked with the proposed checks), that its files may not be, and that the record keeps the row with <code>after_acceptance</code> and the checks the accepted report was measured against. Set version.json to 3.31.0 and run <code>npm run stamp:version</code> to write the manifests and the lockfile. Add a 3.31.0 section to the extension's CHANGELOG.md saying what changed for a developer across sessions 305 to 308.</p></td><td><span class="mono">docs/driving-a-session.md</span><br><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const f=require('fs');const d=f.readFileSync('docs/driving-a-session.md','utf8');const c=f.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(d.includes('after_acceptance')&amp;&amp;c.includes('3.31.0')?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Amending an accepted step's files, id or ask</li><li>Any change to an accepted report, a round or a verdict already written: the amendment moves only what later fixes are measured against</li><li>An engine or an unattended Mechanic amending an accepted step's checks</li><li>A Work Explorer command for the amendment</li><li>Showing amendments to the reviewer</li><li>Any new gate</li><li>Publishing 3.31.0, which is session 309's</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[22:46:17]</span> <span class="muted">run-started</span> session=308 mode=pull</div>
+<div class="line"><span class="at">[22:46:17]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[22:47:22]</span> <span class="muted">run-resumed</span> session=308 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[22:47:22]</span> <span class="muted">plan-accepted</span> steps=[&quot;the-verb&quot;,&quot;the-sentences&quot;,&quot;the-words-and-the-number&quot;] non_goals=7</div>
+<div class="line"><span class="at">[22:47:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[22:47:23]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=the-verb</div>
+<div class="line"><span class="at">[22:49:44]</span> <span class="muted">run-resumed</span> session=308 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[22:49:48]</span> <span class="muted">check-passed</span> step=the-verb argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[22:50:38]</span> <span class="muted">named-tests-passed</span> step=the-verb suite=typescript command=node scripts/suite.mjs container packages/router/test/driver.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[22:50:39]</span> <span class="muted">report-accepted</span> seq=2 step=the-verb files=[&quot;packages/router/src/driver.ts&quot;,&quot;packages/router/src/session.ts&quot;,&quot;packages/router/src/cli/session.ts&quot;,&quot;packages/router/test/driver.test.ts&quot;] notes=amendPlanStep takes byPerson and sessionsDir: an accepted step's checks move for a person (row carries after_acceptance), an engine is refused with the person's command whole, an accepted step's files for nobody; personsVerb moved to driver.ts and isAPersonsVerb wraps it</div>
+<div class="line"><span class="at">[22:50:39]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=the-sentences</div>
+<div class="line"><span class="at">[22:54:08]</span> <span class="muted">run-resumed</span> session=308 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[22:54:16]</span> <span class="muted">check-passed</span> step=the-sentences argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[22:54:16]</span> <span class="muted">check-passed</span> step=the-sentences argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[22:55:05]</span> <span class="muted">named-tests-passed</span> step=the-sentences suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts packages/router/test/driver.test.ts</div>
+<div class="line"><span class="at">[22:55:05]</span> <span class="muted">report-accepted</span> seq=3 step=the-sentences files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/src/driver.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=ACCEPTED_CHECK_WAYS in driver.ts: a failed check another step declared ends with it (report blocked, the operator amends), the step's own keeps CHECK_FAILED_WAYS; the fix-round ask and rejected-thrice cost say the split; amendedSpec re-reads allPlanChecks for a synthesised step; drive.test covers a fix step accepted against a person's amended check</div>
+<div class="line"><span class="at">[22:55:05]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=the-words-and-the-number</div>
+<div class="line"><span class="at">[22:55:57]</span> <span class="muted">run-resumed</span> session=308 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[22:55:59]</span> <span class="muted">check-passed</span> step=the-words-and-the-number argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[22:55:59]</span> <span class="muted">check-passed</span> step=the-words-and-the-number argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const f=require('fs');const d=f.readFileSync('docs/driving-a-session.md','utf8');const c=f.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');process.exit(d.includes('after_acceptance')&amp;&amp;c.includes('3.31.0')?0:1)&quot;]</div>
+<div class="line"><span class="at">[22:56:00]</span> <span class="muted">report-accepted</span> seq=4 step=the-words-and-the-number files=[&quot;docs/driving-a-session.md&quot;,&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=driving-a-session.md says who amends an accepted step's checks and what amendments.jsonl keeps (after_acceptance, before); version 3.31.0 stamped; CHANGELOG 3.31.0 covers 305-308</div>
+<div class="line"><span class="at">[22:56:00]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[22:56:01]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[22:56:01]</span> <span class="muted">job-started</span> name=verification pid=47340 log=.dabbler/runs/s308/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[22:57:23]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s308/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[22:57:23]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[22:57:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[22:57:23]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[22:57:23]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=42680 log=.dabbler/runs/s308/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[22:57:25]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s308/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[22:57:25]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[22:57:25]</span> <span class="muted">job-started</span> name=run of record: typescript pid=40940 log=.dabbler/runs/s308/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[22:58:55]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s308/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[22:58:55]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[22:58:56]</span> <span class="muted">job-started</span> name=run of record: extension pid=38836 log=.dabbler/runs/s308/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[22:59:14]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s308/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[22:59:14]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[22:59:17]</span> <span class="muted">landed</span> commit=e198969ebd729da2e8557d8a296e659da0dd6e45</div>
+<div class="line"><span class="at">[22:59:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[22:59:17]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[22:59:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[22:59:17]</span> <span class="muted">job-started</span> name=close pid=7048 log=.dabbler/runs/s308/driver/jobs/close.log</div>
+<div class="line"><span class="at">[22:59:22]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s308/driver/jobs/close.log</div>
+<div class="line"><span class="at">[22:59:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>3 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** Issue → The engine refusal interpolates `sessionsDir` without quoting, so the printed command is not directly runnable when the directory contains spaces. Location → `packages/router/src/driver.ts`, in the accepted-step `personsVerb` refusal. Fix → Render the sessions-directory argument with shell-safe quoting.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** Issue → The visible engine-refusal test calls `amendPlanStep` with `byPerson: false` directly, so it does not pin the required `planAmend` → `personIsPresent()` wiring. Location → `packages/router/test/driver.test.ts`. Fix → With an accepted step and an engine environment marker, invoke `planAmend` and assert refusal, the complete operator command, and no plan/amendment mutation. This may be covered elsewhere in the unseen suite.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** Issue → The fix-step test uses two separate `sessionNext` calls, so it does not clearly distinguish same-process in-flight refresh behavior from reconstruction that reads the amended plan afresh. Location → `packages/router/test/drive.test.ts`. Fix → Start a continuous drive with a synthetic fix outstanding, amend an accepted owner’s check between issuance and its answer, and assert that answer is judged against the amended check.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>90s</td><td>1459</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>309</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

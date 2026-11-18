@@ -7111,9 +7111,9 @@
     {
       "number": 359,
       "title": "Before a session starts and after it ends, beside the IDE",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T10:30:58.161000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T10:58:07.891000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

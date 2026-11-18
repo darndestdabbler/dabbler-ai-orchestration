@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:local="clr-namespace:Dabbler.VisualStudio"
+             xmlns:platformui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              Background="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}"
              Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}">
   <!-- No horizontal scrolling, so a row is as wide as the window and a long one wraps. -->
@@ -19,8 +20,12 @@
       <CommandBinding Command="ApplicationCommands.Copy" Executed="OnCopy" CanExecute="OnCanCopy" />
     </ListBox.CommandBindings>
     <ListBox.ContextMenu>
-      <ContextMenu>
-        <MenuItem Command="ApplicationCommands.Copy" Header="Copy" />
+      <!-- In the theme's menu colours. -->
+      <ContextMenu Background="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarMenuBackgroundGradientBrushKey}}"
+                   BorderBrush="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarMenuBorderBrushKey}}"
+                   Foreground="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarTextActiveBrushKey}}">
+        <MenuItem Command="ApplicationCommands.Copy" Header="Copy"
+                  Foreground="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarTextActiveBrushKey}}" />
       </ContextMenu>
     </ListBox.ContextMenu>
     <ListBox.ItemContainerStyle>
@@ -28,6 +33,34 @@
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Padding" Value="4,0" />
         <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
+        <!-- WPF's own row draws its selection in fixed colours; this one takes the theme's, focused or not. -->
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ListBoxItem">
+              <Border x:Name="Row" Background="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                  <Setter TargetName="Row" Property="Background" Value="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemActiveBrushKey}}" />
+                  <Setter Property="Foreground" Value="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemActiveTextBrushKey}}" />
+                </Trigger>
+                <MultiTrigger>
+                  <MultiTrigger.Conditions>
+                    <Condition Property="IsSelected" Value="True" />
+                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                  </MultiTrigger.Conditions>
+                  <Setter TargetName="Row" Property="Background" Value="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemInactiveBrushKey}}" />
+                  <Setter Property="Foreground" Value="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemInactiveTextBrushKey}}" />
+                </MultiTrigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                  <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemActiveBrushKey}}" />
+                  <Setter TargetName="Row" Property="BorderThickness" Value="1" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
       </Style>
     </ListBox.ItemContainerStyle>
     <ListBox.ItemTemplate>

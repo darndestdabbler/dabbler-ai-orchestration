@@ -17,6 +17,7 @@ namespace Dabbler.VisualStudio
         public ConfigurationControl()
         {
             InitializeComponent();
+            RowKeys.FocusRowsWhenShown(this, Rows);
         }
 
         /// <summary>A menu item was clicked, or a row with a click was double-clicked or had Enter pressed on it.</summary>
@@ -24,12 +25,19 @@ namespace Dabbler.VisualStudio
 
         private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
         {
-            var row = (FrameworkElement)sender;
-            if (!(row.DataContext is ConfigurationNode node) || node.Actions.Count == 0 || row.ContextMenu == null)
-            {
-                e.Handled = true;
-                return;
-            }
+            if (!Fill((FrameworkElement)sender)) e.Handled = true;
+        }
+
+        /// <summary>The context-menu key or Shift+F10 on the selected row opens its menu, as a right-click does.</summary>
+        private void OnRowsMenuKey(object sender, ContextMenuEventArgs e)
+        {
+            RowKeys.OpenMenu(e, Fill);
+        }
+
+        /// <summary>Fills a row's menu with its actions; false where it has none.</summary>
+        private bool Fill(FrameworkElement row)
+        {
+            if (!(row.DataContext is ConfigurationNode node) || node.Actions.Count == 0 || row.ContextMenu == null) return false;
             node.IsSelected = true;
             row.ContextMenu.Items.Clear();
             foreach (var action in node.Actions)
@@ -38,6 +46,7 @@ namespace Dabbler.VisualStudio
                 item.Click += (_, _) => ActionChosen?.Invoke(this, action);
                 row.ContextMenu.Items.Add(item);
             }
+            return true;
         }
 
         private void OnRootActionClick(object sender, RoutedEventArgs e)

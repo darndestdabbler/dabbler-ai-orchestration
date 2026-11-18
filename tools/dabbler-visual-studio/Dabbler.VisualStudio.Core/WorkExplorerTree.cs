@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -199,6 +200,44 @@ namespace Dabbler.VisualStudio.Core
             Roots.Clear();
             foreach (var node in nodes) Roots.Add(node);
             Message = nodes.Count == 0 ? NoSessionPlan : null;
+        }
+
+        /// <summary>
+        /// Selects the row of session <paramref name="session"/> (a label such
+        /// as 358 or 007) of the repository at <paramref name="repositoryRoot"/>,
+        /// opening every row above it; false where the tree shows no such row.
+        /// </summary>
+        public bool Reveal(string repositoryRoot, string session)
+        {
+            if (!int.TryParse(session, out var number)) return false;
+            var root = SamePath(repositoryRoot);
+            foreach (var path in Paths(Roots, new List<WorkExplorerNode>()))
+            {
+                var node = path[path.Count - 1];
+                if (!node.Id.StartsWith("session:", StringComparison.Ordinal)) continue;
+                var slash = node.Id.LastIndexOf('/');
+                if (slash < 0 || !int.TryParse(node.Id.Substring(slash + 1), out var found) || found != number) continue;
+                if (!string.Equals(SamePath(node.Id.Substring("session:".Length, slash - "session:".Length)), root, StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var above in path.Take(path.Count - 1)) above.IsExpanded = true;
+                foreach (var other in Walk(Roots)) other.IsSelected = other == node;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>A path as it compares: full, with one kind of slash and none at the end.</summary>
+        private static string SamePath(string path) =>
+            Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/');
+
+        /// <summary>Every node, with the nodes above it, outermost first.</summary>
+        private static IEnumerable<List<WorkExplorerNode>> Paths(IEnumerable<WorkExplorerNode> nodes, List<WorkExplorerNode> above)
+        {
+            foreach (var node in nodes)
+            {
+                var path = new List<WorkExplorerNode>(above) { node };
+                yield return path;
+                foreach (var below in Paths(node.Children, path)) yield return below;
+            }
         }
 
         private static IEnumerable<WorkExplorerNode> Walk(IEnumerable<WorkExplorerNode> nodes)

@@ -111,6 +111,27 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void Reveal_selects_a_sessions_row_and_opens_the_rows_above_it()
+        {
+            var tree = new WorkExplorerTree();
+            tree.Show(TwoBuckets());
+            var repository = tree.Roots[0];
+            repository.IsExpanded = false;
+            repository.Children[0].Children[0].IsSelected = true;
+
+            Assert.True(tree.Reveal(@"r\", "006"));
+
+            var done = repository.Children[1];
+            Assert.True(repository.IsExpanded);
+            Assert.True(done.IsExpanded);
+            Assert.True(done.Children[0].IsSelected);
+            Assert.False(repository.Children[0].Children[0].IsSelected);
+
+            Assert.False(tree.Reveal("R", "9"));
+            Assert.False(tree.Reveal("Elsewhere", "6"));
+        }
+
+        [Fact]
         public void OffersSetUp_only_for_a_document_with_no_plan()
         {
             var tree = new WorkExplorerTree();

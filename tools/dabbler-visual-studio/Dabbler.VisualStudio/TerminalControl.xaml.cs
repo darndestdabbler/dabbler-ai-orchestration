@@ -55,6 +55,7 @@ namespace Dabbler.VisualStudio
         public TerminalControl()
         {
             InitializeComponent();
+            RowKeys.FocusRowsWhenShown(this, List);
             ((INotifyCollectionChanged)List.Items).CollectionChanged += OnRowsChanged;
             // A row's colours are chosen as it is drawn, so a change of theme draws them all again.
             Loaded += (_, _) => VSColorTheme.ThemeChanged += OnThemeChanged;

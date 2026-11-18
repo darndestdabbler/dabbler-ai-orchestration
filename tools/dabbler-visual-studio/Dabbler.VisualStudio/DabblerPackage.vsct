@@ -22,18 +22,24 @@
         <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
         <Strings>
           <ButtonText>Dabbler Work Explorer</ButtonText>
+          <CanonicalName>.Dabbler.WorkExplorer</CanonicalName>
+          <LocCanonicalName>.Dabbler.WorkExplorer</LocCanonicalName>
         </Strings>
       </Button>
       <Button guid="guidDabblerCommandSet" id="TerminalCommandId" priority="0x0101" type="Button">
         <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
         <Strings>
           <ButtonText>Dabbler Terminal</ButtonText>
+          <CanonicalName>.Dabbler.Terminal</CanonicalName>
+          <LocCanonicalName>.Dabbler.Terminal</LocCanonicalName>
         </Strings>
       </Button>
       <Button guid="guidDabblerCommandSet" id="ConfigurationCommandId" priority="0x0102" type="Button">
         <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
         <Strings>
           <ButtonText>Dabbler Configuration</ButtonText>
+          <CanonicalName>.Dabbler.Configuration</CanonicalName>
+          <LocCanonicalName>.Dabbler.Configuration</LocCanonicalName>
         </Strings>
       </Button>
     </Buttons>

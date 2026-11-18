@@ -14,10 +14,12 @@ using Task = System.Threading.Tasks.Task;
 namespace Dabbler.VisualStudio
 {
     /// <summary>
-    /// The extension's package. It autoloads nothing: Visual Studio loads it
-    /// the first time one of its commands is used.
+    /// The extension's package. It loads in the background once a solution
+    /// is open, so a session that needs a person is said in the main window
+    /// although no Dabbler window has been opened since Visual Studio started.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
+    [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     // Docked beside the Solution Explorer, as VS Code's sits in its explorer.
     [ProvideToolWindow(typeof(WorkExplorerWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
@@ -37,6 +39,7 @@ namespace Dabbler.VisualStudio
         private const int ConfigurationCommandId = 0x0103;
 
         private bool nodePassed;
+        private NoticeWatcher? notices;
         private Router? router;
 
         /// <summary>The router the extension carries; null until the package has initialized.</summary>
@@ -71,6 +74,29 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(ShowConfigurationAsync).FileAndForget("dabbler/configuration"),
                 new CommandID(CommandSet, ConfigurationCommandId)));
+            notices = new NoticeWatcher(this);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            // Visual Studio closes a package on its main thread, and only then disposes it.
+#pragma warning disable VSTHRD010
+            if (disposing) notices?.Dispose();
+#pragma warning restore VSTHRD010
+            notices = null;
+            base.Dispose(disposing);
+        }
+
+        /// <summary>
+        /// The Work Explorer shown with session <paramref name="session"/> of
+        /// the repository at <paramref name="root"/> selected, where it shows
+        /// that repository; shown as it is where the session is not named.
+        /// </summary>
+        internal async Task ShowWorkExplorerAtAsync(string root, string? session)
+        {
+            var window = await ShowToolWindowAsync(typeof(WorkExplorerWindow), 0, create: true, DisposalToken);
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            if (session != null && window is WorkExplorerWindow explorer) explorer.Reveal(root, session);
         }
 
         /// <summary>View > Other Windows > Dabbler Configuration.</summary>

@@ -13601,6 +13601,21 @@
       "dateTime": "2026-11-18T09:40:03.680000-05:00",
       "task": "Let a developer set Dabbler up in the solution open in Visual Studio. Where the open solution's git repository has no session plan (the router's Work Explorer document names no repository), the Work Explorer window's sentence carries a button, Set Up Dabbler in This Solution; where the solution is in no git repository the window says so and offers no button, because the router's bootstrap would `git init` it and initialising a repository is not the extension's. The button runs the router's own `dabbler bootstrap --project-dir <repository root>` under a wait dialog. What it printed -- the files it wrote and committed, and what it read the repository as (its posture and the suites it declares) -- is shown in the router's words in the Dabbler Session pane; a refusal or failure is shown in the router's words in a dialog. The window then follows the repository again, and session 1 is offered as VS Code offers it: Start Session 1 or Later, where Start Session 1 runs the Start Session action the router's Work Explorer document gives session 1, through the existing Start flow. That flow is where uncommitted changes are refused: bootstrap commits only the files it wrote, and `session start` refuses a tree with uncommitted changes with the router's sentence and its ways through, which the Start flow already shows as buttons. The library decides only which document yields the offer and which action is the first session's start; every sentence and every refusal is the router's.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 358,
+      "dateTime": "2026-11-18T10:01:34.702000-05:00",
+      "task": "Make Visual Studio say when a session needs a person. The library gains TerminalNotices, which reads each object `dabbler terminal --follow --json` prints and returns the notice it raises, if any. A `paused` or `instruction-overdue` notice object carries the router's own sentence as its message. A `session-closed` line raises a closed notice, but only for a session this following saw open first, so a close that happened long ago is not reported as news. Each notice gets a key: the repository, the session, and the stop and reason, or the instruction seq and its outstanding seconds. The key is written to a file of raised keys under the user's local application data, and a key already in that file raises nothing, whether it is read again or read by a new TerminalNotices after Visual Studio restarts. The extension gains a notice watcher. The package now loads in the background once a solution exists. The watcher follows the open solution's repository and keeps following a repository whose session is still open after the developer switches solutions, so its close still reaches them. Each notice becomes an information bar in Visual Studio's main window with the message and a Show in Work Explorer button. The button shows the Work Explorer and selects that session's row, through a new WorkExplorerTree.Reveal. The three windows take Visual Studio's light, dark and blue themes for selected rows, buttons and menus, as they already do for their text, backgrounds and the terminal's tones. Every row and action can be reached from the keyboard, including a row's actions through the context-menu key. Each window's command gets a canonical name a developer can bind a key to.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 358,
+      "dateTime": "2026-11-18T10:09:53.012000-05:00",
+      "what": "step 'keyboard': its files",
+      "reason": "The keyboard's row menu and the focus hand-over are the same for the Work Explorer and Configuration trees and the terminal list, so they live once in a small RowKeys helper rather than copied into each control",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

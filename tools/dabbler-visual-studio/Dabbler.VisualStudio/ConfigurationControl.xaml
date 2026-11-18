@@ -3,8 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:core="clr-namespace:Dabbler.VisualStudio.Core;assembly=Dabbler.VisualStudio.Core"
+             xmlns:platformui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              Background="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}"
              Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}">
+  <UserControl.Resources>
+    <!-- A row's menu in the theme's menu colours; the items it is filled with take the item style. -->
+    <Style x:Key="ThemedMenuItem" TargetType="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarTextActiveBrushKey}}" />
+    </Style>
+    <Style x:Key="ThemedMenu" TargetType="ContextMenu">
+      <Setter Property="Background" Value="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarMenuBackgroundGradientBrushKey}}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarMenuBorderBrushKey}}" />
+      <Setter Property="Foreground" Value="{DynamicResource {x:Static platformui:EnvironmentColors.CommandBarTextActiveBrushKey}}" />
+      <Setter Property="ItemContainerStyle" Value="{StaticResource ThemedMenuItem}" />
+    </Style>
+  </UserControl.Resources>
   <DockPanel>
     <!-- The root row's words: what the session is run with, and the model catalog's age. -->
     <TextBlock DockPanel.Dock="Top" Text="{Binding Header}" TextWrapping="Wrap" Margin="8,6,8,6" Opacity="0.8" />
@@ -17,16 +30,25 @@
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate DataType="{x:Type core:ConfigurationAction}">
-          <Button Content="{Binding Title}" Click="OnRootActionClick" Padding="8,2" Margin="0,0,6,0" />
+          <Button Content="{Binding Title}" Click="OnRootActionClick" Padding="8,2" Margin="0,0,6,0"
+                  Style="{DynamicResource {x:Static vsshell:VsResourceKeys.ButtonStyleKey}}" />
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
     <TreeView x:Name="Rows"
               ItemsSource="{Binding Roots}"
               KeyDown="OnRowsKeyDown"
+              ContextMenuOpening="OnRowsMenuKey"
               Background="Transparent"
               Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
               BorderThickness="0">
+      <!-- A selected row in the theme's selection colours, focused or not, in place of the system's highlight the rows are drawn with. -->
+      <TreeView.Resources>
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemActiveColorKey}}" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemActiveTextColorKey}}" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemInactiveColorKey}}" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{DynamicResource {x:Static platformui:TreeViewColors.SelectedItemInactiveTextColorKey}}" />
+      </TreeView.Resources>
       <TreeView.ItemContainerStyle>
         <Style TargetType="TreeViewItem">
           <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -42,7 +64,7 @@
                       MouseLeftButtonDown="OnRowMouseDown"
                       ContextMenuOpening="OnRowMenuOpening">
             <StackPanel.ContextMenu>
-              <ContextMenu />
+              <ContextMenu Style="{StaticResource ThemedMenu}" />
             </StackPanel.ContextMenu>
             <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
             <TextBlock Text="{Binding Description}" Margin="6,0,0,0" Opacity="0.7" VerticalAlignment="Center" />

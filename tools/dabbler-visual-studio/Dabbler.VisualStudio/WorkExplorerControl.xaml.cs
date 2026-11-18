@@ -16,6 +16,7 @@ namespace Dabbler.VisualStudio
         public WorkExplorerControl()
         {
             InitializeComponent();
+            RowKeys.FocusRowsWhenShown(this, Rows);
         }
 
         /// <summary>
@@ -37,12 +38,25 @@ namespace Dabbler.VisualStudio
 
         private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
         {
-            var row = (FrameworkElement)sender;
-            if (!(row.DataContext is WorkExplorerNode node) || node.Actions.Count == 0 || row.ContextMenu == null)
-            {
-                e.Handled = true;
-                return;
-            }
+            if (!Fill((FrameworkElement)sender)) e.Handled = true;
+        }
+
+        /// <summary>The context-menu key or Shift+F10 on the selected row opens its menu, as a right-click does.</summary>
+        private void OnRowsMenuKey(object sender, ContextMenuEventArgs e)
+        {
+            RowKeys.OpenMenu(e, Fill);
+        }
+
+        /// <summary>A row selected -- by the keyboard or a notice's button -- is scrolled into view.</summary>
+        private void OnItemSelected(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is TreeViewItem item) item.BringIntoView();
+        }
+
+        /// <summary>Fills a row's menu with its actions; false where it has none.</summary>
+        private bool Fill(FrameworkElement row)
+        {
+            if (!(row.DataContext is WorkExplorerNode node) || node.Actions.Count == 0 || row.ContextMenu == null) return false;
             node.IsSelected = true;
             row.ContextMenu.Items.Clear();
             foreach (var action in node.Actions)
@@ -56,6 +70,7 @@ namespace Dabbler.VisualStudio
                 different.Click += (_, _) => DifferentModelsChosen?.Invoke(this, action);
                 row.ContextMenu.Items.Add(different);
             }
+            return true;
         }
 
         private void OnRowMouseDown(object sender, MouseButtonEventArgs e)

@@ -98,6 +98,45 @@ namespace Dabbler.VisualStudio
             AddInfoBar(infoBar);
         }
 
+        /// <summary>
+        /// Selects session <paramref name="session"/> of the repository at
+        /// <paramref name="root"/>. Where the window is still filling with
+        /// that repository, it is selected once the document arrives. Where
+        /// the session is in another repository -- one the developer has moved
+        /// away from -- the window shows that repository instead, until the
+        /// solution changes, and selects it there.
+        /// </summary>
+        internal void Reveal(string root, string session)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            pendingReveal = null;
+            if (tree.Reveal(root, session)) return;
+            pendingReveal = (root, session);
+            if (string.Equals(root, repositoryRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                if (tree.Roots.Count == 0 && tree.Message == null) return;
+                pendingReveal = null;
+                SayNotShown(root, session);
+                return;
+            }
+            shownInstead = root;
+            Restart();
+        }
+
+        private void SayNotShown(string root, string session)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            Say($"Session {session} of {root} is not in the Work Explorer's tree.");
+        }
+
+        // The session to select once the next document is shown; main thread only.
+        private (string Root, string Session)? pendingReveal;
+
+        // The repository shown in place of the open solution's, because a
+        // notice asked for one of its sessions; null once the solution
+        // changes. Main thread only.
+        private string? shownInstead;
+
         public override void OnToolWindowCreated()
         {
             base.OnToolWindowCreated();
@@ -120,6 +159,7 @@ namespace Dabbler.VisualStudio
 
         private void OnSolutionChanged(object sender, EventArgs e)
         {
+            shownInstead = null;
             Restart();
         }
 
@@ -128,7 +168,10 @@ namespace Dabbler.VisualStudio
             Dabbler.JoinableTaskFactory.RunAsync(RestartAsync).FileAndForget("dabbler/work-explorer/follow");
         }
 
-        /// <summary>Stops what is followed, and follows the open solution's repository, where there is one.</summary>
+        /// <summary>
+        /// Stops what is followed, and follows the repository a notice asked
+        /// for, or else the open solution's, where there is one.
+        /// </summary>
         private async Task RestartAsync()
         {
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -137,18 +180,22 @@ namespace Dabbler.VisualStudio
             repositoryRoot = null;
             tree.Roots.Clear();
             tree.Message = null;
-            var folder = await Dabbler.SolutionFolderAsync();
-            if (mine != generation) return;
-            if (folder == null)
-            {
-                tree.Message = WorkExplorerTree.NoSolution;
-                return;
-            }
-            var root = WorkExplorerTree.RepositoryRootOf(folder);
+            var root = shownInstead;
             if (root == null)
             {
-                tree.Message = WorkExplorerTree.NotInRepository;
-                return;
+                var folder = await Dabbler.SolutionFolderAsync();
+                if (mine != generation) return;
+                if (folder == null)
+                {
+                    tree.Message = WorkExplorerTree.NoSolution;
+                    return;
+                }
+                root = WorkExplorerTree.RepositoryRootOf(folder);
+                if (root == null)
+                {
+                    tree.Message = WorkExplorerTree.NotInRepository;
+                    return;
+                }
             }
             if (!await Dabbler.EnsureNodeAsync() || mine != generation) return;
             var router = Dabbler.Router;
@@ -182,7 +229,14 @@ namespace Dabbler.VisualStudio
             Dabbler.JoinableTaskFactory.RunAsync(async () =>
             {
                 await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-                if (mine == generation) tree.Show(document);
+                if (mine != generation) return;
+                tree.Show(document);
+                if (pendingReveal is (string root, string session))
+                {
+                    if (!tree.Reveal(root, session)) SayNotShown(root, session);
+                    else if (shownInstead != null) Say($"This window shows {root}, where session {session} is, until a solution is opened or closed.");
+                }
+                pendingReveal = null;
             }).FileAndForget("dabbler/work-explorer/show");
         }
 

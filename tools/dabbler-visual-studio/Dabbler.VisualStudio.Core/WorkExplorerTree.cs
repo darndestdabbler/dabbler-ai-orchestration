@@ -7,10 +7,34 @@ using System.Text.RegularExpressions;
 
 namespace Dabbler.VisualStudio.Core
 {
+    /// <summary>The router's ids of the actions that do more than open a file.</summary>
+    public static class ActionIds
+    {
+        public const string StartSession = "dabblerSessionSets.startSession";
+        public const string ConsultWithAi = "dabbler.consultWithAi";
+        public const string OpenMechanic = "dabbler.openMechanic";
+    }
+
     /// <summary>One row as the tree shows it: the router's words, made plain, and whether it is open or selected.</summary>
     public sealed class WorkExplorerNode : INotifyPropertyChanged
     {
         private static readonly Regex IconToken = new Regex(@"\$\([A-Za-z0-9~-]+\)\s?");
+
+        /// <summary>
+        /// The actions this extension runs. The router offers more; one whose
+        /// Visual Studio half is not built yet is not shown, because a menu
+        /// item that does nothing is worse than none.
+        /// </summary>
+        internal static readonly IReadOnlyCollection<string> RunnableActions = new HashSet<string>
+        {
+            "dabblerSessionSets.openSpec",
+            "dabblerSessionSets.openActivityLog",
+            "dabblerSessionSets.openChangeLog",
+            "dabblerSessionSets.openSessionState",
+            ActionIds.StartSession,
+            ActionIds.ConsultWithAi,
+            ActionIds.OpenMechanic,
+        };
 
         private bool isExpanded;
         private bool isSelected;
@@ -21,6 +45,7 @@ namespace Dabbler.VisualStudio.Core
             Label = IconToken.Replace(row.Label, "").Trim();
             Tooltip = PlainText(row.Tooltip);
             Children = row.Children.Select(child => new WorkExplorerNode(child)).ToList();
+            Actions = row.Actions.Where(action => RunnableActions.Contains(action.Id)).ToList();
             isExpanded = row.Collapsible == "expanded";
         }
 
@@ -41,6 +66,9 @@ namespace Dabbler.VisualStudio.Core
         public WorkExplorerIcon? Icon => Row.Icon;
 
         public IReadOnlyList<WorkExplorerNode> Children { get; }
+
+        /// <summary>The row's actions this extension runs, in the order the router gave them: the row's context menu.</summary>
+        public IReadOnlyList<WorkExplorerAction> Actions { get; }
 
         public bool IsExpanded
         {

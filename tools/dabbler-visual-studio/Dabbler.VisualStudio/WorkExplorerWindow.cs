@@ -23,6 +23,9 @@ namespace Dabbler.VisualStudio
 
         private RouterFollow? follow;
 
+        // The repository being followed, which a row's action runs in; main thread only.
+        private string? repositoryRoot;
+
         // Which following is current. A document or a restart that belongs to
         // an earlier one is dropped; read and written on the main thread only.
         private int generation;
@@ -31,7 +34,17 @@ namespace Dabbler.VisualStudio
             : base(null)
         {
             Caption = "Dabbler Work Explorer";
-            Content = new WorkExplorerControl { DataContext = tree };
+            var control = new WorkExplorerControl { DataContext = tree };
+            control.ActionChosen += OnActionChosen;
+            Content = control;
+        }
+
+        private void OnActionChosen(object sender, WorkExplorerAction action)
+        {
+            var root = repositoryRoot;
+            if (root == null) return;
+            Dabbler.JoinableTaskFactory.RunAsync(() => new RowActions(Dabbler).RunAsync(root, action))
+                .FileAndForget("dabbler/work-explorer/action");
         }
 
         private DabblerPackage Dabbler => (DabblerPackage)Package;
@@ -72,6 +85,7 @@ namespace Dabbler.VisualStudio
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
             var mine = ++generation;
             Stop();
+            repositoryRoot = null;
             tree.Roots.Clear();
             tree.Message = null;
             var folder = await SolutionFolderAsync();
@@ -90,6 +104,7 @@ namespace Dabbler.VisualStudio
             if (!await Dabbler.EnsureNodeAsync() || mine != generation) return;
             var router = Dabbler.Router;
             if (router == null) return;
+            repositoryRoot = root;
             follow = new RouterFollow(
                 router,
                 root,

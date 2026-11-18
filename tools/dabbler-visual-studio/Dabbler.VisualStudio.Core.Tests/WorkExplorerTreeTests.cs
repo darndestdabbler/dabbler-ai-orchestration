@@ -111,6 +111,32 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void Actions_shows_only_the_actions_this_extension_runs()
+        {
+            object Action(string id, string title) => new { id, title, argv = new[] { "dabbler", "session" } };
+            var session = new
+            {
+                id = "session:R/7",
+                kind = "session",
+                label = "7: Rows",
+                collapsible = "none",
+                actions = new[]
+                {
+                    Action("dabblerSessionSets.startSession", "Start Session"),
+                    Action("dabblerSessionSets.cancel", "Cancel Session"),
+                    Action("dabbler.consultWithAi", "Consult with AI"),
+                    Action("dabblerSessionSets.closeSession", "Close Session"),
+                },
+            };
+            var tree = new WorkExplorerTree();
+            tree.Show(Document(Row("repository:R", "repository", "repo", null, null, "expanded", session)));
+
+            var node = Assert.Single(tree.Roots[0].Children);
+            Assert.Equal(new[] { "Start Session", "Consult with AI" }, node.Actions.Select(a => a.Title));
+            Assert.Empty(tree.Roots[0].Actions);
+        }
+
+        [Fact]
         public void RepositoryRootOf_finds_the_git_folder_above()
         {
             var root = Path.Combine(Path.GetTempPath(), "dabbler-root-" + Guid.NewGuid().ToString("N"));

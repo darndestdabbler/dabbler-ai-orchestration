@@ -49,10 +49,11 @@ namespace Dabbler.VisualStudio.Core.Tests
         [Fact]
         public void Run_reports_a_failure_in_the_routers_words()
         {
-            using var bundle = new FakeBundle("console.error('refused: no session is open'); process.exit(3);");
+            using var bundle = new FakeBundle("console.log('{\"registered\":false}'); console.error('refused: no session is open'); process.exit(3);");
             var failure = Assert.Throws<RouterFailure>(() => new Router(bundle.Path).Run(bundle.Folder, new[] { "session", "next" }, Limit));
             Assert.Equal("refused: no session is open", failure.Message);
             Assert.Equal(3, failure.ExitCode);
+            Assert.Equal("{\"registered\":false}", failure.Output.Trim());
         }
     }
 }

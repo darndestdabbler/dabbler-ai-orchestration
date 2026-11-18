@@ -14,7 +14,9 @@
   </UserControl.Resources>
 
   <Grid>
-  <TreeView ItemsSource="{Binding Roots}"
+  <TreeView x:Name="Rows"
+            ItemsSource="{Binding Roots}"
+            KeyDown="OnRowsKeyDown"
             Background="Transparent"
             Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
             BorderThickness="0"
@@ -29,7 +31,14 @@
     <TreeView.ItemTemplate>
       <HierarchicalDataTemplate DataType="{x:Type core:WorkExplorerNode}" ItemsSource="{Binding Children}">
         <!-- The tooltip is the header's, so a row without one never shows its parent's. -->
-        <StackPanel Orientation="Horizontal" ToolTip="{Binding Tooltip}">
+        <!-- The menu is filled with the row's actions as it opens, and does not open where there are none. -->
+        <StackPanel Orientation="Horizontal" ToolTip="{Binding Tooltip}"
+                    Background="Transparent"
+                    MouseLeftButtonDown="OnRowMouseDown"
+                    ContextMenuOpening="OnRowMenuOpening">
+          <StackPanel.ContextMenu>
+            <ContextMenu />
+          </StackPanel.ContextMenu>
           <ContentControl Content="{Binding Icon, Converter={StaticResource StatusPictures}}"
                           Width="16" Height="16" Margin="0,0,4,0" Focusable="False" />
           <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />

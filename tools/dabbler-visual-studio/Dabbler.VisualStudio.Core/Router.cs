@@ -19,14 +19,18 @@ namespace Dabbler.VisualStudio.Core
     /// <summary>A verb the router refused or failed, in the router's own words.</summary>
     public sealed class RouterFailure : Exception
     {
-        public RouterFailure(string words, int exitCode)
+        public RouterFailure(string words, int exitCode, string output = "")
             : base(words)
         {
             ExitCode = exitCode;
+            Output = output;
         }
 
         /// <summary>The router's exit code, or -1 where it never ran or was stopped.</summary>
         public int ExitCode { get; }
+
+        /// <summary>What the verb printed on standard output before it failed: a `--json` verb prints its answer when it refuses too.</summary>
+        public string Output { get; }
     }
 
     /// <summary>Runs one router verb with `node` on the bundle the extension carries, and returns what it printed.</summary>
@@ -77,7 +81,7 @@ namespace Dabbler.VisualStudio.Core
             if (process.ExitCode != 0)
             {
                 var words = errors.Trim().Length > 0 ? errors.Trim() : output.Trim();
-                throw new RouterFailure(words.Length > 0 ? words : $"`{CommandLine(args)}` exited {process.ExitCode}.", process.ExitCode);
+                throw new RouterFailure(words.Length > 0 ? words : $"`{CommandLine(args)}` exited {process.ExitCode}.", process.ExitCode, output);
             }
             return output;
         }

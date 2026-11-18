@@ -1,0 +1,203 @@
+name: Publish the Visual Studio extension to the Visual Studio Marketplace
+
+# The same release tag as `publish-vscode.yml`, and the same shapes:
+#
+#   - `vsix-vX.Y.Z-rcN` -> build only. The .vsix is an artifact of the run,
+#                          installable by hand; nothing is published.
+#   - `vsix-vX.Y.Z`     -> build, then publish, gated by a green `Test` run
+#                          for the tagged commit and by the `marketplace`
+#                          environment's required reviewer.
+#
+# One tag releases both extensions because the repository has one version
+# (`version.json`, stamped into both manifests by `npm run stamp:version`).
+# `dabbler release` makes the tag; this workflow never does.
+#
+# BEFORE THE FIRST PUBLISH -- the operator's, once, and nothing here can do it:
+#
+#   1. The publisher. The Visual Studio Marketplace and the VS Code
+#      Marketplace are one gallery, so the publisher is the VS Code
+#      extension's own, `DarndestDabbler`. At
+#      https://marketplace.visualstudio.com/manage/publishers/DarndestDabbler
+#      confirm you are its owner. Nothing new is created; if that page does
+#      not open, create a publisher with that exact id there.
+#   2. The token. VsixPublisher takes an Azure DevOps personal access token
+#      with the **Marketplace > Publish** scope and **All accessible
+#      organizations**, the same kind `vsce` takes. The `marketplace`
+#      environment's `VSCE_PAT` secret already holds one, and this workflow
+#      reads it. If it has expired, or was made with narrower scope, make a
+#      new one at https://dev.azure.com -> User settings -> Personal access
+#      tokens, and store it under Settings -> Environments -> marketplace ->
+#      Environment secrets as `VSCE_PAT`. Both extensions then publish with it.
+#   3. The approval. Settings -> Environments -> marketplace must keep its
+#      required reviewer, which is what stops a pushed tag publishing
+#      without a person.
+#
+# VsixPublisher is taken from the Microsoft.VSSDK.BuildTools package the
+# extension already builds with, at the version its project names, so the
+# tool that publishes is the one that built. Its `tools\vssdk\bin\lib` copy
+# is the one run: the copy one folder up stops on load with a
+# System.Runtime.CompilerServices.Unsafe binding error (17.14.2142).
+
+on:
+  push:
+    tags:
+      - 'vsix-v*'
+
+permissions:
+  contents: read
+
+env:
+  VS_MANIFEST: tools/dabbler-visual-studio/Dabbler.VisualStudio/source.extension.vsixmanifest
+  VS_PROJECT: tools/dabbler-visual-studio/Dabbler.VisualStudio/Dabbler.VisualStudio.csproj
+  VSIX: tools/dabbler-visual-studio/Dabbler.VisualStudio/bin/Release/net472/Dabbler.VisualStudio.vsix
+
+jobs:
+  classify:
+    name: Classify tag
+    runs-on: ubuntu-latest
+    outputs:
+      is_final: ${{ steps.classify.outputs.is_final }}
+      semver_version: ${{ steps.classify.outputs.semver_version }}
+    steps:
+      - name: Classify ${{ github.ref_name }}
+        id: classify
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_final=true" >> "$GITHUB_OUTPUT"
+            echo "semver_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          elif [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            echo "is_final=false" >> "$GITHUB_OUTPUT"
+            echo "semver_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag is a release candidate: build only, no publish."
+          else
+            echo "::error::tag $tag does not match vsix-vX.Y.Z or vsix-vX.Y.Z-rcN."
+            exit 1
+          fi
+
+  # The .vsix carries the VS Code extension's self-contained copy of the
+  # router, so both are built first, exactly as `test.yml` builds them.
+  build:
+    name: Build the .vsix
+    needs: classify
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Every manifest carries version.json's version
+        run: npm run check:version
+
+      # A Visual Studio Marketplace version is X.Y.Z: an RC tag builds the
+      # version it is a candidate for.
+      - name: The tag names the manifest's version
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          $declared = ([xml](Get-Content $env:VS_MANIFEST -Raw)).PackageManifest.Metadata.Identity.Version
+          if ($declared -ne $env:EXPECTED_VERSION) {
+            Write-Output "::error::the tag names $env:EXPECTED_VERSION and $env:VS_MANIFEST declares $declared"
+            exit 1
+          }
+
+      - name: Router bundle
+        run: npm run build -w dabbler-ai-router
+
+      - name: The VS Code extension's copy of the router
+        run: npm run compile -w dabbler-ai-orchestration
+
+      - name: Build the extension
+        run: |
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          & $msbuild dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal /nodeReuse:false
+          exit $LASTEXITCODE
+
+      - name: Upload the .vsix
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: visual-studio-vsix
+          path: ${{ env.VSIX }}
+          if-no-files-found: error
+          retention-days: 30
+
+  require-green-test:
+    name: Require green Test for the tagged commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    steps:
+      - name: Checkout tag (for the local composite action)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Require a successful Test run for ${{ github.sha }}
+        uses: ./.github/actions/require-green-test
+        with:
+          sha: ${{ github.sha }}
+          infra-override-sha: ${{ vars.RELEASE_INFRA_OVERRIDE_SHA }}
+          infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
+
+  publish:
+    name: Publish to the Visual Studio Marketplace (final releases only)
+    needs: [classify, build, require-green-test]
+    if: ${{ needs.classify.outputs.is_final == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration-visual-studio
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # Before the download, and it must stay there: checkout cleans the
+      # workspace. The tree gives the publish manifest and its overview; the
+      # bytes published are the build job's artifact.
+      - name: Checkout tag (for the publish manifest)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Download the .vsix
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: visual-studio-vsix
+          path: vsix/
+
+      - name: VsixPublisher, at the version the project builds with
+        run: |
+          $sdk = ([xml](Get-Content $env:VS_PROJECT -Raw)).Project.ItemGroup.PackageReference |
+            Where-Object { $_.Include -eq 'Microsoft.VSSDK.BuildTools' }
+          Invoke-WebRequest "https://www.nuget.org/api/v2/package/Microsoft.VSSDK.BuildTools/$($sdk.Version)" -OutFile vssdk.zip
+          Expand-Archive vssdk.zip -DestinationPath vssdk
+          if (-not (Test-Path vssdk\tools\vssdk\bin\lib\VsixPublisher.exe)) {
+            Write-Output "::error::Microsoft.VSSDK.BuildTools $($sdk.Version) has no tools\vssdk\bin\lib\VsixPublisher.exe"
+            exit 1
+          }
+
+      - name: Publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          & vssdk\tools\vssdk\bin\lib\VsixPublisher.exe publish `
+            -payload vsix\Dabbler.VisualStudio.vsix `
+            -publishManifest tools\dabbler-visual-studio\publishManifest.json `
+            -personalAccessToken $env:VSCE_PAT
+          exit $LASTEXITCODE

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 339 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 339 transcript</h1>
+<div class="cancelled" id="cancelled"><strong>CANCELLED</strong> <span class="at">at 2026-11-17T12:45:46-05:00</span><div>No reason was given.</div><div>It was cancelled before anything ran.</div></div>
+<p class="stamp">Rendered 2026-11-17T17:45:46.774Z by dabbler-ai-router 3.34.1 at dd9249db5fcc97c34e32ddf80cb333ff6015afbc.</p>
+<h2>Session Plan</h2>
+<h3>Session 339 of 342: Documentation for an existing .NET solution is walked to a close</h3>
+<p>Scope: <code>docs/uat/uat-document-walk.md</code> (new: what was walked and what was found), whatever in <code>packages/router/src/</code> or <code>tools/dabbler-ai-orchestration/src/</code> the walk shows to be stopping a session and is small to fix, with the test named after it</p>
+<p><strong>Why.</strong> The operator wants the framework to be usable for work that is not a program without choking, and has a real need that is one: a documentation repository for an existing .NET solution, separate from the code it describes, holding enough high-level and lower-level documentation (how database access is done, which UI tools are used) to move that solution to AI-facilitated development. Nobody has yet run a session to its close in a repository with no code, and the framework's account of itself -- checks, suites, a run of record, a reviewer reading a diff -- was written about code.</p>
+<p>Rounds 25 and 26 (<code>docs/design/consults/</code>) said to walk a document before the first two sessions' text is rewritten, since text scaffolded into a repository stays in it for good. Round 28 (<code>round28-synthesis.md</code>), asked on 2026-11-17 whether a general or light Dabbler is wanted, said no: the operator's Python, JavaScript and LilyPond repositories have closed 131 sessions between them with no special support, so the engine is already general, and less enforcement is not what work without code lacks. What it lacks is two things no instruction can supply: the material a reviewer needs to judge a claim, and a record that a person accepted the work. Both advisors also said documentation of real code is a better first walk than the scratch procedure this session first planned, because its claims can be shown false.</p>
+<p>The operator's solution is a work repository and is not sent anywhere by this session. The walk uses <code>darndestdabbler/ContosoUniversity</code>, one of the six public forks of the maintenance walk: an ASP.NET MVC 5 application on .NET Framework 4.8.1 with Entity Framework, a solution kept under <code>src/</code>, and enough of a data layer and a UI to have something to get wrong.</p>
+<p>Two things are known from the source and are not what the walk is for. The suite gate already says a repository of documents &quot;has nothing to run and is inapplicable, not passed&quot;. And every step must declare a check, prose steps included. What is not known is what the walk is for:</p>
+<ul><li><strong>What the reviewer is given.</strong> It reads the diff against the session's section of the plan and the declared non-goals. Nothing in the verification code names source material, so a reviewer may be judging a page about data access against code it was never shown. Whether a reviewer reached through a seat reads the code for itself is not known.</li><li><strong>Whether the loop ends.</strong> A reviewer of prose can raise findings about taste for seven rounds. Findings should be errors -- a requirement missed, the code contradicted, an earlier page contradicted, a stated rule broken -- and preferences should be Minor, which ends the loop.</li><li><strong>What a suite can honestly be</strong> for documentation, and what a check can be on a locked-down Windows machine that may have neither Node on PATH nor a free hand with PowerShell.</li><li><strong>What the diff looks like.</strong> A paragraph written as one long line shows a three-word edit as the whole paragraph replaced. One sentence per line may be what makes a prose diff reviewable.</li><li><strong>Which sentences the framework prints assume code.</strong></li><li><strong>What a person's review costs and catches</strong> that the suite and the reviewer did not.</li></ul>
+<p><strong>Step 1 -- the documentation repository.</strong> Outside this repository, with the router built from this tree: a new folder with its own git repository and no remote, set up as it is today, with a session plan written by hand in place of the scaffolded sessions 1 and 2. The code is a sibling checkout of the fork, read and never written, and <code>docs/planning/source.md</code> in the documentation repository records the fork's address, the full commit hash and the paths that matter. No submodule, and no neighbouring folder is searched: the path is given.</p>
+<p>The plan written by hand has six documentation sessions, of which this walk runs two: a solution map with the commands that build and test it; a glossary of the domain's terms as the code uses them; how database access is done, traced through one entity; how a request reaches a page and comes back, with the UI tools named; what to touch to make each common kind of change; and a hand-over page a model reads first. They are written for a model that will change the code, so they are short and dense and name files, not long prose for a newcomer. Pages are Markdown, one sentence per line.</p>
+<p>The repository declares one suite in <code>dabbler.yaml</code>, a short script it holds itself: every relative link resolves, every path a page names in backticks exists in the code at the pinned commit, and the sibling checkout is at that commit. It does not claim that a type or a member a page names exists: a text search cannot promise that.</p>
+<p>Before either session runs, the plan also holds three to five questions a person will be asked of the finished pages, agreed by the operator: for instance, whether the page on database access matches how the solution works, and whether a developer could find where to make a named change from the pages alone.</p>
+<p><strong>Step 2 -- a page to its close.</strong> Run the first documentation session, the solution map, to its close. Record each stop, each sentence that speaks of code to a person writing documentation, what the checks and the suite were and whether they ran, and what the reviewer was sent, read from the round's own record.</p>
+<p><strong>Step 3 -- a review that should say no.</strong> The second session writes the page on database access, and its draft carries one seeded false claim about the code: for instance, that two saves are one transaction where the code commits them separately. The code that disproves it is in the sibling checkout and not in the diff. Record whether the reviewer finds it, what it cited, whether its other findings are errors or preferences, and how many rounds the loop takes. If the claim gets through, the session's section of the plan is amended to quote the source the claim rests on, with its path and commit, and the review is asked again: that says whether handing the reviewer the source is enough. The false claim is removed before the session closes, whoever found it.</p>
+<p><strong>Step 4 -- a person's review, by hand.</strong> The authoring AI turns the agreed questions into a checklist in the JSON format of the operator's checklist editor (<code>darndestdabbler/uat-checklist-editor</code>), the operator works through it against the two pages, and what fails is corrected or written down as a session. Nothing in the router reads the file. Record how long it took, what it caught that the suite and the reviewer had not, which questions were worth asking, and whether anything stopped the authoring AI from marking the items passed itself.</p>
+<p><strong>Step 5 -- what was found, written down.</strong> <code>docs/uat/uat-document-walk.md</code> says what was walked, each finding, and for each whether it was fixed here, is planned as a session, or is a limit to state in the documentation. Session 341 is written from this page, and so is the plan the operator then writes for the work repository's own documentation.</p>
+<p>The page also carries a second list, kept through steps 1 to 4: every thing the walk needed that a person who is not a developer would not have or would not know. Installing an engine CLI, a key or a seat, git and a remote, a terminal, Markdown, reading a diff, the vocabulary on screen. The operator asked on 2026-11-14 whether VS Code is the right interface for this kind of work at all, and whether such a person needs a simpler one. That is decided from this list, after the walk, and not before it: the list says whether the obstacle is the editor or everything under it.</p>
+<p><strong>Step 6 -- fix what is small.</strong> A stop whose fix is small and plainly the framework's -- a sentence that assumes code -- is fixed here, with its test. Anything that needs a design is written into this plan as a session of its own, before session 341, and is not built here. Two are expected and are planned only if the walk shows the need: a way for a session to name the material its reviewer is given, one mechanism for code and prose alike; and a person's acceptance of a piece of work at a milestone, recorded by the router against the commit that was read, which an engine cannot write and which replaces no check, finding or suite result.</p>
+<p><strong>Non-goals.</strong> The other four documentation sessions, and any documentation of the operator's work repository: that is the operator's, in its own repository, after this. A mode, a setting or a lighter framework for work that is not code. Reading the checklist file in the router, or any record of a person's acceptance: step 6 plans it if it is wanted. A check of types and members by a compiler. Building or running the solution documented. Any change to the scaffolded sessions 1 and 2: session 341. A reviewer for binary documents. A spell-check, style or citation control. Any public statement that documents are supported.</p>
+<p><strong>Tests.</strong> One per fix step 6 makes, in the file named after what it changed. A walk that finds nothing small to fix adds none.</p>
+<p><strong>Releasable.</strong> Yes, as 3.36.0 in session 342, where step 6 changed anything.</p>
+<h2>Verification</h2>
+<p>No verification round was recorded.</p>
+<h2>Test runs</h2>
+<p>No test run was recorded.</p>
+</main>
+</body>
+</html>

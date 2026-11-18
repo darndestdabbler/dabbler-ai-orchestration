@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 277 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 277 transcript</h1>
+<p class="stamp">Rendered 2026-10-21T18:53:57.367Z by dabbler-ai-router 3.21.0 at 71b0926dcee3c49148f20f49d239baf8cd99f00f.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-10-21T14:35:55.937-04:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 277 of 279: Open a Mechanic, and what it did, in the extension</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration</code> -- <code>src/commands/sessionCommands.ts</code> (*Open a Mechanic*), <code>src/providers/ActionRegistry.ts</code>, <code>src/providers/solutionTreeModel.ts</code> (the Configuration row for <code>dabbler.mechanic</code>; *Authoring Model* and *Mechanic Model* under Authoring AI), the Work Explorer's stop and its funds wait, <code>package.json</code>; their tests; a walk page <code>docs/uat/uat-mechanic.md</code></p>
+<p><strong>Why.</strong> 274 to 276 are the router's. A person meets them in the editor: a stop they open a Mechanic on themselves, the setting that grants the unattended authority, a memo the Mechanic left on a hand-back, and 272's wait for funds.</p>
+<p><strong>Step 1 -- Open a Mechanic.</strong> The consult launcher, briefed with <code>--mechanic</code>, on the Mechanic Model by default and any other from the *Different Models...* list, never the author's live session.</p>
+<p><strong>Step 2 -- the settings.</strong> A Configuration row for <code>dabbler.mechanic</code>, written to the checkout's settings and committed as every choice is. Under <strong>Authoring AI</strong>, the row that read *Model* reads *Authoring Model*, and a *Mechanic Model* row sits below it: a fourth role in <code>ROLE_LABELS</code>, <code>ROLE_COMMANDS</code> and <code>ROLE_HELP</code>, set by <code>dabblerSolution.setMechanicModel</code> from the authoring engine's own model list, and reading &quot;same as Authoring Model&quot; while nothing is chosen.</p>
+<p><strong>Step 3 -- what a person reads.</strong> A stopped session shows the Mechanic's memo where there is one, and a session waiting for funds reads &quot;Waiting for funds: &lt;vendor&gt;&quot; with Continue.</p>
+<p><strong>Step 4 -- the walk.</strong> <code>docs/uat/uat-mechanic.md</code>, copy-pasteable, on the Java sample: a stop the unattended Mechanic clears with no person; one it hands back with a memo; a funds pause resumed by Continue; a cancel whose page says cancelled.</p>
+<p><strong>Non-goals.</strong> Any router change. A modal or a menu of proposals.</p>
+<p><strong>Tests.</strong> One per command and row changed, in the test file named after each.</p>
+<p><strong>Releasable.</strong> Yes -- with 272 to 278, as 3.23.0 in session 279.</p>
+<h2>Work Plan</h2>
+<p>Bring the Mechanic (sessions 274-276) and the funds wait (272) into the VS Code extension. A person can Open a Mechanic from the Work Explorer: the consult launcher briefed with <code>dabbler consult --mechanic</code>, on the configured authoring engine, offered the Mechanic Model first and any other model of that engine's list, in a new terminal of its own and never the author's live session. Under Authoring AI in Configuration the row that read 'Model' reads 'Authoring Model', a 'Mechanic Model' row sits below it (a fourth role in ROLE_LABELS, ROLE_COMMANDS and ROLE_HELP, set by dabblerSolution.setMechanicModel from the authoring engine's own model list, reading 'same as Authoring Model' while nothing is chosen), and a 'Mechanic' row shows dabbler.mechanic (unattended, attended, off) set by dabblerSolution.setMechanic; both write through <code>dabbler configure</code>, which commits the checkout's settings as every choice is. A stopped session's tooltip carries the Mechanic's memo where one was left, and a session waiting for funds reads 'Waiting for funds: &lt;vendor&gt;' with a Continue Session action that resumes it the way Start does. The router is touched only as plumbing the extension cannot do without: the in-process configure passes the CLI's existing --mechanic and --mechanic-model through, and index.ts exports the existing explainMechanic, explainMechanicModel and mechanicMemoPath so the extension reads the setting and the memo path through the router's one rule rather than a copy. A walk page, docs/uat/uat-mechanic.md, walks the four cases on the Java sample.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/d61059bdba75ab9a9803f06ab4f949e17c71128c"><code>d61059bdba75ab9a9803f06ab4f949e17c71128c</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Router plumbing</td><td><p>In packages/router/src/contracts/router.ts add optional <code>mechanic</code> and <code>mechanicModel</code> to ConfigureOptions; in packages/router/src/inProcess.ts pass them as --mechanic and --mechanic-model; in packages/router/src/index.ts export the existing explainMechanic, explainMechanicModel (config.ts) and mechanicMemoPath (drive.ts). One test in packages/router/test/inProcess.test.ts that configure passes both flags.</p></td><td><span class="mono">packages/router/src/contracts/router.ts</span><br><span class="mono">packages/router/src/inProcess.ts</span><br><span class="mono">packages/router/src/index.ts</span><br><span class="mono">packages/router/test/inProcess.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/inProcess.test.ts</code></td><td>yes</td></tr>
+<tr><td>Mechanic settings rows</td><td><p>In solutionTreeModel.ts: ROLE_LABELS authoring reads 'Authoring Model'; add a 'mechanic' role (ROLE_LABELS 'Mechanic Model', ROLE_COMMANDS 'dabblerSolution.setMechanicModel', ROLE_HELP one sentence, an icon) listed under Authoring AI after the Authoring Model row, reading 'same as Authoring Model' while nothing is chosen; and a 'Mechanic' row (dabbler.mechanic: unattended/attended/off) under Authoring AI with command dabblerSolution.setMechanic. The values come through SolutionContext, filled by SolutionTreeProvider from the router's explainMechanic/explainMechanicModel. In configurationCommands.ts add setMechanicModel (items from the authoring role's candidates, plus a 'same as Authoring Model' item that clears it) and setMechanic (a pick of the three modes), both writing through router.configure; register both and add them to package.json commands and menus. Update the tests that read the 'Model' label; one test per new row in solutionTreeModel.test.ts and per new command in commandFlows.test.ts.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/configurationCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/extension.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>npx tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>npm --prefix tools/dabbler-ai-orchestration run lint</code></td><td>yes</td></tr>
+<tr><td>Open a mechanic</td><td><p>In sessionCommands.ts add runOpenMechanic and the command dabbler.openMechanic: the configured authoring engine, a model pick (ui.askModel) titled 'Open a Mechanic' with the Mechanic Model first, the same two model refusals Consult applies, and a new terminal named 'Mechanic — &lt;engine&gt; — &lt;repository&gt;' whose first sentence runs <code>dabbler consult --sessions-dir docs/sessions --mechanic</code>; it never reuses the author's terminal. Add it to ActionRegistry.ts on the in-flight session row and to package.json. Tests: actionRegistry.test.ts (offered on the in-flight row only) and commandFlows.test.ts (the terminal opened carries the --mechanic brief and the picked model).</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>npx tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>npm --prefix tools/dabbler-ai-orchestration run lint</code></td><td>yes</td></tr>
+<tr><td>Memo and funds wait</td><td><p>In workExplorerTreeModel.ts: an in-flight session whose waiting.for is the funds wait reads 'Waiting for funds: &lt;vendor&gt;' on its row; a session waiting on a person shows the Mechanic's memo in its tooltip where the file at mechanicMemoPath exists and is not empty. Add a 'Continue Session' entry (command dabblerSessionSets.continueSession, registered in sessionCommands.ts to the same start Start Session runs) to ActionRegistry.ts on the in-flight row that waits for funds, and to package.json. Tests: workExplorerTreeModel.test.ts (the funds description; the memo in the tooltip) and actionRegistry.test.ts (Continue only on the funds wait).</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/src/utils/fileSystem.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts</span></td><td><code>npx tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>npm --prefix tools/dabbler-ai-orchestration run lint</code></td><td>yes</td></tr>
+<tr><td>Walk page</td><td><p>Write docs/uat/uat-mechanic.md: copy-pasteable steps on the Java sample for four cases -- a stop the unattended Mechanic clears with no person; one it hands back with a memo (shown on the session's tooltip); a funds pause resumed by Continue Session; a cancel whose transcript page says cancelled -- each with what to set, what to do, and what to see.</p></td><td><span class="mono">docs/uat/uat-mechanic.md</span></td><td><code>node -e const t=require('fs').readFileSync('docs/uat/uat-mechanic.md','utf8');const need=['clears','memo','Waiting for funds','Continue Session','cancelled'];process.exit(need.every(w=&gt;t.includes(w))?0:1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>No change to the router's behavior: no new verb, flag, gate, stop kind or wording; its only touches are passing configure's existing --mechanic/--mechanic-model through the in-process adapter and exporting three existing functions</li><li>No modal and no menu of proposals: the Mechanic is opened as a terminal and its memo is read, never offered as choices</li><li>No Mechanic launched by the extension without the person's click: the unattended Mechanic remains the router's</li><li>No --mine (machine-level) write for the Mechanic rows: they write the checkout, as the other model rows do</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[18:35:55]</span> <span class="muted">run-started</span> session=277 mode=pull</div>
+<div class="line"><span class="at">[18:35:55]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[18:39:31]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[18:39:31]</span> <span class="muted">plan-accepted</span> steps=[&quot;router-plumbing&quot;,&quot;mechanic-settings-rows&quot;,&quot;open-a-mechanic&quot;,&quot;memo-and-funds-wait&quot;,&quot;walk-page&quot;] non_goals=4</div>
+<div class="line"><span class="at">[18:39:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[18:39:31]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=router-plumbing</div>
+<div class="line"><span class="at">[18:40:13]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:40:18]</span> <span class="muted">check-passed</span> step=router-plumbing argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:40:20]</span> <span class="muted">check-passed</span> step=router-plumbing argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/inProcess.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:40:24]</span> <span class="muted">named-tests-passed</span> step=router-plumbing suite=typescript command=node scripts/suite.mjs container packages/router/test/inProcess.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[18:40:24]</span> <span class="muted">report-accepted</span> seq=2 step=router-plumbing files=[&quot;packages/router/src/contracts/router.ts&quot;,&quot;packages/router/src/inProcess.ts&quot;,&quot;packages/router/src/index.ts&quot;,&quot;packages/router/test/inProcess.test.ts&quot;] notes=configure passes --mechanic/--mechanic-model in process; explainMechanic, explainMechanicModel, mechanicMemoPath exported</div>
+<div class="line"><span class="at">[18:40:24]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=mechanic-settings-rows</div>
+<div class="line"><span class="at">[18:44:13]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:44:19]</span> <span class="muted">check-passed</span> step=mechanic-settings-rows argv=[&quot;npx&quot;,&quot;tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[18:44:21]</span> <span class="muted">check-passed</span> step=mechanic-settings-rows argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:44:25]</span> <span class="muted">named-tests-passed</span> step=mechanic-settings-rows suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[18:44:32]</span> <span class="muted">named-tests-passed</span> step=mechanic-settings-rows suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</div>
+<div class="line"><span class="at">[18:44:32]</span> <span class="muted">report-accepted</span> seq=3 step=mechanic-settings-rows files=[&quot;tools/dabbler-ai-orchestration/src/providers/solutionTreeModel.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/configurationCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/extension.ts&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=Authoring Model / Mechanic Model / Mechanic rows under Authoring AI; setMechanicModel and setMechanic write through configure; three Start-opens-CLI tests in commandFlows fail on this machine with or without this change</div>
+<div class="line"><span class="at">[18:44:32]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=open-a-mechanic</div>
+<div class="line"><span class="at">[18:45:57]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:46:02]</span> <span class="muted">check-passed</span> step=open-a-mechanic argv=[&quot;npx&quot;,&quot;tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[18:46:04]</span> <span class="muted">check-passed</span> step=open-a-mechanic argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:46:08]</span> <span class="muted">named-tests-passed</span> step=open-a-mechanic suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[18:46:16]</span> <span class="muted">named-tests-passed</span> step=open-a-mechanic suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[18:46:16]</span> <span class="muted">report-accepted</span> seq=4 step=open-a-mechanic files=[&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=dabbler.openMechanic: configured authoring engine, Mechanic Model offered first, its own 'Mechanic' terminal briefed with consult --mechanic; on the in-flight session row</div>
+<div class="line"><span class="at">[18:46:16]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=memo-and-funds-wait</div>
+<div class="line"><span class="at">[18:48:49]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:48:55]</span> <span class="muted">check-passed</span> step=memo-and-funds-wait argv=[&quot;npx&quot;,&quot;tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[18:48:57]</span> <span class="muted">check-passed</span> step=memo-and-funds-wait argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:49:01]</span> <span class="muted">named-tests-passed</span> step=memo-and-funds-wait suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[18:49:07]</span> <span class="muted">named-tests-passed</span> step=memo-and-funds-wait suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts</div>
+<div class="line"><span class="at">[18:49:07]</span> <span class="muted">report-accepted</span> seq=5 step=memo-and-funds-wait files=[&quot;tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;tools/dabbler-ai-orchestration/src/utils/fileSystem.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts&quot;] notes=funds wait reads 'Waiting for funds: &lt;vendor&gt;' with Continue Session; memo read in buildRepository via router mechanicMemoPath and shown on a person-waiting session's tooltip; router dist rebuilt so the extension's runtime sees step 1's exports</div>
+<div class="line"><span class="at">[18:49:07]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=walk-page</div>
+<div class="line"><span class="at">[18:49:53]</span> <span class="muted">run-resumed</span> session=277 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:49:55]</span> <span class="muted">check-passed</span> step=walk-page argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('docs/uat/uat-mechanic.md','utf8');const need=['clears','memo','Waiting for funds','Continue Session','cancelled'];process.exit(need.every(w=&gt;t.includes(w))?0:1)&quot;]</div>
+<div class="line"><span class="at">[18:49:55]</span> <span class="muted">report-accepted</span> seq=6 step=walk-page files=[&quot;docs/uat/uat-mechanic.md&quot;] notes=walk on the Java sample: Configuration rows, a stop the Mechanic clears, one handed back with a memo plus Open a Mechanic, a cancel's page, a funds pause resumed by Continue Session</div>
+<div class="line"><span class="at">[18:49:55]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[18:49:56]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[18:49:56]</span> <span class="muted">job-started</span> name=verification pid=50688 log=.dabbler/runs/s277/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:52:20]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s277/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:52:20]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[18:52:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[18:52:20]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[18:52:20]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=24016 log=.dabbler/runs/s277/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:52:22]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s277/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:52:22]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[18:52:22]</span> <span class="muted">job-started</span> name=run of record: typescript pid=39184 log=.dabbler/runs/s277/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:53:31]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s277/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:53:31]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[18:53:31]</span> <span class="muted">job-started</span> name=run of record: extension pid=3948 log=.dabbler/runs/s277/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:53:47]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s277/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:53:47]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[18:53:51]</span> <span class="muted">landed</span> commit=d61059bdba75ab9a9803f06ab4f949e17c71128c</div>
+<div class="line"><span class="at">[18:53:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[18:53:51]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[18:53:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[18:53:51]</span> <span class="muted">job-started</span> name=close pid=19448 log=.dabbler/runs/s277/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:53:57]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s277/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:53:57]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>5 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `docs/uat/uat-mechanic.md` instructs `git revert --no-edit HEAD` to remove the planted contradictory test after cancellation. By then `HEAD` is expected to be a session/cancellation commit, not the earlier test commit, so this can revert the wrong change. Record the planted commit hash and revert that hash, or remove the test explicitly.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The promised test placement—“in the test file named after each”—is not followed for `sessionCommands.ts` and `configurationCommands.ts`; their new command flows are tested in `commandFlows.test.ts`. The behavior is substantially covered, so this is organizational rather than a blocking correctness defect.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Nit:** Add a command test with an explicit Mechanic model choice: start with authoring candidates `claude-opus-5` and `claude-sonnet-5`, select `claude-sonnet-5`, and assert `configure({ repoRoot, mechanicModel: &quot;claude-sonnet-5&quot; })`. The visible test selects only “same as Authoring Model” and therefore pins clearing, not setting a concrete model.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Nit:** Add an in-process configuration test starting with a nonempty `dabbler.mechanicModel`, invoke `configure({ mechanicModel: &quot;&quot; })`, and assert the setting is cleared while `dabbler.mechanic` remains unchanged. The current test passes the empty model but asserts only the delegation mode.</td><td>not answered</td></tr>
+<tr><td>4</td><td><strong>minor</strong></td><td>**Nit:** Add a launcher fallback test where `mechanicModel(root)` returns `null`; invoke `runOpenMechanic` with configured authoring model `opus` and assert `askModel` receives `opus` first. The implementation appears correct, but the visible launcher test covers only an explicitly configured Mechanic Model.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>69s</td><td>1368</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>16s</td><td>291</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

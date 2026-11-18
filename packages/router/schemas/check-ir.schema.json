@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "check IR v1 (one bounded question put to a worker)",
+  "description": "The intermediate representation of a single critique check, stored in checks.json under the machine-owned run directory. The IR describes bounded work for a model; it is not a general programming language. Recursive or unbounded traversal, whole-program data flow, temporal execution, dynamic dispatch resolution, arithmetic better done deterministically, and anything a compiler, test, linter, schema validator, or exact AST query already decides do not belong here — those compile to code, run as G0 executables, or go to adjudication. A check that repeatedly needs a new operator is evidence that it belongs in code, so the operator set below is closed and nesting is bounded at two levels rather than left open.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "check_id",
+    "source",
+    "executor",
+    "objective",
+    "selector",
+    "condition",
+    "scope",
+    "branch",
+    "evidence",
+    "authorized_pulls",
+    "bounds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the check rather than interpreting it."
+    },
+    "check_id": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What produced this check — a corpus entry, a claim, or a rule id."
+    },
+    "executor": {
+      "type": "string",
+      "enum": ["worker-model", "g0-deterministic"],
+      "description": "A deterministic executor never routes to a model."
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exactly one imperative semantic question. Two questions are two checks."
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "description": "One closed source of the things the check ranges over.",
+      "properties": {
+        "from": {
+          "type": "string",
+          "enum": [
+            "changed-files",
+            "changed-hunks",
+            "claims",
+            "g0-facts",
+            "manifest-paths"
+          ]
+        },
+        "filter": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Globs or fact keys narrowing the selected set. Never a query language."
+        }
+      }
+    },
+    "condition": { "$ref": "#/$defs/condition_l1" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths", "changed_only"],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "changed_only": {
+          "type": "boolean",
+          "description": "Whether only changed content is eligible evidence."
+        }
+      }
+    },
+    "branch": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 8,
+      "description": "Named outcomes. Names are the check's vocabulary, not free prose.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["when", "outcome"],
+        "properties": {
+          "when": { "$ref": "#/$defs/condition_l2" },
+          "outcome": {
+            "type": "string",
+            "enum": ["pass", "fail", "blocked"]
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail", "blocked"],
+      "description": "All three shapes are required. A check that cannot say what would satisfy it, what would refute it, and what would block it is not a check.",
+      "properties": {
+        "pass": { "$ref": "#/$defs/evidence_shape" },
+        "fail": { "$ref": "#/$defs/evidence_shape" },
+        "blocked": { "$ref": "#/$defs/evidence_shape" }
+      }
+    },
+    "authorized_pulls": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "The only paths the worker process may read. Enforced by the execution environment, not asserted in a prompt."
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_files", "max_bytes", "timeout_seconds"],
+      "properties": {
+        "max_files": { "type": "integer", "minimum": 1 },
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "leaf_operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "description": "Terminal operators. They read the selected content and do not nest.",
+      "properties": {
+        "exists": { "type": "string", "minLength": 1 },
+        "equals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": ["string", "number", "boolean", "null"] }
+        },
+        "count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["of", "operator", "value"],
+          "properties": {
+            "of": { "type": "string", "minLength": 1 },
+            "operator": {
+              "type": "string",
+              "enum": ["eq", "lte", "gte"]
+            },
+            "value": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "condition_l2": {
+      "description": "Second and final level of nesting. Its operands are terminal.",
+      "oneOf": [
+        { "$ref": "#/$defs/leaf_operator" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "not": { "$ref": "#/$defs/leaf_operator" },
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/leaf_operator" }
+            },
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/leaf_operator" }
+            },
+            "for_each": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["in", "satisfies"],
+              "properties": {
+                "in": { "type": "string", "minLength": 1 },
+                "satisfies": { "$ref": "#/$defs/leaf_operator" }
+              }
+            },
+            "if": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["condition", "then"],
+              "properties": {
+                "condition": { "$ref": "#/$defs/leaf_operator" },
+                "then": { "$ref": "#/$defs/leaf_operator" },
+                "else": { "$ref": "#/$defs/leaf_operator" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "condition_l1": {
+      "description": "Top level of the condition tree. Nesting below this point is bounded at one further level, so the deepest legal expression is two levels of operators over terminals.",
+      "oneOf": [
+        { "$ref": "#/$defs/leaf_operator" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "not": { "$ref": "#/$defs/condition_l2" },
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition_l2" }
+            },
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition_l2" }
+            },
+            "for_each": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["in", "satisfies"],
+              "properties": {
+                "in": { "type": "string", "minLength": 1 },
+                "satisfies": { "$ref": "#/$defs/condition_l2" }
+              }
+            },
+            "if": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["condition", "then"],
+              "properties": {
+                "condition": { "$ref": "#/$defs/condition_l2" },
+                "then": { "$ref": "#/$defs/condition_l2" },
+                "else": { "$ref": "#/$defs/condition_l2" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evidence_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requires"],
+      "properties": {
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "quote",
+              "absence-search",
+              "g0-fact",
+              "adjudication-note"
+            ]
+          }
+        },
+        "min_quotes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

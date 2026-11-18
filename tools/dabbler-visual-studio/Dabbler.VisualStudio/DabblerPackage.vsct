@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidDabblerPackage">
+    <Groups>
+      <Group guid="guidDabblerCommandSet" id="DabblerToolsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidDabblerCommandSet" id="VersionCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
+        <Strings>
+          <ButtonText>Dabbler: Version</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidDabblerPackage" value="{425b072f-e523-4795-9b61-5716674585bd}" />
+    <GuidSymbol name="guidDabblerCommandSet" value="{a9db3fec-b5ee-439b-acfe-21f711d1ec33}">
+      <IDSymbol name="DabblerToolsGroup" value="0x1020" />
+      <IDSymbol name="VersionCommandId" value="0x0100" />
+    </GuidSymbol>
+  </Symbols>
+
+</CommandTable>

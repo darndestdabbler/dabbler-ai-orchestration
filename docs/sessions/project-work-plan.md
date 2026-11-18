@@ -387,7 +387,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 347 | The views follow the records | no | 2026-11-17 |
 | 348 | Release 3.36.0 (release: 3.36.0) | yes | 2026-11-18 |
 | 349 | A Visual Studio extension that installs and finds the router | no | 2026-11-18 |
-| 350 | The Work Explorer in Visual Studio | — | not declared |
+| 350 | The Work Explorer in Visual Studio | no | 2026-11-18 |
 | 351 | Start Session from Visual Studio, with the engine in Windows Terminal | — | not declared |
 | 352 | The Dabbler Terminal's output in Visual Studio | — | not declared |
 | 353 | Stop, Continue, Close, Cancel and Restore from Visual Studio | — | not declared |
@@ -3937,3 +3937,9 @@ Build the smallest Visual Studio extension that installs and reaches the router,
 **Amended after acceptance:**
 
 - 2026-11-18 — step 'suite': its files: The lint control check-ci-suites refuses an expensive suite that scripts/ci-suites.json does not name; the new visual-studio suite needs its entry there (same command in CI, so no reason) (claude-code (anthropic, claude-opus-5-5))
+
+### Session 350 — The Work Explorer in Visual Studio
+
+**Releasable: no.**
+
+Give the Visual Studio extension its Work Explorer. The library (Dabbler.VisualStudio.Core) gains the rows of `dabbler view work-explorer` as C# types read from the JSON the router prints (schemas/work-explorer.schema.json, via Newtonsoft.Json, which Visual Studio already carries), and a tree view model that turns one document into nodes -- buckets open or closed as their rows' `collapsible` says, each node carrying its label, description, icon and a plain-text tooltip -- and that, given the next document, rebuilds the tree while keeping open the rows a developer opened and keeping the selected row selected, matched by the rows' ids. The extension (Dabbler.VisualStudio) gains a dockable tool window, Dabbler Work Explorer, opened from View > Other Windows, that finds the git repository holding the open solution, runs `dabbler view work-explorer --repo-root <root> --follow` there through the existing RouterFollow, and binds a WPF tree to the view model, restarting when a solution opens or closes. Icons are the VS Code extension's own status pictures (its media/light and media/dark SVGs, shipped in the VSIX and read into WPF drawings) and, for the editor's own glyphs, the nearest Visual Studio image moniker. Where the solution is in no git repository, or the repository has no session plan, the window shows a sentence saying so and what to do instead of a tree. Library tests: a document parses into rows; a document becomes a tree with the buckets and sessions it names; a second document keeps the opened rows open and the selected row selected; the repository root is found above a folder; a document naming no repository shows the sentence.

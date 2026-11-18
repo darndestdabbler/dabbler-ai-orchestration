@@ -18,6 +18,8 @@ namespace Dabbler.VisualStudio
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
+    // Docked beside the Solution Explorer, as VS Code's sits in its explorer.
+    [ProvideToolWindow(typeof(WorkExplorerWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     [Guid(PackageGuidString)]
     public sealed class DabblerPackage : AsyncPackage
     {
@@ -25,9 +27,16 @@ namespace Dabbler.VisualStudio
 
         private static readonly Guid CommandSet = new Guid("a9db3fec-b5ee-439b-acfe-21f711d1ec33");
         private const int VersionCommandId = 0x0100;
+        private const int WorkExplorerCommandId = 0x0101;
 
         private bool nodePassed;
         private Router? router;
+
+        /// <summary>The router the extension carries; null until the package has initialized.</summary>
+        internal Router? Router => router;
+
+        /// <summary>The Dabbler Commands pane; null until the package has initialized.</summary>
+        internal CommandsPane? Commands { get; private set; }
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -35,12 +44,22 @@ namespace Dabbler.VisualStudio
             var output = await GetServiceAsync(typeof(SVsOutputWindow)) as IVsOutputWindow
                 ?? throw new InvalidOperationException("Visual Studio offered no Output window.");
             var bundle = Path.Combine(Path.GetDirectoryName(typeof(DabblerPackage).Assembly.Location)!, "router", "dabbler.cjs");
-            router = new Router(bundle, CommandsPane.Create(output));
+            Commands = CommandsPane.Create(output);
+            router = new Router(bundle, Commands);
             var commands = await GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService
                 ?? throw new InvalidOperationException("Visual Studio offered no menu command service.");
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(ShowVersionAsync).FileAndForget("dabbler/version"),
                 new CommandID(CommandSet, VersionCommandId)));
+            commands.AddCommand(new MenuCommand(
+                (_, _) => JoinableTaskFactory.RunAsync(ShowWorkExplorerAsync).FileAndForget("dabbler/work-explorer"),
+                new CommandID(CommandSet, WorkExplorerCommandId)));
+        }
+
+        /// <summary>View > Other Windows > Dabbler Work Explorer.</summary>
+        private async Task ShowWorkExplorerAsync()
+        {
+            await ShowToolWindowAsync(typeof(WorkExplorerWindow), 0, create: true, DisposalToken);
         }
 
         /// <summary>Dabbler: Version -- `dabbler version`, which proves the road from Visual Studio to the router.</summary>

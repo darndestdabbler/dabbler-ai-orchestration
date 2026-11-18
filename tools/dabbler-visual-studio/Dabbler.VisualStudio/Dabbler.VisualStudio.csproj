@@ -11,6 +11,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>Dabbler.VisualStudio</RootNamespace>
+    <!-- The Work Explorer's control is XAML. -->
+    <UseWPF>true</UseWPF>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <UseCodebase>true</UseCodebase>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
@@ -37,6 +39,9 @@
     <VSCTCompile Include="DabblerPackage.vsct" ResourceName="Menus.ctmenu" />
     <!-- The router, built by `npm run build -w dabbler-ai-router` before this. -->
     <Content Include="..\..\..\packages\router\dist\dabbler.cjs" Link="router\dabbler.cjs" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The status pictures are the VS Code extension's own, one per theme. -->
+    <Content Include="..\..\dabbler-ai-orchestration\media\light\*.svg" Link="media\light\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\media\dark\*.svg" Link="media\dark\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />

@@ -18,6 +18,12 @@
           <ButtonText>Dabbler: Version</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidDabblerCommandSet" id="WorkExplorerCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>Dabbler Work Explorer</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -26,6 +32,7 @@
     <GuidSymbol name="guidDabblerCommandSet" value="{a9db3fec-b5ee-439b-acfe-21f711d1ec33}">
       <IDSymbol name="DabblerToolsGroup" value="0x1020" />
       <IDSymbol name="VersionCommandId" value="0x0100" />
+      <IDSymbol name="WorkExplorerCommandId" value="0x0101" />
     </GuidSymbol>
   </Symbols>
 

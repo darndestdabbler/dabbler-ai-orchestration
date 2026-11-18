@@ -7023,9 +7023,9 @@
     {
       "number": 355,
       "title": "The Configuration window in Visual Studio",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-18T08:13:55.629000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-18T08:28:14.677000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

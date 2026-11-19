@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 350 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 350 transcript</h1>
+<p class="stamp">Rendered 2026-11-18T09:12:25.814Z by dabbler-ai-router 3.35.0 at 57e79f0121b0c69705786483c00b103011466f49.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-18T03:55:00.370-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 350 of 362: The Work Explorer in Visual Studio</h3>
+<p>Scope: <code>tools/dabbler-visual-studio/</code> (the row types, the tree's view model, the tool window)</p>
+<p><strong>Why.</strong> The Work Explorer is where a developer sees the sessions and acts on them. Session 344 made the router print it.</p>
+<p><strong>Step 1 -- the rows as C# types,</strong> written from the schema session 344 added, in the library.</p>
+<p><strong>Step 2 -- the window.</strong> A dockable tool window, Dabbler Work Explorer, with a tree bound to what <code>dabbler view work-explorer --follow</code> prints for the repository of the open solution. Buckets start open or closed as their rows say. Each row shows its label, description, icon and tooltip.</p>
+<p><strong>Step 3 -- staying put.</strong> When a new document arrives the tree is replaced without losing which rows a developer had opened or which was selected, by the rows' ids.</p>
+<p><strong>Step 4 -- no repository, no sessions.</strong> A solution that is not in a git repository, or one with no session plan, shows a sentence saying so and what to do, where VS Code shows its welcome text.</p>
+<p><strong>Non-goals.</strong> Any action on a row: sessions 351, 353 and 354. More than one repository in a window. Icons drawn afresh: the VS Code extension's are used.</p>
+<p><strong>Tests.</strong> In the library: a document becomes a tree with the buckets and sessions it names; a second document keeps the opened rows open.</p>
+<p><strong>Releasable.</strong> No.</p>
+<h2>Work Plan</h2>
+<p>Give the Visual Studio extension its Work Explorer. The library (Dabbler.VisualStudio.Core) gains the rows of <code>dabbler view work-explorer</code> as C# types read from the JSON the router prints (schemas/work-explorer.schema.json, via Newtonsoft.Json, which Visual Studio already carries), and a tree view model that turns one document into nodes -- buckets open or closed as their rows' <code>collapsible</code> says, each node carrying its label, description, icon and a plain-text tooltip -- and that, given the next document, rebuilds the tree while keeping open the rows a developer opened and keeping the selected row selected, matched by the rows' ids. The extension (Dabbler.VisualStudio) gains a dockable tool window, Dabbler Work Explorer, opened from View &gt; Other Windows, that finds the git repository holding the open solution, runs <code>dabbler view work-explorer --repo-root &lt;root&gt; --follow</code> there through the existing RouterFollow, and binds a WPF tree to the view model, restarting when a solution opens or closes. Icons are the VS Code extension's own status pictures (its media/light and media/dark SVGs, shipped in the VSIX and read into WPF drawings) and, for the editor's own glyphs, the nearest Visual Studio image moniker. Where the solution is in no git repository, or the repository has no session plan, the window shows a sentence saying so and what to do instead of a tree. Library tests: a document parses into rows; a document becomes a tree with the buckets and sessions it names; a second document keeps the opened rows open and the selected row selected; the repository root is found above a folder; a document naming no repository shows the sentence.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/23d5f23c0f5c896c52ef3ab0f0cb8f4617295bc8"><code>23d5f23c0f5c896c52ef3ab0f0cb8f4617295bc8</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Rows</td><td><p>In Dabbler.VisualStudio.Core add WorkExplorerDocument.cs: the rows of <code>dabbler view work-explorer</code> as C# types written from packages/router/schemas/work-explorer.schema.json -- WorkExplorerDocument (SchemaVersion, Repositories), WorkExplorerRow (Id, Kind, Label, Description, Tooltip, Icon, Collapsible, ContextValue, Click, Actions, Children, Error), WorkExplorerIcon (Kind, Id, Color, Slug), WorkExplorerAction (Id, Title, Argv, Opens, Preview, Confirm, Reason), WorkExplorerOpens, WorkExplorerConfirmation, WorkExplorerReason -- read-only properties, nullable where the schema allows null. Add <code>public static WorkExplorerDocument Parse(string json)</code> that reads one line the router printed with Newtonsoft.Json and throws a FormatException naming the problem when the JSON is not a document or its schemaVersion is not 1. Reference Newtonsoft.Json 13.0.3 from the library's project (Visual Studio 17.14 carries that version). Add WorkExplorerDocumentTests.cs with one test, Parse_reads_every_member_of_a_row: a document with a repository, a bucket and a session whose session row has a file icon, a theme icon elsewhere, a click and an action with confirm and reason, parsed and each member asserted; and that a schemaVersion of 2 is refused.</p></td><td><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerDocument.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/Dabbler.VisualStudio.Core.csproj</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerDocumentTests.cs</span></td><td><code>dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</code><br><code>{msbuild} dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal</code></td><td>yes</td></tr>
+<tr><td>Window</td><td><p>In the library add WorkExplorerTree.cs: WorkExplorerNode (Row, Id, Label with any <code>$(name)</code> icon token removed, Description, Tooltip as plain text -- the row's markdown with <code>**</code>, backticks and <code>$(name)</code> tokens removed, null where the row has none -- Icon, Children, and IsExpanded and IsSelected raising PropertyChanged) and WorkExplorerTree (Roots as an ObservableCollection of nodes, <code>Show(WorkExplorerDocument)</code> replacing them, each node starting expanded exactly when its row's collapsible is <code>expanded</code>), plus <code>public static string? RepositoryRootOf(string folder)</code> returning the nearest folder at or above <code>folder</code> holding a <code>.git</code> directory or file, or null. In WorkExplorerTreeTests.cs: Show_builds_the_buckets_and_sessions_a_document_names (a document with a repository, an In Progress bucket marked expanded holding a session, and a collapsed Done bucket: the nodes, their order, labels, descriptions and plain tooltips, In Progress open and Done closed) and RepositoryRootOf_finds_the_git_folder_above (a temporary folder with <code>.git</code> and a nested folder; null for a folder with none above it inside the temporary root is not asserted, since a machine's temp may sit in a repository). In the extension: a dockable tool window, Dabbler Work Explorer (WorkExplorerWindow.cs, a ToolWindowPane registered with ProvideToolWindow, opened by a <code>Dabbler Work Explorer</code> button under View &gt; Other Windows in DabblerPackage.vsct and handled in DabblerPackage.cs), whose content is WorkExplorerControl.xaml/.xaml.cs: a TreeView over the tree's Roots with a HierarchicalDataTemplate over Children, IsExpanded and IsSelected bound two-way, each row showing its icon, label and dimmed description with the plain tooltip, in Visual Studio's environment colours. The window finds the solution's folder (IVsSolution), takes RepositoryRootOf it, passes the Node check through the package's EnsureNodeAsync, and runs <code>view work-explorer --repo-root &lt;root&gt; --follow</code> through RouterFollow with the package's Router; each line is parsed with WorkExplorerDocument.Parse off the main thread and shown with Show on it (a line that does not parse goes to the Dabbler Commands pane and the tree stays); the follower is stopped and restarted when a solution opens or closes, and stopped when the window is disposed. Icons (StatusPictures.cs): a <code>file</code> icon is the VS Code extension's tools/dabbler-ai-orchestration/media/light or media/dark <code>&lt;slug&gt;.svg</code>, chosen by whether the tool-window background is dark, included in the VSIX by Content links and read into a WPF DrawingImage from its circle and path elements (recursing into g; fill, stroke and stroke-width from the style attribute; path data through Geometry.Parse); a <code>theme</code> icon maps to a KnownMoniker -- info to StatusInformation, error to StatusError (StatusWarning when its colour is charts.yellow), eye to Visible -- and any other id shows no icon. The project sets UseWPF so the XAML compiles.</p></td><td><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerWindow.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/StatusPictures.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/DabblerPackage.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/DabblerPackage.vsct</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/Dabbler.VisualStudio.csproj</span></td><td><code>dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</code><br><code>{msbuild} dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal</code></td><td>yes</td></tr>
+<tr><td>Staying put</td><td><p>Make WorkExplorerTree.Show keep a developer's place: before replacing Roots it records the ids of the expanded nodes and of the selected one; in the new tree a node whose id was recorded is expanded exactly when it was expanded before (a row a developer closed stays closed even if its row says <code>expanded</code>), a node with a new id starts as its row says, and the node with the selected id is selected. Add to WorkExplorerTreeTests.cs Show_keeps_the_rows_a_developer_opened_and_selected: show a document, open the collapsed Done bucket, close In Progress, select a session, show a second document with the same ids and one new session, and assert Done open, In Progress closed, the session selected and the new one as its row says.</p></td><td><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs</span></td><td><code>dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</code></td><td>yes</td></tr>
+<tr><td>No sessions</td><td><p>Give WorkExplorerTree a Message (string, null when the tree is shown, raising PropertyChanged) and two sentences as public constants, each saying what is missing and what to do, in the words of the VS Code welcome text: NotInRepository (the solution is not in a git repository, so there are no sessions to show; put it in one and set Dabbler up there) and NoSessionPlan (this repository has no session plan yet; set Dabbler up in it) -- name the real command a person runs to set a repository up, checked against <code>dabbler --help</code> before writing it. Show sets Message to NoSessionPlan when the document names no repository and to null otherwise. WorkExplorerControl.xaml shows the Message, wrapped, where the tree would be whenever it is not null; WorkExplorerWindow.cs sets NotInRepository (and empties the tree, starting no router) when RepositoryRootOf finds no repository for the open solution, and says no solution is open when none is. Add to WorkExplorerTreeTests.cs Show_says_what_to_do_when_the_document_names_no_repository.</p></td><td><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerWindow.cs</span></td><td><code>dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</code><br><code>{msbuild} dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Any action on a row -- a click, a context menu, a confirmation or a reason box: sessions 351, 353 and 354. A row's <code>click</code> and <code>actions</code> are read into the types and nothing runs them.</li><li>More than one repository in a window: the window follows the one repository of the open solution.</li><li>Icons drawn afresh: the VS Code extension's SVG status pictures are read as they are, and the editor's own glyphs map to existing Visual Studio image monikers.</li><li>Setting a repository up from Visual Studio: the empty window says what to do, and does not do it.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[08:55:00]</span> <span class="muted">run-started</span> session=350 mode=pull</div>
+<div class="line"><span class="at">[08:55:00]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[08:58:33]</span> <span class="muted">run-resumed</span> session=350 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[08:58:33]</span> <span class="muted">answer-taken</span> steps=4</div>
+<div class="line"><span class="at">[08:58:33]</span> <span class="muted">plan-accepted</span> steps=[&quot;rows&quot;,&quot;window&quot;,&quot;staying-put&quot;,&quot;no-sessions&quot;] non_goals=4</div>
+<div class="line"><span class="at">[08:58:34]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[08:58:34]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=rows</div>
+<div class="line"><span class="at">[08:59:53]</span> <span class="muted">run-resumed</span> session=350 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[08:59:53]</span> <span class="muted">answer-taken</span> seq=2 step=rows status=done notes=Work Explorer row types with Newtonsoft.Json Parse that refuses a shape other than 1; one parse test</div>
+<div class="line"><span class="at">[08:59:55]</span> <span class="muted">check-started</span> step=rows argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;]</div>
+<div class="line"><span class="at">[08:59:59]</span> <span class="muted">check-ended</span> step=rows argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[08:59:59]</span> <span class="muted">check-started</span> step=rows argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;]</div>
+<div class="line"><span class="at">[09:00:09]</span> <span class="muted">check-ended</span> step=rows argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;] outcome=<span class="good">passed</span> seconds=10</div>
+<div class="line"><span class="at">[09:00:09]</span> <span class="muted">check-started</span> step=rows suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerDocumentTests</div>
+<div class="line"><span class="at">[09:00:13]</span> <span class="muted">check-ended</span> step=rows suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerDocumentTests outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[09:00:14]</span> <span class="muted">report-accepted</span> seq=2 step=rows files=[&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerDocument.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/Dabbler.VisualStudio.Core.csproj&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerDocumentTests.cs&quot;] notes=Work Explorer row types with Newtonsoft.Json Parse that refuses a shape other than 1; one parse test</div>
+<div class="line"><span class="at">[09:00:14]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=window</div>
+<div class="line"><span class="at">[09:04:33]</span> <span class="muted">run-resumed</span> session=350 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[09:04:33]</span> <span class="muted">answer-taken</span> seq=3 step=window status=done notes=Tree view model with RepositoryRootOf; dockable Work Explorer tool window following view work-explorer for the solution's repository; VS Code status SVGs read into WPF drawings, theme icons as KnownMonikers</div>
+<div class="line"><span class="at">[09:04:34]</span> <span class="muted">check-started</span> step=window argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;]</div>
+<div class="line"><span class="at">[09:04:39]</span> <span class="muted">check-ended</span> step=window argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[09:04:39]</span> <span class="muted">check-started</span> step=window argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;]</div>
+<div class="line"><span class="at">[09:04:42]</span> <span class="muted">check-ended</span> step=window argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[09:04:42]</span> <span class="muted">check-started</span> step=window suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[09:04:48]</span> <span class="muted">check-ended</span> step=window suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[09:04:48]</span> <span class="muted">check-started</span> step=window suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests</div>
+<div class="line"><span class="at">[09:04:51]</span> <span class="muted">check-ended</span> step=window suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[09:04:52]</span> <span class="muted">report-accepted</span> seq=3 step=window files=[&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerWindow.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/StatusPictures.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/DabblerPackage.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/DabblerPackage.vsct&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/Dabbler.VisualStudio.csproj&quot;] notes=Tree view model with RepositoryRootOf; dockable Work Explorer tool window following view work-explorer for the solution's repository; VS Code status SVGs read into WPF drawings, theme icons as KnownMonikers</div>
+<div class="line"><span class="at">[09:04:52]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=staying-put</div>
+<div class="line"><span class="at">[09:05:34]</span> <span class="muted">run-resumed</span> session=350 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[09:05:34]</span> <span class="muted">answer-taken</span> seq=4 step=staying-put status=done notes=Show keeps opened, closed and selected rows by id; new rows start as their row says</div>
+<div class="line"><span class="at">[09:05:35]</span> <span class="muted">check-started</span> step=staying-put argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;]</div>
+<div class="line"><span class="at">[09:05:41]</span> <span class="muted">check-ended</span> step=staying-put argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[09:05:41]</span> <span class="muted">check-started</span> step=staying-put suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests</div>
+<div class="line"><span class="at">[09:05:43]</span> <span class="muted">check-ended</span> step=staying-put suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[09:05:44]</span> <span class="muted">report-accepted</span> seq=4 step=staying-put files=[&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs&quot;] notes=Show keeps opened, closed and selected rows by id; new rows start as their row says</div>
+<div class="line"><span class="at">[09:05:44]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=no-sessions</div>
+<div class="line"><span class="at">[09:07:01]</span> <span class="muted">run-resumed</span> session=350 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[09:07:01]</span> <span class="muted">answer-taken</span> seq=5 step=no-sessions status=done notes=Message for no solution, no git repository and no session plan, naming dabbler bootstrap; shown in place of the tree</div>
+<div class="line"><span class="at">[09:07:02]</span> <span class="muted">check-started</span> step=no-sessions argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;]</div>
+<div class="line"><span class="at">[09:07:08]</span> <span class="muted">check-ended</span> step=no-sessions argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[09:07:08]</span> <span class="muted">check-started</span> step=no-sessions argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;]</div>
+<div class="line"><span class="at">[09:07:12]</span> <span class="muted">check-ended</span> step=no-sessions argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;] outcome=<span class="good">passed</span> seconds=4</div>
+<div class="line"><span class="at">[09:07:12]</span> <span class="muted">check-started</span> step=no-sessions suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[09:07:18]</span> <span class="muted">check-ended</span> step=no-sessions suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[09:07:18]</span> <span class="muted">check-started</span> step=no-sessions suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests</div>
+<div class="line"><span class="at">[09:07:22]</span> <span class="muted">check-ended</span> step=no-sessions suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter WorkExplorerTreeTests outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[09:07:22]</span> <span class="muted">report-accepted</span> seq=5 step=no-sessions files=[&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/WorkExplorerTree.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/WorkExplorerTreeTests.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerControl.xaml&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/WorkExplorerWindow.cs&quot;] notes=Message for no solution, no git repository and no session plan, naming dabbler bootstrap; shown in place of the tree</div>
+<div class="line"><span class="at">[09:07:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[09:07:23]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[09:07:25]</span> <span class="muted">job-started</span> name=verification pid=12336 log=.dabbler/runs/s350/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[09:09:40]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[09:09:40]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[09:09:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[09:09:40]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[09:09:41]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=57976 log=.dabbler/runs/s350/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[09:09:46]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[09:09:47]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[09:09:48]</span> <span class="muted">job-started</span> name=run of record: typescript pid=5172 log=.dabbler/runs/s350/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[09:11:35]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[09:11:36]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[09:11:37]</span> <span class="muted">job-started</span> name=run of record: extension pid=62320 log=.dabbler/runs/s350/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[09:11:57]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[09:11:57]</span> <span class="muted">run-of-record</span> suite=visual-studio stage=final-full why=visual-studio declares whole_at_close command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</div>
+<div class="line"><span class="at">[09:11:58]</span> <span class="muted">job-started</span> name=run of record: visual-studio pid=33304 log=.dabbler/runs/s350/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[09:12:04]</span> <span class="muted">job-finished</span> name=run of record: visual-studio exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[09:12:04]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[09:12:06]</span> <span class="muted">committing</span> subject=Session 350: The Work Explorer in Visual Studio</div>
+<div class="line"><span class="at">[09:12:07]</span> <span class="muted">pushing</span></div>
+<div class="line"><span class="at">[09:12:11]</span> <span class="muted">landed</span> commit=23d5f23c0f5c896c52ef3ab0f0cb8f4617295bc8</div>
+<div class="line"><span class="at">[09:12:11]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[09:12:12]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[09:12:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[09:12:13]</span> <span class="muted">job-started</span> name=close pid=47076 log=.dabbler/runs/s350/driver/jobs/close.log</div>
+<div class="line"><span class="at">[09:12:25]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s350/driver/jobs/close.log</div>
+<div class="line"><span class="at">[09:12:25]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div>
+<div class="line"><span class="at">[09:12:25]</span> <span class="muted">transcript-rendering</span> carry=outline</div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>4 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Issue →** Inline editor glyphs in labels are discarded rather than rendered.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Issue →** Tooltip conversion does not generally produce plain text; it only removes icon tokens, `**`, and backticks.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>**Issue →** File icons are selected for the theme only when the converter runs, so switching Visual Studio themes can leave already-rendered icons using the previous theme’s SVG.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>**Issue →** The visible tests exercise only the core model; none loads the shipped XAML, command registration, tool window, SVG resources, or real `RouterFollow` path.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>3s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>105s</td><td>1677</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>193</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+<tr><td>visual-studio</td><td>final-full</td><td><span class="good">passed</span></td><td>4s</td><td>13</td><td>0</td><td>0</td><td><span class="mono">dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-visual-studio</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

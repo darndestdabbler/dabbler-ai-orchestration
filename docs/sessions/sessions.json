@@ -7285,9 +7285,9 @@
     {
       "number": 368,
       "title": "An engine pane in Visual Studio takes the keys",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-19T05:57:13.376000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-19T12:55:59.367000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

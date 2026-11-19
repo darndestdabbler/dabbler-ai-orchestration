@@ -26,6 +26,8 @@
     <!-- 17.14: the oldest Visual Studio the manifest installs on. -->
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" />
+    <!-- The Dabbler Engine's control: the version Visual Studio 2026 carries. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,6 +55,10 @@
     <!-- The status pictures are the VS Code extension's own, one per theme. -->
     <Content Include="..\..\dabbler-ai-orchestration\media\light\*.svg" Link="media\light\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\dabbler-ai-orchestration\media\dark\*.svg" Link="media\dark\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Dabbler Engine's page and the terminal it draws with, from the
+         workspace's node_modules: `npm ci` at the root before this. -->
+    <Content Include="engine\engine.html;engine\engine.js" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\node_modules\@xterm\xterm\lib\xterm.js;..\..\..\node_modules\@xterm\xterm\css\xterm.css;..\..\..\node_modules\@xterm\addon-fit\lib\addon-fit.js" Link="engine\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />

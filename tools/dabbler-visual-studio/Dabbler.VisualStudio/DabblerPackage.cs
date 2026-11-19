@@ -27,6 +27,8 @@ namespace Dabbler.VisualStudio
     [ProvideToolWindow(typeof(TerminalWindow), Style = VsDockStyle.Tabbed, Window = "34e76e81-ee4a-11d0-ae2e-00a0c90fffc3")]
     // Beside the Work Explorer, as VS Code's Configuration section sits under its tree.
     [ProvideToolWindow(typeof(ConfigurationWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
+    // A tab in the editor area, where a file opens.
+    [ProvideToolWindow(typeof(EngineWindow), Style = VsDockStyle.MDI)]
     [Guid(PackageGuidString)]
     public sealed class DabblerPackage : AsyncPackage
     {
@@ -37,6 +39,7 @@ namespace Dabbler.VisualStudio
         private const int WorkExplorerCommandId = 0x0101;
         private const int TerminalCommandId = 0x0102;
         private const int ConfigurationCommandId = 0x0103;
+        private const int OpenEngineHereCommandId = 0x0104;
 
         private bool nodePassed;
         private NoticeWatcher? notices;
@@ -74,6 +77,9 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(ShowConfigurationAsync).FileAndForget("dabbler/configuration"),
                 new CommandID(CommandSet, ConfigurationCommandId)));
+            commands.AddCommand(new MenuCommand(
+                (_, _) => JoinableTaskFactory.RunAsync(OpenEngineHereAsync).FileAndForget("dabbler/engine"),
+                new CommandID(CommandSet, OpenEngineHereCommandId)));
             notices = new NoticeWatcher(this);
         }
 
@@ -115,6 +121,16 @@ namespace Dabbler.VisualStudio
         private async Task ShowTerminalAsync()
         {
             await ShowToolWindowAsync(typeof(TerminalWindow), 0, create: true, DisposalToken);
+        }
+
+        /// <summary>
+        /// Tools > Dabbler: Open Engine Here -- the configured engine in the
+        /// Dabbler Engine pane, or the pane as it is where one is running.
+        /// </summary>
+        private async Task OpenEngineHereAsync()
+        {
+            var window = await ShowToolWindowAsync(typeof(EngineWindow), 0, create: true, DisposalToken);
+            if (window is EngineWindow engine) await engine.OpenAsync();
         }
 
         /// <summary>

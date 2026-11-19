@@ -19,6 +19,8 @@
     "check:version": "node packages/router/scripts/run-ts.mjs packages/router/scripts/stamp-version.ts --check"
   },
   "devDependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "pptxgenjs": "^4.0.1"
   }
 }

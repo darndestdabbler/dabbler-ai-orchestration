@@ -405,6 +405,11 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 365 | Release 3.38.0 (release: 3.38.0) | yes | 2026-11-18 |
 | 366 | A Word document is written as a document, and its text is reviewed | no | 2026-11-18 |
 | 367 | Release 3.39.0 (release: 3.39.0) | yes | 2026-11-18 |
+| 368 | An engine pane in Visual Studio takes the keys | no | 2026-11-19 |
+| 369 | An engine outlives Visual Studio | — | not declared |
+| 370 | Start Session opens the engine inside Visual Studio | — | not declared |
+| 371 | A Dabbler layout, and the way back | — | not declared |
+| 372 | Release 3.40.0 (release: 3.40.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4082,3 +4087,14 @@ Make a session whose product is a Word document (or another office file) produce
 **Releasable: yes.**
 
 Release 3.39.0: the framework packs and publishes what is on the trunk.
+
+### Session 368 — An engine pane in Visual Studio takes the keys
+
+**Releasable: no.**
+
+Prove that Claude Code and the Copilot CLI can be typed to inside a Visual Studio pane as they are in Windows Terminal. The Visual Studio extension gains one Dabbler Engine tool window that opens as a tab in the editor area (VsDockStyle.MDI) and holds a WebView2 control. The control shows xterm.js and its fit addon, which are shipped in the package from the workspace's node_modules and loaded from nowhere else, and its WebView2 data folder is Dabbler's own under %LOCALAPPDATA%\Dabbler. A new command, Tools > Dabbler: Open Engine Here, reads this repository's configured engine and model, asks `dabbler session launch --for consult` for the launch line, and runs it through ConPTY inside Visual Studio's process. The PATH and environment are the ones the Windows Terminal tab is given, and the engine is joined to the pane: bytes go both ways and the pane's size goes to the engine on every resize, never a size of zero. While the terminal has focus it keeps Esc, Shift+Tab, the arrows, Enter with its modifiers, Ctrl+C and Ctrl+V. Ctrl+C copies a selection and otherwise interrupts, pasted text goes in as text, and Ctrl+Tab and Visual Studio's window keys still leave the pane. What is kept and what a size becomes is decided in the library, in TerminalKeys and TerminalSize, with their tests. The terminal takes Visual Studio's light, dark and blue themes, follows a change of them, and has its own font and size. docs/uat/uat-visual-studio-engine-pane.md records which WebView2 assembly Visual Studio loads and the walk in Visual Studio 2026 with both engines beside Windows Terminal, and it ends with one line: go, or what failed and where.
+
+**Amended after acceptance:**
+
+- 2026-11-19 — step 'engine': its files: Opening the root solution in Visual Studio for the smoke run wrote .vs/, which nothing ignored; .gitignore now ignores Visual Studio's per-user state (claude-code (anthropic, claude-opus-5-5))
+- 2026-11-19 — step 'walk': its files: The walk showed Shift+Enter sent the prompt in the pane where Windows Terminal makes a new line; the fix is in engine.js, a file the engine step named, which now sends Shift+Enter as Alt+Enter. (claude-code (anthropic, claude-opus-5-5))

@@ -2486,3 +2486,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 13 read(s), 0 search(es), 0 listing(s); 2 not confined to scope; 1 read(s) of the transport's own handoff file, not counted
 - Raw round output: `.dabbler/runs/s366/`
+
+## Session 368 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-6.1-terra (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s368/`

@@ -28,5 +28,7 @@ test-results/
 bin/
 obj/
 TestResults/
+# Visual Studio's own per-user state, written beside a solution it opens.
+.vs/
 coverage*.json
 coverage*.xml

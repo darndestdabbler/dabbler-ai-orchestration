@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 361 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 361 transcript</h1>
+<p class="stamp">Rendered 2026-11-18T18:13:49.024Z by dabbler-ai-router 3.35.0 at 478f50392a9d737c29f4d57d5ede864de1560f96.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-18T12:59:33.325-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 361 of 365: The Work Explorer offers only what its verbs take, and a stop's bar goes with the stop</h3>
+<p>Scope: <code>packages/router/src/views/workExplorer.ts</code> (which actions a session's row offers), <code>packages/router/src/progress.ts</code> with the progress projection's schema and its generated type (whether a standing stop can be waived), <code>tools/dabbler-visual-studio/Dabbler.VisualStudio/NoticeWatcher.cs</code> (the editor's bar for a session that needs a person), and the tests named after each</p>
+<p><strong>Why.</strong> Session 360's walk in Visual Studio found three things a developer meets at a stop, and none was small enough to fix inside the walk.</p>
+<p><strong>Step 1 -- Review exception only where a waiver can go.</strong> A session's row offers Review exception on every standing stop, because the row knows who the stop waits on and not what kind it is. On a <code>blocked</code> stop, which the walk produced, it runs <code>session waive</code> and the router refuses: *&quot;a 'blocked' stop has nothing to go past&quot;*. The projection says whether the standing stop is one <code>session waive</code> accepts, read from the one list it reads (<code>WAIVABLE_STOP_KINDS</code>), and the row offers Review exception only then. The VS Code extension and the Visual Studio extension both take the row's actions as the router gives them, so neither changes.</p>
+<p><strong>Step 2 -- a way back to the engine on the session's own row.</strong> With the engine's terminal closed mid-session, the session's row offered nothing that reopens it; the repository's row did, because its Start Session re-registers the session in flight, which is how a session continues. The session in flight's row offers that same start as Continue Session where no stop stands -- the action and its label exist already, for a wait on funds. It adds no way to start an engine the repository row does not already offer.</p>
+<p><strong>Step 3 -- the bar goes when the stop does.</strong> Visual Studio says *&quot;session N is paused&quot;* in an information bar across the editor, and the bar stayed after the walk rolled the session back, until closed by hand. It closes itself when the next notice for that repository says the session has moved on.</p>
+<p><strong>Non-goals.</strong> Knowing whether an engine is still running. Any new stop kind or any change to what <code>session waive</code> accepts. The Configuration window.</p>
+<p><strong>Tests.</strong> In <code>workExplorer.test.ts</code>: a <code>blocked</code> stop's row offers no Review exception and a <code>tests</code> stop's row does; a session in flight with no stop offers Continue Session. In <code>progress.test.ts</code>: the projection says a <code>blocked</code> stop cannot be waived. In the Visual Studio library, the test named after the file that decides when the bar closes.</p>
+<p><strong>Releasable.</strong> No: it ships in 3.37.0, in session 363.</p>
+<h2>Work Plan</h2>
+<p>Fix the three things session 360's walk in Visual Studio found at a stop. The progress projection says whether the standing stop is one <code>session waive</code> accepts, as a <code>stopWaivable</code> member present beside <code>stopActor</code>. It reads <code>WAIVABLE_STOP_KINDS</code>, which moves from session.ts into driver.ts beside <code>renderStop</code>, because progress.ts already imports driver.ts and session.ts imports progress.ts. The schema and the generated type gain the member, and the session row offers Review exception only where it says true. The row of the session in flight offers Continue Session, the same start the repository row's Start Session runs, wherever no stop stands, as well as on a wait for funds. In the Visual Studio library, TerminalNotices raises a moved-on notice for a paused session when the stream says it resumed, closed, or moved to another session, which is what a rollback produces. NoticeWatcher keeps each paused bar it shows and closes it on that notice.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/65b0405df436ac8ebe108c8fd24ca7475334f977"><code>65b0405df436ac8ebe108c8fd24ca7475334f977</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Projection says waivable</td><td><p>Move WAIVABLE_STOP_KINDS from session.ts to driver.ts (exported; session.ts imports it). In progress.ts, project <code>stopWaivable</code> (boolean) on an in-flight session wherever <code>stopActor</code> is projected, true when the standing stop's kind is in WAIVABLE_STOP_KINDS. Add the member to progress-projection.schema.json, regenerate src/generated/progress-projection.ts with <code>npm --prefix packages/router run generate:types</code>, and add a progress.test.ts test that a <code>blocked</code> stop projects stopWaivable false and a <code>tests</code> stop true.</p></td><td><span class="mono">packages/router/src/driver.ts</span><br><span class="mono">packages/router/src/session.ts</span><br><span class="mono">packages/router/src/progress.ts</span><br><span class="mono">packages/router/schemas/progress-projection.schema.json</span><br><span class="mono">packages/router/src/generated/progress-projection.ts</span><br><span class="mono">packages/router/test/progress.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>npm --prefix packages/router run check:types</code><br><code>node packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/progress.test.ts</code></td><td>yes</td></tr>
+<tr><td>Review exception only where waivable</td><td><p>In views/workExplorer.ts, offer <code>dabbler.reviewException</code> only where a stop stands and the session's <code>stopWaivable</code> is true. In workExplorer.test.ts, update the standing-stop actions test and add one showing that a <code>blocked</code> stop's row offers no Review exception and a <code>tests</code> stop's row does.</p></td><td><span class="mono">packages/router/src/views/workExplorer.ts</span><br><span class="mono">packages/router/test/workExplorer.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node --test packages/router/test/workExplorer.test.ts</code></td><td>yes</td></tr>
+<tr><td>Continue session on the row</td><td><p>In views/workExplorer.ts, offer <code>dabblerSessionSets.continueSession</code> on the session in flight wherever no stop stands (no <code>stopActor</code>), as well as on a wait for funds. It runs the same startSession. Update the Continue Session test in workExplorer.test.ts so that a session in flight with no stop offers it, a stop that is not a wait for funds does not, and a row not in flight does not.</p></td><td><span class="mono">packages/router/src/views/workExplorer.ts</span><br><span class="mono">packages/router/test/workExplorer.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node --test packages/router/test/workExplorer.test.ts</code></td><td>yes</td></tr>
+<tr><td>Paused bar goes with the stop</td><td><p>In Dabbler.VisualStudio.Core/TerminalNotices.cs, add a <code>moved-on</code> notice kind. It is raised, without going through the raised-once file, for a session this following saw paused when the stream then reads a <code>progress-resumed</code> line for it, its <code>session-closed</code> line, or a <code>phase</code> line naming another session (a rollback). In NoticeWatcher.cs, keep the bar shown for each paused session of a repository, close it on that session's moved-on notice, and show no bar for the moved-on notice itself. Add a TerminalNoticesTests.cs test covering when a paused session is said to have moved on.</p></td><td><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/TerminalNotices.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/TerminalNoticesTests.cs</span><br><span class="mono">tools/dabbler-visual-studio/Dabbler.VisualStudio/NoticeWatcher.cs</span></td><td><code>dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</code><br><code>{msbuild} dabbler-visual-studio.slnx /restore /t:Build /p:Configuration=Release /nologo /v:minimal</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Knowing whether an engine is still running</li><li>Any new stop kind, or any change to what <code>session waive</code> accepts (the release-session and rejected-thrice-off-a-step refusals stay the verb's own)</li><li>The Configuration window</li><li>Any change to the VS Code extension or to how either extension takes a row's actions</li><li>Closing the overdue-instruction or session-closed bars: only the paused bar goes with its stop</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:59:33]</span> <span class="muted">run-started</span> session=361 mode=pull</div>
+<div class="line"><span class="at">[17:59:33]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[18:02:18]</span> <span class="muted">run-resumed</span> session=361 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[18:02:18]</span> <span class="muted">answer-taken</span> steps=4</div>
+<div class="line"><span class="at">[18:02:18]</span> <span class="muted">plan-accepted</span> steps=[&quot;projection-says-waivable&quot;,&quot;review-exception-only-where-waivable&quot;,&quot;continue-session-on-the-row&quot;,&quot;paused-bar-goes-with-the-stop&quot;] non_goals=5</div>
+<div class="line"><span class="at">[18:02:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[18:02:20]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=projection-says-waivable</div>
+<div class="line"><span class="at">[18:03:52]</span> <span class="muted">run-resumed</span> session=361 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:03:52]</span> <span class="muted">answer-taken</span> seq=2 step=projection-says-waivable status=done notes=WAIVABLE_STOP_KINDS moved to driver.ts; standingStop projects stopActor and stopWaivable</div>
+<div class="line"><span class="at">[18:03:53]</span> <span class="muted">check-started</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:03:59]</span> <span class="muted">check-ended</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[18:03:59]</span> <span class="muted">check-started</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:04:06]</span> <span class="muted">check-ended</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=7</div>
+<div class="line"><span class="at">[18:04:06]</span> <span class="muted">check-started</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;check:types&quot;]</div>
+<div class="line"><span class="at">[18:04:08]</span> <span class="muted">check-ended</span> step=projection-says-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;check:types&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[18:04:08]</span> <span class="muted">check-started</span> step=projection-says-waivable argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[18:04:10]</span> <span class="muted">check-ended</span> step=projection-says-waivable argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[18:04:10]</span> <span class="muted">check-started</span> step=projection-says-waivable argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/progress.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:04:13]</span> <span class="muted">check-ended</span> step=projection-says-waivable argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/progress.test.ts&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[18:04:13]</span> <span class="muted">check-started</span> step=projection-says-waivable suite=typescript command=node scripts/suite.mjs container packages/router/test/driver.test.ts packages/router/test/progress.test.ts packages/router/test/schema.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[18:05:12]</span> <span class="muted">check-ended</span> step=projection-says-waivable suite=typescript command=node scripts/suite.mjs container packages/router/test/driver.test.ts packages/router/test/progress.test.ts packages/router/test/schema.test.ts packages/router/test/session.test.ts outcome=<span class="good">passed</span> seconds=60</div>
+<div class="line"><span class="at">[18:05:13]</span> <span class="muted">report-accepted</span> seq=2 step=projection-says-waivable files=[&quot;packages/router/src/driver.ts&quot;,&quot;packages/router/src/session.ts&quot;,&quot;packages/router/src/progress.ts&quot;,&quot;packages/router/schemas/progress-projection.schema.json&quot;,&quot;packages/router/src/generated/progress-projection.ts&quot;,&quot;packages/router/test/progress.test.ts&quot;] notes=WAIVABLE_STOP_KINDS moved to driver.ts; standingStop projects stopActor and stopWaivable</div>
+<div class="line"><span class="at">[18:05:13]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=review-exception-only-where-waivable</div>
+<div class="line"><span class="at">[18:06:00]</span> <span class="muted">run-resumed</span> session=361 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:06:00]</span> <span class="muted">answer-taken</span> seq=3 step=review-exception-only-where-waivable status=done notes=Review exception offered only where stopWaivable is true</div>
+<div class="line"><span class="at">[18:06:02]</span> <span class="muted">check-started</span> step=review-exception-only-where-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:06:08]</span> <span class="muted">check-ended</span> step=review-exception-only-where-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[18:06:08]</span> <span class="muted">check-started</span> step=review-exception-only-where-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:06:15]</span> <span class="muted">check-ended</span> step=review-exception-only-where-waivable argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=7</div>
+<div class="line"><span class="at">[18:06:15]</span> <span class="muted">check-started</span> step=review-exception-only-where-waivable argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:06:17]</span> <span class="muted">check-ended</span> step=review-exception-only-where-waivable argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[18:06:17]</span> <span class="muted">check-started</span> step=review-exception-only-where-waivable suite=typescript command=node scripts/suite.mjs container packages/router/test/workExplorer.test.ts</div>
+<div class="line"><span class="at">[18:06:23]</span> <span class="muted">check-ended</span> step=review-exception-only-where-waivable suite=typescript command=node scripts/suite.mjs container packages/router/test/workExplorer.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[18:06:24]</span> <span class="muted">report-accepted</span> seq=3 step=review-exception-only-where-waivable files=[&quot;packages/router/src/views/workExplorer.ts&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] notes=Review exception offered only where stopWaivable is true</div>
+<div class="line"><span class="at">[18:06:24]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=continue-session-on-the-row</div>
+<div class="line"><span class="at">[18:07:07]</span> <span class="muted">run-resumed</span> session=361 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:07:07]</span> <span class="muted">answer-taken</span> seq=4 step=continue-session-on-the-row status=done notes=Continue Session offered on the session in flight where no stop stands, and on a wait for funds</div>
+<div class="line"><span class="at">[18:07:08]</span> <span class="muted">check-started</span> step=continue-session-on-the-row argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[18:07:14]</span> <span class="muted">check-ended</span> step=continue-session-on-the-row argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[18:07:14]</span> <span class="muted">check-started</span> step=continue-session-on-the-row argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[18:07:21]</span> <span class="muted">check-ended</span> step=continue-session-on-the-row argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=7</div>
+<div class="line"><span class="at">[18:07:21]</span> <span class="muted">check-started</span> step=continue-session-on-the-row argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;]</div>
+<div class="line"><span class="at">[18:07:23]</span> <span class="muted">check-ended</span> step=continue-session-on-the-row argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[18:07:23]</span> <span class="muted">check-started</span> step=continue-session-on-the-row suite=typescript command=node scripts/suite.mjs container packages/router/test/workExplorer.test.ts</div>
+<div class="line"><span class="at">[18:07:29]</span> <span class="muted">check-ended</span> step=continue-session-on-the-row suite=typescript command=node scripts/suite.mjs container packages/router/test/workExplorer.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[18:07:30]</span> <span class="muted">report-accepted</span> seq=4 step=continue-session-on-the-row files=[&quot;packages/router/src/views/workExplorer.ts&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] notes=Continue Session offered on the session in flight where no stop stands, and on a wait for funds</div>
+<div class="line"><span class="at">[18:07:30]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=paused-bar-goes-with-the-stop</div>
+<div class="line"><span class="at">[18:09:18]</span> <span class="muted">run-resumed</span> session=361 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[18:09:18]</span> <span class="muted">answer-taken</span> seq=5 step=paused-bar-goes-with-the-stop status=done notes=TerminalNotices says moved-on for a paused session that resumes or is replaced by another session's run (rollback); NoticeWatcher closes its paused bar then, and on its close</div>
+<div class="line"><span class="at">[18:09:19]</span> <span class="muted">check-started</span> step=paused-bar-goes-with-the-stop argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;]</div>
+<div class="line"><span class="at">[18:09:24]</span> <span class="muted">check-ended</span> step=paused-bar-goes-with-the-stop argv=[&quot;dotnet&quot;,&quot;test&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj&quot;,&quot;--nologo&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[18:09:24]</span> <span class="muted">check-started</span> step=paused-bar-goes-with-the-stop argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;]</div>
+<div class="line"><span class="at">[18:09:28]</span> <span class="muted">check-ended</span> step=paused-bar-goes-with-the-stop argv=[&quot;{msbuild}&quot;,&quot;dabbler-visual-studio.slnx&quot;,&quot;/restore&quot;,&quot;/t:Build&quot;,&quot;/p:Configuration=Release&quot;,&quot;/nologo&quot;,&quot;/v:minimal&quot;] outcome=<span class="good">passed</span> seconds=4</div>
+<div class="line"><span class="at">[18:09:28]</span> <span class="muted">check-started</span> step=paused-bar-goes-with-the-stop suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[18:09:34]</span> <span class="muted">check-ended</span> step=paused-bar-goes-with-the-stop suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[18:09:34]</span> <span class="muted">check-started</span> step=paused-bar-goes-with-the-stop suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter TerminalNoticesTests</div>
+<div class="line"><span class="at">[18:09:37]</span> <span class="muted">check-ended</span> step=paused-bar-goes-with-the-stop suite=visual-studio command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo --filter TerminalNoticesTests outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[18:09:38]</span> <span class="muted">report-accepted</span> seq=5 step=paused-bar-goes-with-the-stop files=[&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/TerminalNotices.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/TerminalNoticesTests.cs&quot;,&quot;tools/dabbler-visual-studio/Dabbler.VisualStudio/NoticeWatcher.cs&quot;] notes=TerminalNotices says moved-on for a paused session that resumes or is replaced by another session's run (rollback); NoticeWatcher closes its paused bar then, and on its close</div>
+<div class="line"><span class="at">[18:09:38]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[18:09:38]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[18:09:40]</span> <span class="muted">job-started</span> name=verification pid=42876 log=.dabbler/runs/s361/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:10:54]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[18:10:54]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[18:10:54]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[18:10:55]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[18:10:56]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=65604 log=.dabbler/runs/s361/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:11:02]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[18:11:03]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[18:11:04]</span> <span class="muted">job-started</span> name=run of record: typescript pid=11260 log=.dabbler/runs/s361/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:12:51]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[18:12:52]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[18:12:52]</span> <span class="muted">job-started</span> name=run of record: extension pid=10476 log=.dabbler/runs/s361/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:13:13]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[18:13:14]</span> <span class="muted">run-of-record</span> suite=visual-studio stage=final-full why=visual-studio declares whole_at_close command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</div>
+<div class="line"><span class="at">[18:13:15]</span> <span class="muted">job-started</span> name=run of record: visual-studio pid=62320 log=.dabbler/runs/s361/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[18:13:22]</span> <span class="muted">job-finished</span> name=run of record: visual-studio exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[18:13:22]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[18:13:25]</span> <span class="muted">committing</span> subject=Session 361: The Work Explorer offers only what its verbs take, and a s…</div>
+<div class="line"><span class="at">[18:13:26]</span> <span class="muted">pushing</span></div>
+<div class="line"><span class="at">[18:13:30]</span> <span class="muted">landed</span> commit=65b0405df436ac8ebe108c8fd24ca7475334f977</div>
+<div class="line"><span class="at">[18:13:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[18:13:31]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[18:13:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[18:13:32]</span> <span class="muted">job-started</span> name=close pid=39124 log=.dabbler/runs/s361/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:13:49]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s361/driver/jobs/close.log</div>
+<div class="line"><span class="at">[18:13:49]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div>
+<div class="line"><span class="at">[18:13:49]</span> <span class="muted">transcript-rendering</span> carry=outline</div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `NoticeWatcher.cs` has no direct test proving that a retained paused `IVsInfoBarUIElement` receives `Close()` on `MovedOn` or `SessionClosed`; `TerminalNoticesTests.cs` only verifies notice production. A useful case would retain a fake paused bar, feed the corresponding notice through the watcher path, and assert the paused bar closes while the moved-on notice creates no new bar.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>4s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>104s</td><td>1683</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>19s</td><td>193</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+<tr><td>visual-studio</td><td>final-full</td><td><span class="good">passed</span></td><td>5s</td><td>60</td><td>0</td><td>0</td><td><span class="mono">dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-visual-studio</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

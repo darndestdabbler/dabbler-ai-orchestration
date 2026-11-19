@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 336 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 336 transcript</h1>
+<p class="stamp">Rendered 2026-11-16T17:36:51.127Z by dabbler-ai-router 3.34.1 at 0ee524d3d7ac47c0d1f6a819f773eeb9bf21c680.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-16T12:22:55.188-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 336 of 342: A rollback from a stop offers the report first</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts</code> (<code>runRollbackSessionFlow</code>), <code>tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</code> (<code>runReportStop</code>), <code>packages/router/src/session.ts</code> (<code>defectReport</code>, <code>reportText</code>), <code>packages/router/src/cli/session.ts</code> (the <code>defect-report</code> switch and the <code>rollback</code> help), <code>packages/router/src/contracts/router.ts</code> and <code>packages/router/src/inProcess.ts</code> (<code>SessionDefectReportOptions</code>), <code>commandFlows.test.ts</code>, <code>session.test.ts</code>, <code>docs/driving-a-session.md</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Ahead of the walks, and last of three.</strong> The operator, 2026-11-16: staff are starting to meet framework stops that end in a rollback, and those are the stops the maintainers most need to hear about. Sessions 334 and 335 remove the cause that was found; this one is for the next cause, which nobody has found yet. It ships with them as 3.35.0.</p>
+<p><strong>Why.</strong> A stop a person rolls back from is one the framework gave no acceptable way past, and today it is the one stop that cannot be reported:</p>
+<ul><li>Report this stop to Dabbler is offered only while a stop stands over the session in flight (<code>hasStandingStop</code>). After a rollback nothing is in flight, so the item is gone.</li><li><code>rollback</code> moves the run record of every session it undoes to <code>.dabbler/superseded-runs/</code>, and <code>defect-report --session N</code> reads the live record only, so it refuses: the session &quot;met no stop the framework recorded&quot;.</li><li>The Mechanic's two lines for the maintainers are read from <code>mechanic-log.md</code>, a tracked file the rollback's reset or revert takes back with everything else.</li><li>So the report can be written only before the rollback, and nothing in the rollback's one dialog says so.</li></ul>
+<p><strong>Step 1 -- the dialog offers it.</strong> Where the session in flight stands at a stop, the rollback's modal carries a third choice, &quot;Report, Then Roll Back&quot;, and its detail says the choice is one provider call and that nothing is sent to the maintainers. It is still one dialog: nothing is asked between the choice and the rollback. The report is written first, by the same <code>defect-report</code> call Report this stop makes; then the rollback runs, bound to the HEAD the facts were read at, which a report does not move because it writes only under <code>.dabbler/</code>. Then the report opens, with the same Copy and open offer as now. Where no stop stands, the dialog is as it is today.</p>
+<p><strong>Step 2 -- a report that could not be written does not hold the rollback up, and is not hidden.</strong> If <code>defect-report</code> refuses or fails, the person is told so in its own words and asked once whether to roll back anyway: the default keeps the session, because rolling back is what makes the report impossible.</p>
+<p><strong>Step 3 -- the report says a rollback followed.</strong> <code>defect-report</code> takes a switch, <code>--rolling-back</code>, and the report's Where section gains one line: the person chose to roll the session back rather than go on. Nothing else of the rollback is in the report: no count of commits, no author, no path, no reason.</p>
+<p><strong>Step 4 -- a person at a terminal is told.</strong> <code>dabbler session rollback --help</code> and <code>docs/driving-a-session.md</code> say that a stop is reported before it is rolled back, and name the command.</p>
+<p><strong>Step 5 -- the number.</strong> <code>version.json</code> goes to 3.35.0 (a minor: a person has a choice they did not have), stamped with <code>npm run stamp:version</code>, and the changelog's 3.35.0 section says what sessions 334 to 336 changed for a person.</p>
+<p><strong>Non-goals.</strong> Sending anything: the person reads the report and sends it themselves, as now, and no code posts an issue. A report after the rollback, read from a superseded run record. A report of a rollback from no stop, or of a completed session rolled back with nothing standing: a session that ran to its end and was not wanted is feedback of another kind, and gets a session of its own if it is asked for. Asking the person for a reason at the rollback. Any change to what a rollback does to the tree, the ledger or the run records. Any change to what is scrubbed or to the Primary Reviewer's check.</p>
+<p><strong>Tests.</strong> In <code>commandFlows.test.ts</code>: with a stop standing, &quot;Report, Then Roll Back&quot; calls <code>defect-report</code> and then <code>rollback</code>, in that order, and opens the report; with none standing the dialog offers two choices and <code>defect-report</code> is not called; a refused report asks once and rolls back only on the person's say-so; a rollback that fails after the report was written still opens the report. In <code>session.test.ts</code>: <code>--rolling-back</code> adds the one line to Where, and the report without it is unchanged. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes, as 3.35.0 in session 338.</p>
+<h2>Work Plan</h2>
+<p>Make a stop that ends in a rollback reportable. The router's <code>dabbler session defect-report</code> takes a <code>--rolling-back</code> switch (carried through <code>SessionDefectReportOptions</code> and the in-process router) that adds one line to the report's Where section saying the person chose to roll the session back rather than go on, and nothing else of the rollback. In the Work Explorer, the rollback's one modal gains a third choice, &quot;Report, Then Roll Back&quot;, only where a stop stands over the session in flight (the same <code>hasStandingStop</code> test Report this stop uses, carried on the row as it is read): its detail says the choice is one provider call and nothing is sent to the maintainers; choosing it writes the report with the same <code>defect-report</code> call, then runs the rollback bound to the HEAD the dry run read, then opens the report with the same Copy and open offer as Report this stop (that tail is shared rather than copied). A report that is refused or fails is said in its own words and the person is asked once whether to roll back anyway, the default keeping the session; a rollback that fails after the report was written still opens the report. <code>dabbler session rollback --help</code> and <code>docs/driving-a-session.md</code> say a stop is reported before it is rolled back, naming the command. <code>version.json</code> goes to 3.35.0, stamped with <code>npm run stamp:version</code>, and the changelog's 3.35.0 section says what sessions 334 to 336 changed for a person.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/8f563cfbfbd072e7611b5620cf50bb6466aada75"><code>8f563cfbfbd072e7611b5620cf50bb6466aada75</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Report says rolling back</td><td><p>Add <code>rollingBack?: boolean</code> to <code>DefectReportOptions</code> in packages/router/src/session.ts and pass it to <code>reportText</code>, which appends one line to Where when it is set: the person chose to roll the session back rather than go on -- no count, author, path or reason. Add <code>--rolling-back</code> to the CLI's switches and to the <code>defect-report</code> help in packages/router/src/cli/session.ts and pass it through; add <code>rollingBack?: boolean</code> to <code>SessionDefectReportOptions</code> in packages/router/src/contracts/router.ts and have packages/router/src/inProcess.ts append the switch. In packages/router/test/session.test.ts, one test: with <code>rollingBack</code> the Where section carries the one line, and without it the report is unchanged.</p></td><td></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/session.test.ts</code><br><code>node --test packages/router/test/cli.test.ts</code></td><td>yes</td></tr>
+<tr><td>Dialog offers report</td><td><p>Export <code>hasStandingStop</code> from tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts and carry it on <code>CancellableSession</code> as <code>stopStands</code> in <code>cancellableSessionOf</code>. Let <code>CancelLifecycleUi.confirm</code> take any number of choices and give the UI a non-modal <code>choose</code>. In <code>runRollbackSessionFlow</code>, where <code>stopStands</code>, the modal offers &quot;Report, Then Roll Back&quot; before &quot;Roll Back&quot; and &quot;Keep&quot;, and its detail adds that the choice is one provider call and nothing is sent to the maintainers; choosing it calls <code>router.session.defectReport({ repoRoot, rollingBack: true })</code>, then the rollback with <code>asOf: facts.head</code>, then opens the report. Extract the open-then-Copy-and-open tail of <code>runReportStop</code> in tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts into one exported function both flows call. A rollback that fails after the report was written still opens the report. Where no stop stands, the dialog is as today. In commandFlows.test.ts: with a stop standing the choice calls defect-report then rollback in that order and opens the report; with none standing two choices are offered and defect-report is not called; a rollback that fails after the report still opens it.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</code></td><td>yes</td></tr>
+<tr><td>Refused report asks once</td><td><p>In <code>runRollbackSessionFlow</code>, when the report is refused, fails, or names no file it wrote, tell the person in the router's own words and ask once, modally, whether to roll back anyway, the default (dismissing, or Keep) keeping the session; roll back only on the person's say-so. In commandFlows.test.ts: a refused report asks once and rolls back only when the person says so.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</span></td><td><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</code></td><td>yes</td></tr>
+<tr><td>Terminal is told</td><td><p>In the <code>rollback</code> help in packages/router/src/cli/session.ts, add that a stop is reported before it is rolled back, with <code>dabbler session defect-report --rolling-back</code>, because the rollback moves the run record the report reads. Say the same in the Rollback paragraph of docs/driving-a-session.md, and that the Work Explorer's dialog offers Report, Then Roll Back where a stop stands.</p></td><td><span class="mono">packages/router/src/cli/session.ts</span><br><span class="mono">docs/driving-a-session.md</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>node --test packages/router/test/cli.test.ts</code><br><code>node packages/router/scripts/check-shipped-docs.mjs</code><br><code>node -e const fs=require('fs');const d=fs.readFileSync('docs/driving-a-session.md','utf8');const h=fs.readFileSync('packages/router/src/cli/session.ts','utf8');if(!d.includes('defect-report --rolling-back')||!h.includes('defect-report --rolling-back'))process.exit(1)</code></td><td>yes</td></tr>
+<tr><td>Version 3 35 0</td><td><p>Set version.json to 3.35.0 and run <code>npm run stamp:version</code>. In tools/dabbler-ai-orchestration/CHANGELOG.md, turn the Unreleased section into a 3.35.0 section dated 2026-11-16 that says, for a person, what sessions 334 to 336 changed: the answer file says whose it is, a session's section of the plan is read one way, and a rollback from a stop offers the report first.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.35.0'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.35.0]')){process.exit(1)}</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Sending anything: the person reads the report and sends it themselves; no code posts an issue.</li><li>A report written after the rollback, read from a superseded run record.</li><li>A report of a rollback from no stop, or of a completed session rolled back with nothing standing: the dialog is unchanged there.</li><li>Asking the person for a reason at the rollback, or any box between the choice and the rollback.</li><li>Any change to what a rollback does to the tree, the ledger or the run records.</li><li>Any change to what the report scrubs or to the Primary Reviewer's check of its passages.</li><li>Publishing 3.35.0: session 338 releases it.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[17:22:55]</span> <span class="muted">run-started</span> session=336 mode=pull</div>
+<div class="line"><span class="at">[17:22:55]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[17:25:06]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[17:25:06]</span> <span class="muted">plan-accepted</span> steps=[&quot;report-says-rolling-back&quot;,&quot;dialog-offers-report&quot;,&quot;refused-report-asks-once&quot;,&quot;terminal-is-told&quot;,&quot;version-3-35-0&quot;] non_goals=7</div>
+<div class="line"><span class="at">[17:25:06]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[17:25:06]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=report-says-rolling-back</div>
+<div class="line"><span class="at">[17:25:48]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:26:01]</span> <span class="muted">check-passed</span> step=report-says-rolling-back argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:26:01]</span> <span class="muted">check-passed</span> step=report-says-rolling-back argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/session.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:26:01]</span> <span class="muted">check-passed</span> step=report-says-rolling-back argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/cli.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:26:09]</span> <span class="muted">named-tests-passed</span> step=report-says-rolling-back suite=typescript command=node scripts/suite.mjs container packages/router/test/inProcess.test.ts packages/router/test/schema.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[17:26:09]</span> <span class="muted">report-accepted</span> seq=2 step=report-says-rolling-back files=[] notes=defect-report --rolling-back adds one Where line; carried through the contract and in-process router; test in session.test.ts</div>
+<div class="line"><span class="at">[17:26:09]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=dialog-offers-report</div>
+<div class="line"><span class="at">[17:30:13]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:30:25]</span> <span class="muted">check-passed</span> step=dialog-offers-report argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[17:30:25]</span> <span class="muted">check-passed</span> step=dialog-offers-report argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:30:31]</span> <span class="muted">named-tests-passed</span> step=dialog-offers-report suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[17:30:40]</span> <span class="muted">named-tests-passed</span> step=dialog-offers-report suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[17:30:40]</span> <span class="muted">report-accepted</span> seq=3 step=dialog-offers-report files=[&quot;tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/commands/sessionCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=Rollback modal offers Report, Then Roll Back where a stop stands; report, rollback at facts' HEAD, then the shared openReport; a failed rollback still opens it. Note: 3 Start-session tests in commandFlows fail on a host with provider keys set, before and after this change; pass without keys.</div>
+<div class="line"><span class="at">[17:30:40]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=refused-report-asks-once</div>
+<div class="line"><span class="at">[17:31:15]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:31:27]</span> <span class="muted">check-passed</span> step=refused-report-asks-once argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[17:31:27]</span> <span class="muted">check-passed</span> step=refused-report-asks-once argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:31:33]</span> <span class="muted">named-tests-passed</span> step=refused-report-asks-once suite=typescript command=node scripts/suite.mjs container packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[17:31:42]</span> <span class="muted">named-tests-passed</span> step=refused-report-asks-once suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts</div>
+<div class="line"><span class="at">[17:31:42]</span> <span class="muted">report-accepted</span> seq=4 step=refused-report-asks-once files=[&quot;tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts&quot;] notes=A refused or failed report is said in its words and asked about once (Roll Back Anyway / Keep, dismissal keeps); test covers all three answers</div>
+<div class="line"><span class="at">[17:31:42]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=terminal-is-told</div>
+<div class="line"><span class="at">[17:32:11]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:32:20]</span> <span class="muted">check-passed</span> step=terminal-is-told argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[17:32:20]</span> <span class="muted">check-passed</span> step=terminal-is-told argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/cli.test.ts&quot;]</div>
+<div class="line"><span class="at">[17:32:20]</span> <span class="muted">check-passed</span> step=terminal-is-told argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[17:32:20]</span> <span class="muted">check-passed</span> step=terminal-is-told argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');const d=fs.readFileSync('docs/driving-a-session.md','utf8');const h=fs.readFileSync('packages/router/src/cli/session.ts','utf8');if(!d.includes('defect-report --rolling-back')||!h.includes('defect-report --rolling-back'))process.exit(1)&quot;]</div>
+<div class="line"><span class="at">[17:32:28]</span> <span class="muted">named-tests-passed</span> step=terminal-is-told suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[17:32:28]</span> <span class="muted">report-accepted</span> seq=5 step=terminal-is-told files=[&quot;packages/router/src/cli/session.ts&quot;,&quot;docs/driving-a-session.md&quot;] notes=rollback --help and the Rollback paragraph say a stop is reported before it is rolled back, naming defect-report --rolling-back and the dialog's choice</div>
+<div class="line"><span class="at">[17:32:28]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=version-3-35-0</div>
+<div class="line"><span class="at">[17:33:07]</span> <span class="muted">run-resumed</span> session=336 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[17:33:11]</span> <span class="muted">check-passed</span> step=version-3-35-0 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[17:33:11]</span> <span class="muted">check-passed</span> step=version-3-35-0 argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.35.0'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.35.0]')){process.exit(1)}&quot;]</div>
+<div class="line"><span class="at">[17:33:12]</span> <span class="muted">report-accepted</span> seq=6 step=version-3-35-0 files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.35.0, stamped; changelog 3.35.0 covers sessions 334-336 for a person</div>
+<div class="line"><span class="at">[17:33:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[17:33:13]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[17:33:14]</span> <span class="muted">job-started</span> name=verification pid=44640 log=.dabbler/runs/s336/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:34:26]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s336/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[17:34:26]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[17:34:26]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[17:34:26]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[17:34:26]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=51492 log=.dabbler/runs/s336/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:34:31]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s336/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[17:34:31]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[17:34:32]</span> <span class="muted">job-started</span> name=run of record: typescript pid=55360 log=.dabbler/runs/s336/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:36:14]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s336/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[17:36:14]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[17:36:15]</span> <span class="muted">job-started</span> name=run of record: extension pid=8080 log=.dabbler/runs/s336/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:36:36]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s336/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[17:36:36]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[17:36:41]</span> <span class="muted">landed</span> commit=8f563cfbfbd072e7611b5620cf50bb6466aada75</div>
+<div class="line"><span class="at">[17:36:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[17:36:42]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[17:36:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[17:36:43]</span> <span class="muted">job-started</span> name=close pid=25712 log=.dabbler/runs/s336/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:36:51]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s336/driver/jobs/close.log</div>
+<div class="line"><span class="at">[17:36:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The visible extension tests manually set `stopStands: true`; none exercises `cancellableSessionOf` with a real stopped session row and asserts that the third choice appears. A useful case would construct a repository whose current in-progress session has `stopActor`, pass its node through `cancellableSessionOf`, invoke rollback, and assert the modal offers `[&quot;Report, Then Roll Back&quot;, &quot;Roll Back&quot;, &quot;Keep&quot;]`.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The visible tests exercise `rollingBack` directly in `defectReport` and use a fake router in the extension, so they do not pin the full `InProcessRouter → CLI --rolling-back → defectReport` path. A useful case would invoke the in-process defect-report verb with `rollingBack: true` against a stopped repository and assert the generated report contains exactly the additional `Then` line.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>3s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>100s</td><td>1515</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>20s</td><td>332</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

@@ -2500,3 +2500,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s369/`
+
+## Session 370 verification — REMEDIATED AT THE CAP after 7 round(s)
+
+- Every blocking finding of round 7 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] UPHOLD — Continue Session cannot find a Windows Terminal engine**
+- Fixed, unreviewed: [major] UPHOLD — Session closure excludes Windows Terminal engines**
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

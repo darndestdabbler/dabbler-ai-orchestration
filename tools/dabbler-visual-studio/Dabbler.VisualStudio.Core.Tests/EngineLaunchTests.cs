@@ -26,6 +26,12 @@ namespace Dabbler.VisualStudio.Core.Tests
                 new[] { "session", "launch", "--for", "mechanic", "--engine", "codex", "--sessions-dir", @"D:\R\docs\sessions" },
                 EngineLaunch.Arguments(mechanic, "codex", null));
 
+            // Continue Session runs the start Start Session runs, so its engine is a session's.
+            var resume = Action(ActionIds.ContinueSession, "dabbler", "session", "start", "--sessions-dir", @"D:\R\docs\sessions");
+            Assert.Equal(
+                new[] { "session", "launch", "--for", "session", "--engine", "codex", "--sessions-dir", @"D:\R\docs\sessions" },
+                EngineLaunch.Arguments(resume, "codex", null));
+
             Assert.Throws<ArgumentException>(() => EngineLaunch.Arguments(Action("dabblerSessionSets.cancel", "dabbler"), "codex", null));
         }
 

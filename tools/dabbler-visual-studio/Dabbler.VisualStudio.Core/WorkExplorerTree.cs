@@ -94,11 +94,14 @@ namespace Dabbler.VisualStudio.Core
         /// The session's number where the row is a complete session, which
         /// offers Compare With Its Start; null on every other row.
         /// </summary>
-        public int? CompleteSession
+        public int? CompleteSession => Row.ContextValue.Contains(";session-complete;") ? Session : null;
+
+        /// <summary>The session's number where the row is a session, whatever its state; null on every other row.</summary>
+        public int? Session
         {
             get
             {
-                if (Row.Kind != "session" || !Row.ContextValue.Contains(";session-complete;")) return null;
+                if (Row.Kind != "session") return null;
                 var slash = Row.Id.LastIndexOf('/');
                 return slash >= 0 && int.TryParse(Row.Id.Substring(slash + 1), out var number) ? number : (int?)null;
             }

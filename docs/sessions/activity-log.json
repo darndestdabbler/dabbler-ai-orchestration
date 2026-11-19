@@ -13789,6 +13789,32 @@
       "what": "step 'attach': its files",
       "reason": "The host step linked the moved PseudoConsole.cs into the extension so it still built; once the pane attaches to the host, that link and its Using come out of the extension's project.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 370,
+      "dateTime": "2026-11-19T14:34:11.897000-05:00",
+      "task": "Every engine the Visual Studio extension starts -- Start Session, Continue Session, a consult and a Mechanic -- opens as an Engine tab of its own in the editor area, through the engine host of session 369, unless a new Tools > Options > Dabbler > Engine option says Windows Terminal (a new install says Visual Studio). The host is told which session an engine is for and keeps it in its record, so an engine already running for that session is attached to rather than started again; a failure of the pane or the host before an engine exists is said in one sentence and the engine opens in Windows Terminal instead. Continue Session on a session whose engine is running brings its tab forward and starts nothing; a session-closed notice ends that session's engine and closes its tab; closing Visual Studio with an engine attached says, once, that the session carries on and its tab is offered when the solution opens again. Open Engine Here, the proving command, is removed. The decisions -- where an engine opens, which running engine is a session's, which tab a closed session closes -- live in one small Core class with its tests; the Visual Studio side only wires them.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 370,
+      "dateTime": "2026-11-19T14:40:31.332000-05:00",
+      "what": "step 'tabs': its files",
+      "reason": "Set Up Dabbler's first start and Start Session with Different Models also start a session's engine, so they must pass the row's session as Start Session does",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D282",
+      "ordinal": 282,
+      "sessionNumber": 370,
+      "decidedOn": "2026-11-19",
+      "recordedAt": "2026-11-19T15:36:56.183000-05:00",
+      "decider": "operator",
+      "headline": "Session 370's Step 4 covers Engine tabs only; engines opened in Windows Terminal stay untracked",
+      "body": "Review rounds 1-7 read Step 4 (Continue Session brings the running engine's tab forward and starts nothing; a session that ends closes its tab and its engine) as covering engines opened in Windows Terminal too, by the option or the fallback. The author read it as the Engine tab of Step 2, run through the engine host. Meeting the review's reading would need a second launch path -- the engine host in a console mode inside the Windows Terminal tab, keeping records and listening for an end -- and still could not bring a Windows Terminal tab forward, since wt.exe offers no command to focus or close a tab. At the round cap the operator chose to narrow the plan: Step 4 is about Engine tabs, and a Windows Terminal engine is launched and left as before this session. The plan section is amended to say so."
     }
   ]
 }

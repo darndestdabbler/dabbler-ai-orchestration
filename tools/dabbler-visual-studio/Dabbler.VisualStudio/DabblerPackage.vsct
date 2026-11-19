@@ -18,14 +18,6 @@
           <ButtonText>Dabbler: Version</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidDabblerCommandSet" id="OpenEngineHereCommandId" priority="0x0101" type="Button">
-        <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
-        <Strings>
-          <ButtonText>Dabbler: Open Engine Here</ButtonText>
-          <CanonicalName>.Dabbler.OpenEngineHere</CanonicalName>
-          <LocCanonicalName>.Dabbler.OpenEngineHere</LocCanonicalName>
-        </Strings>
-      </Button>
       <Button guid="guidDabblerCommandSet" id="EndEngineCommandId" priority="0x0102" type="Button">
         <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
         <Strings>
@@ -69,7 +61,6 @@
       <IDSymbol name="WorkExplorerCommandId" value="0x0101" />
       <IDSymbol name="TerminalCommandId" value="0x0102" />
       <IDSymbol name="ConfigurationCommandId" value="0x0103" />
-      <IDSymbol name="OpenEngineHereCommandId" value="0x0104" />
       <IDSymbol name="EndEngineCommandId" value="0x0105" />
     </GuidSymbol>
   </Symbols>

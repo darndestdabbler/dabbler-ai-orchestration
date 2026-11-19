@@ -83,7 +83,7 @@
         });
         break;
       case 'exited':
-        terminal.write(`\r\n\x1b[2m[The engine has exited with code ${message.code}. Tools > Dabbler: Open Engine Here starts it again.]\x1b[0m\r\n`);
+        terminal.write(`\r\n\x1b[2m[The engine has exited with code ${message.code}. Its row in the Dabbler Work Explorer starts it again.]\x1b[0m\r\n`);
         break;
     }
   });

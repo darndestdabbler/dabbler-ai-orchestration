@@ -30,9 +30,11 @@ namespace Dabbler.VisualStudio
             this.package = package;
         }
 
-        /// <summary>Runs the Start Session <paramref name="action"/> in <paramref name="repositoryRoot"/>.</summary>
-        public async Task StartAsync(string repositoryRoot, WorkExplorerAction action)
+        /// <summary>Runs the Start Session <paramref name="action"/> of session <paramref name="session"/>'s row in <paramref name="repositoryRoot"/>.</summary>
+        public async Task StartAsync(string repositoryRoot, WorkExplorerAction action, int? session)
         {
+            // Continue Session on a session whose engine is running is the way back to it, and starts nothing.
+            if (action.Id == ActionIds.ContinueSession && await new EngineTab(package).ShowRunningAsync(repositoryRoot, session)) return;
             if (action.Argv == null || !await ReadyAsync() || !await package.EnsureNodeAsync()) return;
             var router = package.Router;
             if (router == null) return;
@@ -46,7 +48,7 @@ namespace Dabbler.VisualStudio
             IReadOnlyList<string> args = action.Argv.Skip(1)
                 .Concat(new[] { "--engine", choice.Engine!, "--model", choice.AuthoringModel!, "--json" })
                 .ToList();
-            await RunAsync(router, repositoryRoot, action, args, choice);
+            await RunAsync(router, repositoryRoot, action, args, choice, session);
         }
 
         /// <summary>
@@ -56,7 +58,7 @@ namespace Dabbler.VisualStudio
         /// and the start run with them for this one session. A dismissed
         /// question starts nothing.
         /// </summary>
-        public async Task StartWithDifferentModelsAsync(string repositoryRoot, WorkExplorerAction action)
+        public async Task StartWithDifferentModelsAsync(string repositoryRoot, WorkExplorerAction action, int? session)
         {
             if (action.Argv == null || !await ReadyAsync() || !await package.EnsureNodeAsync()) return;
             var router = package.Router;
@@ -102,7 +104,7 @@ namespace Dabbler.VisualStudio
                 await TaskScheduler.Default;
             }
             var args = DifferentModels.Arguments(action.Argv.Skip(1).ToList(), configured, answers);
-            await RunAsync(router, repositoryRoot, action, args, DifferentModels.Launching(configured, answers));
+            await RunAsync(router, repositoryRoot, action, args, DifferentModels.Launching(configured, answers), session);
         }
 
         /// <summary>
@@ -178,7 +180,7 @@ namespace Dabbler.VisualStudio
         }
 
         /// <summary>Runs the start with <paramref name="args"/>, offers a refusal's ways on, and opens the engine with <paramref name="choice"/> once it registers.</summary>
-        private async Task RunAsync(Router router, string repositoryRoot, WorkExplorerAction action, IReadOnlyList<string> args, ConfiguredChoice choice)
+        private async Task RunAsync(Router router, string repositoryRoot, WorkExplorerAction action, IReadOnlyList<string> args, ConfiguredChoice choice, int? session)
         {
             while (true)
             {
@@ -187,7 +189,7 @@ namespace Dabbler.VisualStudio
                 if (answer?.Registered == true)
                 {
                     await package.ShowTerminalQuietlyAsync();
-                    await new EngineTab(package).OpenAsync(repositoryRoot, action, choice);
+                    await new EngineTab(package).OpenAsync(repositoryRoot, action, choice, session);
                     return;
                 }
                 var refusal = answer?.Refusal ?? words;

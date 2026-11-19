@@ -23,17 +23,21 @@ namespace Dabbler.VisualStudio
         /// <summary>
         /// Starts a host running <paramref name="commandLine"/> in
         /// <paramref name="cwd"/> with exactly <paramref name="environment"/>,
-        /// and returns its pipe. The host runs from a copy outside the
+        /// and returns its pipe; <paramref name="session"/> is the session the
+        /// engine is for, kept in its record. The host runs from a copy outside the
         /// extension's folder, so an update of the extension never meets a
         /// file a running engine holds.
         /// </summary>
         /// <exception cref="InvalidOperationException">The host could not be started.</exception>
-        public static string Start(string folder, string title, string commandLine, string cwd, IReadOnlyDictionary<string, string> environment, TerminalSize size)
+        public static string Start(string folder, string title, string commandLine, string cwd, IReadOnlyDictionary<string, string> environment, TerminalSize size, int? session = null)
         {
             var pipe = "dabbler-engine-" + Guid.NewGuid().ToString("N");
+            var args = new List<string> { "--folder", folder, "--title", title, "--columns", size.Columns.ToString(), "--rows", size.Rows.ToString(), "--pipe", pipe };
+            if (session != null) args.AddRange(new[] { "--session", session.Value.ToString() });
+            args.AddRange(new[] { "--", commandLine });
             var start = new ProcessStartInfo(Installed())
             {
-                Arguments = string.Join(" ", new[] { "--folder", folder, "--title", title, "--columns", size.Columns.ToString(), "--rows", size.Rows.ToString(), "--pipe", pipe, "--", commandLine }.Select(Router.Quote)),
+                Arguments = string.Join(" ", args.Select(Router.Quote)),
                 WorkingDirectory = cwd,
                 UseShellExecute = false,
                 CreateNoWindow = true,

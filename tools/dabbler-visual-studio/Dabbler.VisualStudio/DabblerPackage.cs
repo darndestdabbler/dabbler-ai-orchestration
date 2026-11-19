@@ -34,6 +34,8 @@ namespace Dabbler.VisualStudio
     [ProvideToolWindow(typeof(ConfigurationWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     // A tab in the editor area, where a file opens: one per engine.
     [ProvideToolWindow(typeof(EngineWindow), Style = VsDockStyle.MDI, MultiInstances = true)]
+    // Tools > Options > Dabbler > Engine: where an engine opens.
+    [ProvideOptionPage(typeof(EngineOptionsPage), "Dabbler", "Engine", 0, 0, true)]
     [Guid(PackageGuidString)]
     public sealed class DabblerPackage : AsyncPackage
     {
@@ -44,7 +46,6 @@ namespace Dabbler.VisualStudio
         private const int WorkExplorerCommandId = 0x0101;
         private const int TerminalCommandId = 0x0102;
         private const int ConfigurationCommandId = 0x0103;
-        private const int OpenEngineHereCommandId = 0x0104;
         private const int EndEngineCommandId = 0x0105;
 
         private bool nodePassed;
@@ -59,6 +60,9 @@ namespace Dabbler.VisualStudio
 
         /// <summary>The Dabbler Session pane; null until the package has initialized.</summary>
         internal SessionPane? Session { get; private set; }
+
+        /// <summary>Where Tools > Options > Dabbler > Engine says an engine opens.</summary>
+        internal EnginePlace EnginePlace => ((EngineOptionsPage)GetDialogPage(typeof(EngineOptionsPage))).OpensIn;
 
         /// <summary>Every Dabbler Engine pane this Visual Studio has made, open or closed. Main thread only.</summary>
         internal List<EngineWindow> EngineWindows { get; } = new List<EngineWindow>();
@@ -89,9 +93,6 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(ShowConfigurationAsync).FileAndForget("dabbler/configuration"),
                 new CommandID(CommandSet, ConfigurationCommandId)));
-            commands.AddCommand(new MenuCommand(
-                (_, _) => JoinableTaskFactory.RunAsync(OpenEngineHereAsync).FileAndForget("dabbler/engine"),
-                new CommandID(CommandSet, OpenEngineHereCommandId)));
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(EndEngineAsync).FileAndForget("dabbler/engine/end"),
                 new CommandID(CommandSet, EndEngineCommandId)));
@@ -152,28 +153,59 @@ namespace Dabbler.VisualStudio
             }
         }
 
-        /// <summary>A pane of its own attached to an engine still running.</summary>
-        private async Task OpenEnginePaneAsync(EngineRecord record)
+        /// <summary>
+        /// The tab of an engine still running: the one already attached to it
+        /// brought forward, or a tab of its own attached to it.
+        /// </summary>
+        internal async Task OpenEnginePaneAsync(EngineRecord record)
         {
-            var window = await FreeEngineWindowAsync();
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            var attached = EngineWindows.FirstOrDefault(pane => pane.Pipe == record.Pipe);
+            if (attached != null)
+            {
+                ErrorHandler.ThrowOnFailure(((IVsWindowFrame)attached.Frame).Show());
+                return;
+            }
+            var (window, ticket, _) = await FreeEngineWindowAsync(record.Folder, record.Session);
             if (window == null) return;
-            await window.AttachAsync(record);
+            var failed = await window.AttachAsync(record, ticket);
+            if (failed == null) return;
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            // The empty tab is not left open; the engine runs on, offered again by its row.
+            ((IVsWindowFrame)window.Frame).CloseFrame((uint)__FRAMECLOSE.FRAMECLOSE_NoSave);
+            Show($"{record.Title} is still running, but its tab could not be shown ({failed.TrimEnd('.')}).", OLEMSGICON.OLEMSGICON_WARNING);
         }
 
-        /// <summary>A Dabbler Engine pane with no engine, shown: one closed earlier, or a new one.</summary>
-        private async Task<EngineWindow?> FreeEngineWindowAsync()
+        /// <summary>
+        /// A Dabbler Engine pane with no engine, reserved for the engine of
+        /// <paramref name="session"/> in <paramref name="folder"/> and shown:
+        /// one closed earlier, or a new one, with the ticket it is reserved
+        /// under. Held, with no pane, where another
+        /// opening has taken a tab for that session meanwhile: that tab is
+        /// brought forward instead, since a session never has two engines.
+        /// </summary>
+        internal async Task<(EngineWindow? Window, int Ticket, bool Held)> FreeEngineWindowAsync(string folder, int? session)
         {
             await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
             var window = EngineWindows.FirstOrDefault(pane => !pane.Busy);
             for (var id = 0; window == null; id++)
             {
                 if (await FindToolWindowAsync(typeof(EngineWindow), id, create: false, DisposalToken) != null) continue;
-                window = await FindToolWindowAsync(typeof(EngineWindow), id, create: true, DisposalToken) as EngineWindow;
-                if (window == null) return null;
+                var made = await FindToolWindowAsync(typeof(EngineWindow), id, create: true, DisposalToken) as EngineWindow;
+                if (made == null) return (null, 0, false);
+                await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+                // Another opening may have made this one while this was waiting.
+                if (!made.Busy) window = made;
             }
-            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            var holder = session == null ? null : EngineWindows.FirstOrDefault(pane => pane != window && pane.Holds(folder, session.Value));
+            if (holder != null)
+            {
+                ErrorHandler.ThrowOnFailure(((IVsWindowFrame)holder.Frame).Show());
+                return (null, 0, true);
+            }
             ErrorHandler.ThrowOnFailure(((IVsWindowFrame)window.Frame).Show());
-            return window;
+            // Nothing awaits between choosing the pane and taking it; a pane that would not show is not taken.
+            return (window, window.Reserve(folder, session), false);
         }
 
         /// <summary>A bar's button opens the engine's pane and closes the bar; a closed bar stops listening.</summary>
@@ -203,6 +235,22 @@ namespace Dabbler.VisualStudio
                 infoBarUIElement.Unadvise(Cookie);
                 closed(infoBarUIElement);
             }
+        }
+
+        /// <summary>
+        /// Visual Studio is closing: where an Engine tab holds an engine, one
+        /// sentence says it carries on, and Visual Studio closes. Nothing here
+        /// stops it closing.
+        /// </summary>
+        protected override int QueryClose(out bool canClose)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            canClose = true;
+            if (EngineWindows.Any(pane => pane.Pipe != null))
+            {
+                Show("The session carries on after Visual Studio closes, and its tab is offered when this solution is opened again.", OLEMSGICON.OLEMSGICON_INFO);
+            }
+            return VSConstants.S_OK;
         }
 
         protected override void Dispose(bool disposing)
@@ -251,20 +299,29 @@ namespace Dabbler.VisualStudio
         }
 
         /// <summary>
-        /// Tools > Dabbler: Open Engine Here -- the configured engine in a
-        /// Dabbler Engine pane, or the pane of the one running for the open
-        /// solution's repository.
+        /// Session <paramref name="session"/> of the repository at
+        /// <paramref name="root"/> has closed: each tab holding its engine
+        /// ends that engine and closes, as VS Code closes a finished session's
+        /// terminal.
         /// </summary>
-        private async Task OpenEngineHereAsync()
+        internal void EndSessionEngines(string root, string? session)
         {
-            var folder = await SolutionFolderAsync();
-            var root = folder == null ? null : WorkExplorerTree.RepositoryRootOf(folder);
+            ThreadHelper.ThrowIfNotOnUIThread();
+            foreach (var window in EngineWindows.Where(pane => EngineOpening.Closes(pane.Folder, pane.Session, root, session)).ToList()) window.EndAndClose();
+        }
+
+        /// <summary>
+        /// The tab that has, or is starting, the engine of session
+        /// <paramref name="session"/> of the repository at <paramref name="root"/>,
+        /// brought forward; false where no tab of this Visual Studio has it.
+        /// </summary>
+        internal async Task<bool> ShowEngineTabAsync(string root, int session)
+        {
             await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
-            // Only an engine of the open solution's repository: one left from another solution runs on in its own pane.
-            var window = root == null ? null : EngineWindows.FirstOrDefault(pane => pane.Busy && string.Equals(pane.Folder, root, StringComparison.OrdinalIgnoreCase));
-            if (window != null) ErrorHandler.ThrowOnFailure(((IVsWindowFrame)window.Frame).Show());
-            else window = await FreeEngineWindowAsync();
-            if (window != null) await window.OpenAsync();
+            var window = EngineWindows.FirstOrDefault(pane => pane.Holds(root, session));
+            if (window == null) return false;
+            ErrorHandler.ThrowOnFailure(((IVsWindowFrame)window.Frame).Show());
+            return true;
         }
 
         /// <summary>

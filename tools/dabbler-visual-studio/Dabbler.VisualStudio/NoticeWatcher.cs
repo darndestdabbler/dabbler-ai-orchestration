@@ -110,6 +110,7 @@ namespace Dabbler.VisualStudio
             {
                 await package.JoinableTaskFactory.SwitchToMainThreadAsync();
                 if (notice.Kind == TerminalNotice.MovedOn || notice.Kind == TerminalNotice.SessionClosed) entry.ClosePause(notice.Session);
+                if (notice.Kind == TerminalNotice.SessionClosed) package.EndSessionEngines(root, notice.Session);
                 if (notice.Kind != TerminalNotice.MovedOn) await ShowAsync(root, entry, notice);
                 if (notice.Kind == TerminalNotice.SessionClosed) Prune();
             }).FileAndForget("dabbler/notices/show");

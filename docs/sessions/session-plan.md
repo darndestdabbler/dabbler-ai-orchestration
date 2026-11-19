@@ -21824,7 +21824,13 @@ running, it attaches to that one: a session never has two.
 **Step 4 -- the session's row.** Continue Session on a session whose
 engine is running brings its tab forward and starts nothing. A session
 that ends closes its tab and its engine, as the VS Code extension closes
-a finished session's terminal.
+a finished session's terminal. Both are about the Engine tab of Step 2,
+whose engine runs through the host: an engine opened in Windows
+Terminal, by the option or as the fallback, is launched as it was before
+this session, and the extension neither finds nor closes it -- `wt.exe`
+hands back no tab or engine process, and has no command that focuses or
+closes a tab. (Amended with the operator's approval during the session,
+after the review read Step 4 as covering Windows Terminal engines too.)
 
 **Step 5 -- closing Visual Studio with an engine running.** One sentence
 before it closes: the session carries on, and its tab is offered when

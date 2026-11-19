@@ -31,7 +31,7 @@ namespace Dabbler.VisualStudio
             {
                 case ActionIds.StartSession:
                 case ActionIds.ContinueSession:
-                    await new SessionStarter(package).StartAsync(repositoryRoot, action);
+                    await new SessionStarter(package).StartAsync(repositoryRoot, action, node.Session);
                     return;
                 case ActionIds.StopSession:
                 case ActionIds.CloseSession:

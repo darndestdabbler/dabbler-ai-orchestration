@@ -48,5 +48,14 @@ namespace Dabbler.VisualStudio.Core.Tests
             Assert.True(record!.IsFor(@"c:\repos\shop\"));
             Assert.False(record.IsFor(@"C:\Repos\Shop2"));
         }
+
+        [Fact]
+        public void A_record_keeps_the_session_its_engine_is_for()
+        {
+            var session = EngineRecord.Parse(new EngineRecord { Folder = @"C:\Repos\Shop", Title = "Claude Code", ProcessId = 42, Pipe = "dabbler-engine-1", Session = 370, StartedAt = DateTimeOffset.Now }.ToJson());
+            var consult = EngineRecord.Parse(new EngineRecord { Folder = @"C:\Repos\Shop", Title = "Consult", ProcessId = 43, Pipe = "dabbler-engine-2", StartedAt = DateTimeOffset.Now }.ToJson());
+            Assert.Equal(370, session!.Session);
+            Assert.Null(consult!.Session);
+        }
     }
 }

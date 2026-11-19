@@ -67,11 +67,11 @@ namespace Dabbler.VisualStudio
             }).FileAndForget("dabbler/work-explorer/set-up");
         }
 
-        private void OnDifferentModelsChosen(object sender, WorkExplorerAction start)
+        private void OnDifferentModelsChosen(object sender, (WorkExplorerNode Node, WorkExplorerAction Action) chosen)
         {
             var root = repositoryRoot;
             if (root == null) return;
-            Dabbler.JoinableTaskFactory.RunAsync(() => new SessionStarter(Dabbler).StartWithDifferentModelsAsync(root, start))
+            Dabbler.JoinableTaskFactory.RunAsync(() => new SessionStarter(Dabbler).StartWithDifferentModelsAsync(root, chosen.Action, chosen.Node.Session))
                 .FileAndForget("dabbler/work-explorer/different-models");
         }
 

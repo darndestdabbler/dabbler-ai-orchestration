@@ -407,7 +407,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 367 | Release 3.39.0 (release: 3.39.0) | yes | 2026-11-18 |
 | 368 | An engine pane in Visual Studio takes the keys | no | 2026-11-19 |
 | 369 | An engine outlives Visual Studio | no | 2026-11-19 |
-| 370 | Start Session opens the engine inside Visual Studio | — | not declared |
+| 370 | Start Session opens the engine inside Visual Studio | no | 2026-11-19 |
 | 371 | A Dabbler layout, and the way back | — | not declared |
 | 372 | Release 3.40.0 (release: 3.40.0) | — | not declared |
 
@@ -4108,3 +4108,13 @@ Move the engine out of Visual Studio's process so that it outlives Visual Studio
 **Amended after acceptance:**
 
 - 2026-11-19 — step 'attach': its files: The host step linked the moved PseudoConsole.cs into the extension so it still built; once the pane attaches to the host, that link and its Using come out of the extension's project. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 370 — Start Session opens the engine inside Visual Studio
+
+**Releasable: no.**
+
+Every engine the Visual Studio extension starts -- Start Session, Continue Session, a consult and a Mechanic -- opens as an Engine tab of its own in the editor area, through the engine host of session 369, unless a new Tools > Options > Dabbler > Engine option says Windows Terminal (a new install says Visual Studio). The host is told which session an engine is for and keeps it in its record, so an engine already running for that session is attached to rather than started again; a failure of the pane or the host before an engine exists is said in one sentence and the engine opens in Windows Terminal instead. Continue Session on a session whose engine is running brings its tab forward and starts nothing; a session-closed notice ends that session's engine and closes its tab; closing Visual Studio with an engine attached says, once, that the session carries on and its tab is offered when the solution opens again. Open Engine Here, the proving command, is removed. The decisions -- where an engine opens, which running engine is a session's, which tab a closed session closes -- live in one small Core class with its tests; the Visual Studio side only wires them.
+
+**Amended after acceptance:**
+
+- 2026-11-19 — step 'tabs': its files: Set Up Dabbler's first start and Start Session with Different Models also start a session's engine, so they must pass the row's session as Start Session does (claude-code (anthropic, claude-opus-5-5))

@@ -18,7 +18,7 @@ namespace Dabbler.EngineHost
 {
     /// <summary>
     /// One engine, kept running whether or not a pane is attached:
-    /// <c>Dabbler.EngineHost --folder F --title T --columns C --rows R --pipe P -- "command line"</c>,
+    /// <c>Dabbler.EngineHost --folder F --title T --columns C --rows R --pipe P [--session N] -- "command line"</c>,
     /// in the working folder and environment it is started with. It runs the
     /// command line it is given and decides nothing.
     /// </summary>
@@ -137,6 +137,7 @@ namespace Dabbler.EngineHost
                 Title = options.Title,
                 ProcessId = System.Diagnostics.Process.GetCurrentProcess().Id,
                 Pipe = options.Pipe,
+                Session = options.Session,
                 StartedAt = DateTimeOffset.Now,
             }.ToJson();
             var temporary = path + ".tmp";
@@ -376,6 +377,8 @@ namespace Dabbler.EngineHost
             public int Rows;
             public string Pipe = "";
             public string CommandLine = "";
+            // The session the engine is for; null for a consult or a Mechanic.
+            public int? Session;
 
             /// <summary>The options, or null where one is missing or the command line is not the one argument after <c>--</c>.</summary>
             public static HostOptions? Parse(string[] args)
@@ -398,6 +401,10 @@ namespace Dabbler.EngineHost
                         case "--pipe": options.Pipe = value; break;
                         case "--columns": int.TryParse(value, out options.Columns); break;
                         case "--rows": int.TryParse(value, out options.Rows); break;
+                        case "--session":
+                            if (!int.TryParse(value, out var session)) return null;
+                            options.Session = session;
+                            break;
                         default: return null;
                     }
                 }

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
 using Task = System.Threading.Tasks.Task;
@@ -70,9 +72,11 @@ namespace Dabbler.VisualStudio
                 return;
             }
             WorkExplorerAction? start;
+            WorkExplorerDocument document;
             try
             {
-                start = WorkExplorerTree.FirstStart(WorkExplorerDocument.Parse(view.Words));
+                document = WorkExplorerDocument.Parse(view.Words);
+                start = WorkExplorerTree.FirstStart(document);
             }
             catch (FormatException error)
             {
@@ -84,7 +88,24 @@ namespace Dabbler.VisualStudio
                 actions.ShowRefusal("Dabbler is set up, but no session in this repository offers Start Session yet. The Work Explorer shows what each session is waiting on.");
                 return;
             }
-            await new SessionStarter(package).StartAsync(repositoryRoot, start);
+            await new SessionStarter(package).StartAsync(repositoryRoot, start, SessionOf(document, start));
+        }
+
+        /// <summary>The session of the row that offers <paramref name="start"/>.</summary>
+        private static int? SessionOf(WorkExplorerDocument document, WorkExplorerAction start)
+        {
+            var tree = new WorkExplorerTree();
+            tree.Show(document);
+            return Walk(tree.Roots).FirstOrDefault(node => node.Row.Actions.Contains(start))?.Session;
+        }
+
+        private static IEnumerable<WorkExplorerNode> Walk(IEnumerable<WorkExplorerNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                yield return node;
+                foreach (var below in Walk(node.Children)) yield return below;
+            }
         }
     }
 }

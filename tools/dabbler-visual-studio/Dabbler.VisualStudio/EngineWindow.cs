@@ -53,7 +53,7 @@ namespace Dabbler.VisualStudio
 
         private JoinableTask? loading;
         private EngineHost.Connection? engine;
-        // An engine's host is being started: a second Open Engine Here starts no other.
+        // An engine's host is being started: a second start in this tab starts no other.
         private bool starting;
         private TerminalSize? sent;
         private TerminalSize latest;
@@ -200,75 +200,62 @@ namespace Dabbler.VisualStudio
             return $"#{colour.R:x2}{colour.G:x2}{colour.B:x2}";
         }
 
+        // How long a new tab has to draw before its engine opens elsewhere.
+        private static readonly TimeSpan DrawLimit = TimeSpan.FromSeconds(30);
+
         /// <summary>
-        /// Starts the configured engine for the open solution's repository,
-        /// unless one is running here already. A refusal is said in a message box.
+        /// Starts <paramref name="launch"/>'s engine in this tab, for
+        /// <paramref name="session"/> where it is a session's, with
+        /// <paramref name="dabblerFolder"/> first on its PATH as a Windows
+        /// Terminal tab has it, under the reservation <paramref name="ticket"/>.
+        /// Null where an engine came to exist, or the tab was closed first;
+        /// otherwise why none did, the tab or its host having failed first.
         /// </summary>
-        internal async Task OpenAsync()
+        internal async Task<string?> StartAsync(int ticket, string root, int? session, EngineLaunch launch, string dabblerFolder)
         {
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (engine != null || starting)
-            {
-                view.Focus();
-                return;
-            }
-            // Closing the tab while the engine is still being found moves this on: nothing starts after the close.
-            var opening = generation;
-            var folder = await Dabbler.SolutionFolderAsync();
-            var root = folder == null ? null : WorkExplorerTree.RepositoryRootOf(folder);
-            if (root == null)
-            {
-                Say("Open a solution in a git repository first: the engine is opened in that repository.");
-                return;
-            }
-            if (!await Dabbler.EnsureNodeAsync()) return;
-            var router = Dabbler.Router;
-            if (router == null) return;
-            await TaskScheduler.Default;
-            var choice = SessionStarter.ReadConfiguration(router, root, out var unreadable);
-            if (choice == null || choice.Missing != null || choice.Engine == null)
-            {
-                await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-                Say(unreadable ?? choice!.Missing!);
-                return;
-            }
-            EngineLaunch launch;
-            try
-            {
-                launch = EngineLaunch.Parse(router.Run(root, EngineLaunch.Arguments(Consult, choice.Engine, choice.AuthoringModel)));
-            }
-            catch (Exception error) when (error is RouterFailure || error is FormatException)
-            {
-                await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-                Say(error.Message);
-                return;
-            }
+            // A tab closed since it was reserved, or reserved again for another engine, starts nothing for this one.
+            if (reservation != ticket) return null;
             var path = Environment.GetEnvironmentVariable("PATH") ?? "";
             var program = WindowsTerminal.ProgramPath(launch.Program, path, Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD");
             var commandLine = string.Join(" ", new[] { program }.Concat(launch.Args).Select(Router.Quote));
             var environment = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>().ToDictionary(pair => (string)pair.Key, pair => (string)pair.Value!, StringComparer.OrdinalIgnoreCase);
             foreach (var pair in launch.Env) environment[pair.Key] = pair.Value;
-            // As the Windows Terminal tab is given it: `dabbler` is the bundle the extension carries.
-            environment["PATH"] = Path.GetDirectoryName(router.BundlePath) + ";" + path;
+            environment["PATH"] = dabblerFolder + ";" + path;
 
-            await (loading ?? throw new InvalidOperationException("The engine pane has not been created."));
+            TerminalSize size;
+            try
+            {
+                await (loading ?? throw new InvalidOperationException("the Engine tab has not been created"));
 #pragma warning disable VSTHRD003 // Completed by the page's message on the main thread, which nothing here blocks.
-            var size = await measured.Task;
+                if (await Task.WhenAny(measured.Task, Task.Delay(DrawLimit)) != measured.Task) throw new TimeoutException("the Engine tab did not draw in time");
+                size = await measured.Task;
 #pragma warning restore VSTHRD003
+            }
+            catch (Exception error) when (!(error is OperationCanceledException))
+            {
+                // WebView2 missing or broken: the tab never drew, and no engine exists.
+                await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
+                // Closed, or reserved again for another engine, meanwhile: this opening has nothing left to report.
+                if (reservation != ticket) return null;
+                Release(ticket);
+                return error.Message;
+            }
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (engine != null || starting || generation != opening) return;
+            if (reservation != ticket) return null;
+            reservation = null;
             var mine = ++generation;
             Post(new { type = "reset" });
-            var typed = launch.Typed;
             starting = true;
             Folder = root;
+            Session = session;
             EngineHost.Connection connection;
             EngineMessage answer;
             string pipe;
             try
             {
                 await TaskScheduler.Default;
-                pipe = EngineHost.Start(root, launch.Title, commandLine, launch.Cwd, environment, size);
+                pipe = EngineHost.Start(root, launch.Title, commandLine, launch.Cwd, environment, size, session);
                 connection = EngineHost.Attach(pipe, size, out answer);
             }
             catch (Exception error) when (error is InvalidOperationException || error is IOException || error is Win32Exception || error is UnauthorizedAccessException)
@@ -276,8 +263,8 @@ namespace Dabbler.VisualStudio
                 await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
                 starting = false;
                 Folder = null;
-                Say($"{launch.Title} could not be started: {error.Message}");
-                return;
+                Session = null;
+                return error.Message;
             }
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
             starting = false;
@@ -286,34 +273,50 @@ namespace Dabbler.VisualStudio
                 // The tab was closed while the engine was starting: an engine nobody saw start is ended, not left running.
                 connection.Send(EngineMessage.End());
                 connection.Dispose();
-                return;
+                return null;
             }
-            Join(connection, answer, mine, pipe, launch.Title, size, typed);
+            Join(connection, answer, mine, pipe, launch.Title, size, launch.Typed);
+            return null;
         }
 
         /// <summary>
         /// Attaches this pane to an engine still running for this folder, as
-        /// its record names it: its screen comes back as the engine last drew it.
+        /// its record names it, under the reservation <paramref name="ticket"/>:
+        /// its screen comes back as the engine last drew it. Null where it
+        /// attached, was refused or reached nothing, each said in the pane, or
+        /// the tab was closed first; otherwise why the tab itself failed, the
+        /// tab then free again and the engine running on.
         /// </summary>
-        internal async Task AttachAsync(EngineRecord record)
+        internal async Task<string?> AttachAsync(EngineRecord record, int ticket)
         {
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (engine != null || starting)
+            // A tab closed since it was reserved, or reserved again for another engine, attaches nothing for this one.
+            if (reservation != ticket) return null;
+            TerminalSize size;
+            try
             {
-                view.Focus();
-                return;
-            }
-            var opening = generation;
-            await (loading ?? throw new InvalidOperationException("The engine pane has not been created."));
+                await (loading ?? throw new InvalidOperationException("the Engine tab has not been created"));
 #pragma warning disable VSTHRD003 // Completed by the page's message on the main thread, which nothing here blocks.
-            var size = await measured.Task;
+                if (await Task.WhenAny(measured.Task, Task.Delay(DrawLimit)) != measured.Task) throw new TimeoutException("the Engine tab did not draw in time");
+                size = await measured.Task;
 #pragma warning restore VSTHRD003
+            }
+            catch (Exception error) when (!(error is OperationCanceledException))
+            {
+                await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
+                // Closed, or reserved again for another engine, meanwhile: this opening has nothing left to report.
+                if (reservation != ticket) return null;
+                Release(ticket);
+                return error.Message;
+            }
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (engine != null || starting || generation != opening) return;
+            if (reservation != ticket) return null;
+            reservation = null;
             var mine = ++generation;
             Post(new { type = "reset" });
             starting = true;
             Folder = record.Folder;
+            Session = record.Session;
             EngineHost.Connection connection;
             EngineMessage answer;
             try
@@ -326,8 +329,9 @@ namespace Dabbler.VisualStudio
                 await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
                 starting = false;
                 Folder = null;
+                Session = null;
                 Notice($"{record.Title} could not be reached: {error.Message}");
-                return;
+                return null;
             }
             await Dabbler.JoinableTaskFactory.SwitchToMainThreadAsync();
             starting = false;
@@ -335,9 +339,10 @@ namespace Dabbler.VisualStudio
             {
                 // The tab was closed while attaching: the engine runs on, as after any close.
                 connection.Dispose();
-                return;
+                return null;
             }
             Join(connection, answer, mine, record.Pipe, record.Title, size, null);
+            return null;
         }
 
         /// <summary>The host's answer taken: refused is said, attached joins the engine to this pane.</summary>
@@ -348,6 +353,7 @@ namespace Dabbler.VisualStudio
             {
                 connection.Dispose();
                 Folder = null;
+                Session = null;
                 Notice(answer.Text ?? "");
                 return;
             }
@@ -370,14 +376,48 @@ namespace Dabbler.VisualStudio
         /// <summary>The repository folder of the engine this pane has or is starting, or null. Main thread only.</summary>
         internal string? Folder { get; private set; }
 
-        /// <summary>Whether this pane has an engine, or is starting or finding one. Main thread only.</summary>
-        internal bool Busy => engine != null || starting;
+        /// <summary>The session of the engine this pane has or is starting, or null for a consult, a Mechanic or none. Main thread only.</summary>
+        internal int? Session { get; private set; }
+
+        /// <summary>Whether this pane has an engine, is starting or finding one, or is reserved for one. Main thread only.</summary>
+        internal bool Busy => engine != null || starting || reservation != null;
+
+        // The ticket of the opening this tab is reserved for, before its engine begins to start; null where none.
+        private int? reservation;
+
+        /// <summary>
+        /// Takes this free tab for the engine of <paramref name="session"/> in
+        /// <paramref name="folder"/>, at the moment it is chosen, so a second
+        /// opening neither takes it nor starts that session's engine again.
+        /// Returns the ticket the opening starts or attaches under: a tab
+        /// closed and reserved again since gives the old ticket nothing.
+        /// </summary>
+        internal int Reserve(string folder, int? session)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            reservation = ++generation;
+            Folder = folder;
+            Session = session;
+            return reservation.Value;
+        }
+
+        /// <summary>Whether this pane has, starts or is reserved for the engine of <paramref name="session"/> in <paramref name="folder"/>. Main thread only.</summary>
+        internal bool Holds(string folder, int session)
+        {
+            return Busy && Session == session && string.Equals(Folder, folder, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Gives up reservation <paramref name="ticket"/>, whose engine never came to exist, where it still stands.</summary>
+        private void Release(int ticket)
+        {
+            if (reservation != ticket) return;
+            reservation = null;
+            Folder = null;
+            Session = null;
+        }
 
         // The sentence to type once the engine has drawn its prompt, or null.
         private string? pendingTyped;
-
-        private static readonly WorkExplorerAction Consult = JsonConvert.DeserializeObject<WorkExplorerAction>(
-            JsonConvert.SerializeObject(new { id = ActionIds.ConsultWithAi, title = "Open Engine Here" }))!;
 
         private async Task LoadAsync()
         {
@@ -467,7 +507,7 @@ namespace Dabbler.VisualStudio
             if (mine != generation) return;
             GiveOutput(mine);
             Detach();
-            Notice("The engine's host has gone. Tools > Dabbler: Open Engine Here starts the engine again.");
+            Notice("The engine's host has gone. Its row in the Dabbler Work Explorer starts it again.");
         }
 
         /// <summary>A line of the pane's own, dimmed, below what the engine drew.</summary>
@@ -544,21 +584,32 @@ namespace Dabbler.VisualStudio
             return true;
         }
 
+        /// <summary>
+        /// Its session is over: ends this tab's engine, or the one it is
+        /// starting, and closes the tab without saying an engine runs on.
+        /// </summary>
+        internal void EndAndClose()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            engine?.Send(EngineMessage.End());
+            // A start still under way sees the tab moved on, and ends what it started.
+            Detach();
+            Caption = "Dabbler Engine";
+            ((IVsWindowFrame)Frame).CloseFrame((uint)__FRAMECLOSE.FRAMECLOSE_NoSave);
+        }
+
         /// <summary>Lets go of the host; the engine runs on.</summary>
         private void Detach()
         {
             generation++;
+            reservation = null;
             engine?.Dispose();
             engine = null;
             Pipe = null;
             Folder = null;
+            Session = null;
             sent = null;
             pendingTyped = null;
-        }
-
-        private void Say(string text)
-        {
-            VsShellUtilities.ShowMessageBox(Dabbler, text, "Dabbler", OLEMSGICON.OLEMSGICON_WARNING, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
         }
 
         protected override void Dispose(bool disposing)

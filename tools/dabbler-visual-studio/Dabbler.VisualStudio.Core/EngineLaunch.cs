@@ -61,7 +61,9 @@ namespace Dabbler.VisualStudio.Core
             string purpose;
             switch (action.Id)
             {
-                case ActionIds.StartSession: purpose = "session"; break;
+                // Continue Session runs the same start as Start Session.
+                case ActionIds.StartSession:
+                case ActionIds.ContinueSession: purpose = "session"; break;
                 case ActionIds.ConsultWithAi: purpose = "consult"; break;
                 case ActionIds.OpenMechanic: purpose = "mechanic"; break;
                 default: throw new ArgumentException($"{action.Title} opens no engine.", nameof(action));

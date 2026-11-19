@@ -229,6 +229,17 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void Session_is_the_number_of_any_sessions_row()
+        {
+            var tree = new WorkExplorerTree();
+            tree.Show(Document(Row("repository:R", "repository", "repo", null, null, "expanded",
+                Row("session:D:/repo/359", "session", "359: Running", null, null, "none"))));
+
+            Assert.Equal(359, tree.Roots[0].Children[0].Session);
+            Assert.Null(tree.Roots[0].Session);
+        }
+
+        [Fact]
         public void RepositoryRootOf_finds_the_git_folder_above()
         {
             var root = Path.Combine(Path.GetTempPath(), "dabbler-root-" + Guid.NewGuid().ToString("N"));

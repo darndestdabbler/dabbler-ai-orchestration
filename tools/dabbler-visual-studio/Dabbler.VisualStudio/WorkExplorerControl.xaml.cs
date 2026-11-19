@@ -25,8 +25,8 @@ namespace Dabbler.VisualStudio
         /// </summary>
         public event EventHandler<(WorkExplorerNode Node, WorkExplorerAction Action)>? ActionChosen;
 
-        /// <summary>Start Session with Different Models was clicked: the row's Start Session, to be run with other answers.</summary>
-        public event EventHandler<WorkExplorerAction>? DifferentModelsChosen;
+        /// <summary>Start Session with Different Models was clicked: the row, and its Start Session to be run with other answers.</summary>
+        public event EventHandler<(WorkExplorerNode Node, WorkExplorerAction Action)>? DifferentModelsChosen;
 
         /// <summary>Compare With Its Start was clicked on a complete session's row: that session's number.</summary>
         public event EventHandler<int>? CompareChosen;
@@ -70,7 +70,7 @@ namespace Dabbler.VisualStudio
                 // The same start, asked: offered wherever Start Session is, as VS Code offers it.
                 if (action.Id != ActionIds.StartSession) continue;
                 var different = new MenuItem { Header = "Start Session with Different Models" };
-                different.Click += (_, _) => DifferentModelsChosen?.Invoke(this, action);
+                different.Click += (_, _) => DifferentModelsChosen?.Invoke(this, (node, action));
                 row.ContextMenu.Items.Add(different);
             }
             // What the session committed, offered where its work is finished.

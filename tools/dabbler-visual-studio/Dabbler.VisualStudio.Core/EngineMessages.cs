@@ -125,6 +125,10 @@ namespace Dabbler.VisualStudio.Core
         [JsonProperty("pipe")]
         public string Pipe { get; set; } = "";
 
+        /// <summary>The session the engine is for; null for a consult or a Mechanic.</summary>
+        [JsonProperty("session", NullValueHandling = NullValueHandling.Ignore)]
+        public int? Session { get; set; }
+
         [JsonProperty("startedAt")]
         public DateTimeOffset StartedAt { get; set; }
 

@@ -8940,3 +8940,9 @@ Consequence. A reference that names a credential this machine does not hold, or 
 ### D281 · 2026-09-17 · Operator · Review is cross-vendor everywhere
 
 On 2026-09-17 the operator ruled that the reviewer is never from the authoring model's vendor, on every surface. The review rounds, triage and session start already exclude the author's whole provider; the pane and dabbler configure applied only the not-the-same-model rule and labelled a same-vendor reviewer as allowed, so the pane offered choices every session with that author refused. Session 151's same-vendor allowance is reversed: the pane keeps same-vendor candidates visible but marks them not usable while authoring is that vendor, a chosen reviewer that conflicts takes the attention tone, and configure warns rather than refuses because the author is chosen at each Start. The not-the-same-model check stays where it is, because the vendor rule covers it.
+
+## Session 370 — Start Session opens the engine inside Visual Studio
+
+### D282 · 2026-11-19 · Operator · Session 370's Step 4 covers Engine tabs only; engines opened in Windows Terminal stay untracked
+
+Review rounds 1-7 read Step 4 (Continue Session brings the running engine's tab forward and starts nothing; a session that ends closes its tab and its engine) as covering engines opened in Windows Terminal too, by the option or the fallback. The author read it as the Engine tab of Step 2, run through the engine host. Meeting the review's reading would need a second launch path -- the engine host in a console mode inside the Windows Terminal tab, keeping records and listening for an end -- and still could not bring a Windows Terminal tab forward, since wt.exe offers no command to focus or close a tab. At the round cap the operator chose to narrow the plan: Step 4 is about Engine tabs, and a Windows Terminal engine is launched and left as before this session. The plan section is amended to say so.

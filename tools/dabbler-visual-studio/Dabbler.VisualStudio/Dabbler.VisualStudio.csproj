@@ -1,0 +1,77 @@
+<Project>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- An in-process extension: the later sessions open a file at a line,
+       compare two commits, show an information bar and ask whether a build
+       or a debugger is running, none of which the out-of-process model
+       documents. It builds with Visual Studio's MSBuild, not `dotnet build`. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Dabbler.VisualStudio</RootNamespace>
+    <!-- The Work Explorer's control is XAML. -->
+    <UseWPF>true</UseWPF>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <!-- A command-line build installs nothing into an experimental instance. -->
+    <DeployExtension Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</DeployExtension>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 17.14: the oldest Visual Studio the manifest installs on. -->
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" />
+    <!-- The Dabbler Engine's control: the version Visual Studio 2026 carries. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OleMenuCommandService derives from System.Design's MenuCommandService. -->
+    <Reference Include="System.Design" />
+    <ProjectReference Include="..\Dabbler.VisualStudio.Core\Dabbler.VisualStudio.Core.csproj" />
+    <!-- Built first and shipped under host/, never loaded into Visual Studio. -->
+    <ProjectReference Include="..\Dabbler.EngineHost\Dabbler.EngineHost.csproj" ReferenceOutputAssembly="false" IncludeOutputGroupsInVSIX="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The engine host and everything it loads, named one by one: a pattern
+         is read before the host is built and would find nothing. -->
+    <Content Include="..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.EngineHost.exe;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.EngineHost.exe.config;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.VisualStudio.Core.dll;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Newtonsoft.Json.dll" Link="host\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest" SubType="Designer" />
+    <VSCTCompile Include="DabblerPackage.vsct" ResourceName="Menus.ctmenu" />
+    <!-- The router as the VS Code extension ships it, built by
+         `npm run compile -w dabbler-ai-orchestration` before this: its
+         dependencies bundled in, a package.json naming it and its data beside
+         it. The router's own dist/dabbler.cjs leaves its dependencies to a
+         node_modules, which an installed extension has none of. -->
+    <Content Include="..\..\dabbler-ai-orchestration\dist\dabbler.cjs;..\..\dabbler-ai-orchestration\dist\package.json;..\..\dabbler-ai-orchestration\dist\router-config.yaml" Link="router\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\dist\schemas\**\*" Link="router\schemas\%(RecursiveDir)%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\dist\prompt-templates\**\*" Link="router\prompt-templates\%(RecursiveDir)%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The manifest's Icon and License: the VS Code extension's own. -->
+    <Content Include="..\..\dabbler-ai-orchestration\media\darndest-dabbler-icon.png" Link="darndest-dabbler-icon.png" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\LICENSE" Link="LICENSE" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- `dabbler` on an engine tab's PATH: it runs the bundle beside it. -->
+    <Content Include="dabbler.cmd" Link="router\dabbler.cmd" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The status pictures are the VS Code extension's own, one per theme. -->
+    <Content Include="..\..\dabbler-ai-orchestration\media\light\*.svg" Link="media\light\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\dabbler-ai-orchestration\media\dark\*.svg" Link="media\dark\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Dabbler Engine's page and the terminal it draws with, from the
+         workspace's node_modules: `npm ci` at the root before this. -->
+    <Content Include="engine\engine.html;engine\engine.js" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\node_modules\@xterm\xterm\lib\xterm.js;..\..\..\node_modules\@xterm\xterm\css\xterm.css;..\..\..\node_modules\@xterm\addon-fit\lib\addon-fit.js" Link="engine\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <!-- The VSSDK package sets VSToolsPath and leaves the import to the
+       project; it has to follow the SDK's targets, which it extends. -->
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+
+</Project>

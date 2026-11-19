@@ -167,4 +167,117 @@ them:
   settings for: Environment*, sets their size. The operator raised it
   there, and both windows followed. The guide should say so.
 
-**Go**
+Session 368's answer: **Go**.
+
+## 7. Coming back to a running engine
+
+From session 369 the engine runs in an engine host, a small program of
+the package's own (`tools/dabbler-visual-studio/Dabbler.EngineHost/Program.cs`)
+that Visual Studio starts and that is not Visual Studio's child, and the
+pane attaches to the host over a named pipe. A pane that attaches to an
+engine that is already running starts with an empty terminal, and it has
+to show the engine's screen as it is now and take typing at once.
+
+**How it was tried.** Two ways were measured against both engines, each
+started by the built host in this repository at 100 by 30. A pane was a
+headless xterm.js (`@xterm/headless` 5.5.0, the same terminal the pane
+draws with, without a window), joined to the host's pipe as the pane is
+and answering the engine's terminal queries as the pane does. The first
+pane attached, waited for the engine's prompt, typed `hello there`
+without Enter, and detached. Three seconds later a second, new pane
+attached at the same size, and its screen and terminal modes were read;
+then it typed `X`.
+
+- **Redraw:** the host made the engine draw again by resizing its console
+  by one column and back. Both engines redrew their screen, but the new
+  terminal stayed on its normal screen, with bracketed paste and the
+  mouse off, because an engine sets those modes once, when it starts, and
+  a redraw does not set them again. A paste would no longer arrive as one
+  paste, and Copilot's mouse would be gone. The rules across the screen
+  were also drawn a column short of the right edge.
+- **Replay:** the host gives an attaching pane what the engine has
+  printed, before anything it prints after. The second pane's screen was
+  the first pane's, line for line, the full-screen prompt with
+  `hello there` in it included, on the alternate screen with bracketed
+  paste and the mouse on, exactly as the first pane had them. `X` landed
+  after `hello there` in both engines, so typing was taken at once.
+
+| Engine | Redraw: screen | Redraw: modes | Replay: screen | Replay: modes | Typing after |
+| --- | --- | --- | --- | --- | --- |
+| Claude Code 2.1.328 | Drawn, a column short | Lost | As it was | As they were | Taken at once |
+| Copilot CLI 1.0.114 | Drawn, a column short | Lost | As it was | As they were | Taken at once |
+
+**Replay is kept, and nothing else.** The host keeps the last million
+characters the engine printed, trimming by half that at a time, and
+remembers the private modes (`ESC [ ? n h` and `l`) set in what it
+trimmed, so that a pane attaching after an hour of output still gets the
+alternate screen, bracketed paste and the mouse first. That trimmed path
+was run once against Claude Code with the limit set to two thousand
+characters for the run, and the second pane came back on the alternate
+screen with bracketed paste and the mouse on, and took typing. A pane of
+a different size than the engine's is replayed to and then resized, and
+the engine draws again at its size.
+
+**What replay cannot give back.** The host keeps what the engine printed,
+not the screen it drew. A part of the screen drawn once and then left
+unchanged while more than a million characters were printed elsewhere,
+such as a prompt sitting under a long-running spinner, is no longer in
+what is kept: a pane attaching then shows the rest of the screen, and
+that part only once the engine draws it again (a keystroke or a resize
+makes both engines draw their prompt). This was reasoned from how the
+replay works and not reproduced; giving back the screen itself would take
+a terminal emulator in the host, which this session does not build.
+
+Visual Studio itself was not walked here: until closing a pane detaches
+rather than ends, the pane in Visual Studio never attaches to an engine
+that is already running. Section 8 walks it there.
+
+## 8. An engine outlives Visual Studio: the walk
+
+Walked 2026-11-19 on Visual Studio Community 2026 with the .vsix built
+from this session installed, Visual Studio started from the Start menu,
+and `dabbler-visual-studio.slnx` at this repository's root open, whose
+engine is Claude Code. The operator worked Visual Studio and reported
+what the screen showed; the session read the processes and the host's
+record (`%LOCALAPPDATA%\Dabbler\engines`) between the steps.
+
+| What was done | Engine kept running | The bar offered it | Live prompt back, typing taken |
+| --- | --- | --- | --- |
+| Claude Code mid-answer, the engine tab closed, then Visual Studio closed with File > Exit, and Visual Studio reopened on the same solution | Yes: the same host and the same `claude.exe` before and after | Yes: "Consult — Claude Code — dabbler-ai-orchestration is still running for this folder." with Open its pane | Yes: the screen as the engine had drawn it, the prompt included, and typed characters appeared at once |
+| Claude Code mid-answer, `devenv.exe` ended from Task Manager (End task), and Visual Studio reopened | Yes: the same host and engine again | Yes | Yes: the answer it was writing had finished meanwhile, and was there; typing appeared at once |
+
+**The first close.** Closing the engine's tab, the first time on this
+machine, showed the message box saying the engine is still running and
+that Tools > Dabbler: End Engine ends it.
+
+**Where the host runs.** Read after each of the two endings: the host's
+parent process was the copy of the host that Visual Studio started, which
+had already exited, so the host is no child of Visual Studio's and
+nothing that walks Visual Studio's process tree reaches it. Windows
+reports the host as in a job; that job is not one that ends with Visual
+Studio, since the host outlived both an exit and a Task Manager kill.
+
+**Not walked in Visual Studio,** at the operator's word, the walk having
+shown what it was for:
+
+- **The Copilot CLI.** Nothing in the host or the pipe differs by engine:
+  the host runs the launch line it is given. Section 7 measured Copilot
+  CLI 1.0.114 coming back through the same host, screen and modes
+  included, outside Visual Studio; it was not closed, killed or reopened
+  in Visual Studio.
+- **Two Visual Studio windows on two solutions,** each with an engine,
+  one closed and reopened. The offer is made per repository folder from
+  each host's record, which section 8's runs read.
+- **A second Visual Studio window on the same folder.** The refusal was
+  proved against the built host with a pipe client of its own: the first
+  pane attached, the second was answered "This engine is open in another
+  Visual Studio window." and closed, and the first went on taking input.
+- **End Engine** from the menu. The end message it sends was proved
+  against the built host the same way: the engine ended, the pane was
+  told its exit, the host exited and its record was removed.
+- **The idle end after 24 hours** without output or a pane.
+
+The Claude Code engine of the walk was left running for the operator, in
+the first Visual Studio's pane.
+
+Go, on what was walked and with the rest waived by the operator: with Claude Code, an engine outlived Visual Studio closing and being killed from Task Manager and came back live in its pane each time; the Copilot CLI, two Visual Studio windows on two solutions, the same-folder refusal and End Engine were not walked in Visual Studio.

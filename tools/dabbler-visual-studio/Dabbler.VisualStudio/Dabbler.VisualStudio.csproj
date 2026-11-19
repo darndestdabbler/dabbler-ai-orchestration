@@ -34,6 +34,14 @@
     <!-- OleMenuCommandService derives from System.Design's MenuCommandService. -->
     <Reference Include="System.Design" />
     <ProjectReference Include="..\Dabbler.VisualStudio.Core\Dabbler.VisualStudio.Core.csproj" />
+    <!-- Built first and shipped under host/, never loaded into Visual Studio. -->
+    <ProjectReference Include="..\Dabbler.EngineHost\Dabbler.EngineHost.csproj" ReferenceOutputAssembly="false" IncludeOutputGroupsInVSIX="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The engine host and everything it loads, named one by one: a pattern
+         is read before the host is built and would find nothing. -->
+    <Content Include="..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.EngineHost.exe;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.EngineHost.exe.config;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Dabbler.VisualStudio.Core.dll;..\Dabbler.EngineHost\bin\$(Configuration)\net472\Newtonsoft.Json.dll" Link="host\%(Filename)%(Extension)" IncludeInVSIX="true" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
-namespace Dabbler.VisualStudio
+namespace Dabbler.EngineHost
 {
     /// <summary>
     /// One program running in a Windows pseudo console (ConPTY): what it

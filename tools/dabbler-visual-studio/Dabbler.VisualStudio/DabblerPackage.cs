@@ -1,14 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dabbler.VisualStudio.Core;
 using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Events;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
+using SolutionEvents = Microsoft.VisualStudio.Shell.Events.SolutionEvents;
 using Task = System.Threading.Tasks.Task;
 
 namespace Dabbler.VisualStudio
@@ -27,8 +32,8 @@ namespace Dabbler.VisualStudio
     [ProvideToolWindow(typeof(TerminalWindow), Style = VsDockStyle.Tabbed, Window = "34e76e81-ee4a-11d0-ae2e-00a0c90fffc3")]
     // Beside the Work Explorer, as VS Code's Configuration section sits under its tree.
     [ProvideToolWindow(typeof(ConfigurationWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
-    // A tab in the editor area, where a file opens.
-    [ProvideToolWindow(typeof(EngineWindow), Style = VsDockStyle.MDI)]
+    // A tab in the editor area, where a file opens: one per engine.
+    [ProvideToolWindow(typeof(EngineWindow), Style = VsDockStyle.MDI, MultiInstances = true)]
     [Guid(PackageGuidString)]
     public sealed class DabblerPackage : AsyncPackage
     {
@@ -40,6 +45,7 @@ namespace Dabbler.VisualStudio
         private const int TerminalCommandId = 0x0102;
         private const int ConfigurationCommandId = 0x0103;
         private const int OpenEngineHereCommandId = 0x0104;
+        private const int EndEngineCommandId = 0x0105;
 
         private bool nodePassed;
         private NoticeWatcher? notices;
@@ -53,6 +59,12 @@ namespace Dabbler.VisualStudio
 
         /// <summary>The Dabbler Session pane; null until the package has initialized.</summary>
         internal SessionPane? Session { get; private set; }
+
+        /// <summary>Every Dabbler Engine pane this Visual Studio has made, open or closed. Main thread only.</summary>
+        internal List<EngineWindow> EngineWindows { get; } = new List<EngineWindow>();
+
+        // The bars offering engines still running for the open solution's folder, by pipe. Main thread only.
+        private readonly Dictionary<string, IVsInfoBarUIElement> engineOffers = new Dictionary<string, IVsInfoBarUIElement>(StringComparer.Ordinal);
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -80,7 +92,117 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(OpenEngineHereAsync).FileAndForget("dabbler/engine"),
                 new CommandID(CommandSet, OpenEngineHereCommandId)));
+            commands.AddCommand(new MenuCommand(
+                (_, _) => JoinableTaskFactory.RunAsync(EndEngineAsync).FileAndForget("dabbler/engine/end"),
+                new CommandID(CommandSet, EndEngineCommandId)));
             notices = new NoticeWatcher(this);
+            SolutionEvents.OnAfterOpenSolution += OnSolutionOpened;
+            SolutionEvents.OnAfterCloseSolution += OnSolutionClosed;
+            // The package loads once a solution is open, after that solution's opening was raised.
+            JoinableTaskFactory.RunAsync(OfferRunningEnginesAsync).FileAndForget("dabbler/engine/offer");
+        }
+
+        private void OnSolutionOpened(object sender, OpenSolutionEventArgs e)
+        {
+            JoinableTaskFactory.RunAsync(OfferRunningEnginesAsync).FileAndForget("dabbler/engine/offer");
+        }
+
+        private void OnSolutionClosed(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            foreach (var bar in engineOffers.Values.ToList()) bar.Close();
+            engineOffers.Clear();
+        }
+
+        /// <summary>
+        /// Each engine still running for the open solution's repository, and
+        /// attached to no pane of this Visual Studio, offered in a bar across
+        /// the main window whose button opens its pane.
+        /// </summary>
+        private async Task OfferRunningEnginesAsync()
+        {
+            var folder = await SolutionFolderAsync();
+            var root = folder == null ? null : WorkExplorerTree.RepositoryRootOf(folder);
+            if (root == null) return;
+            await TaskScheduler.Default;
+            var running = EngineHost.Running(root);
+            if (running.Count == 0) return;
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            if (!(await GetServiceAsync(typeof(SVsShell)) is IVsShell shell)) return;
+            if (!(await GetServiceAsync(typeof(SVsInfoBarUIFactory)) is IVsInfoBarUIFactory factory)) return;
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            if (ErrorHandler.Failed(shell.GetProperty((int)__VSSPROPID7.VSSPROPID_MainWindowInfoBarHost, out var value))) return;
+            if (!(value is IVsInfoBarHost host)) return;
+            foreach (var record in running)
+            {
+                // Attached here already, or offered already: the package's first offer and a solution's opening can meet.
+                if (EngineWindows.Any(window => window.Pipe == record.Pipe) || engineOffers.ContainsKey(record.Pipe)) continue;
+                var model = new InfoBarModel(
+                    new[] { new InfoBarTextSpan($"{record.Title} is still running for this folder.") },
+                    new[] { new InfoBarButton("Open its pane") },
+                    KnownMonikers.StatusInformation,
+                    isCloseButtonVisible: true);
+                var bar = factory.CreateInfoBar(model);
+                var events = new OfferEvents(
+                    () => JoinableTaskFactory.RunAsync(() => OpenEnginePaneAsync(record)).FileAndForget("dabbler/engine/reopen"),
+                    _ => engineOffers.Remove(record.Pipe));
+                bar.Advise(events, out events.Cookie);
+                host.AddInfoBar(bar);
+                engineOffers[record.Pipe] = bar;
+            }
+        }
+
+        /// <summary>A pane of its own attached to an engine still running.</summary>
+        private async Task OpenEnginePaneAsync(EngineRecord record)
+        {
+            var window = await FreeEngineWindowAsync();
+            if (window == null) return;
+            await window.AttachAsync(record);
+        }
+
+        /// <summary>A Dabbler Engine pane with no engine, shown: one closed earlier, or a new one.</summary>
+        private async Task<EngineWindow?> FreeEngineWindowAsync()
+        {
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            var window = EngineWindows.FirstOrDefault(pane => !pane.Busy);
+            for (var id = 0; window == null; id++)
+            {
+                if (await FindToolWindowAsync(typeof(EngineWindow), id, create: false, DisposalToken) != null) continue;
+                window = await FindToolWindowAsync(typeof(EngineWindow), id, create: true, DisposalToken) as EngineWindow;
+                if (window == null) return null;
+            }
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            ErrorHandler.ThrowOnFailure(((IVsWindowFrame)window.Frame).Show());
+            return window;
+        }
+
+        /// <summary>A bar's button opens the engine's pane and closes the bar; a closed bar stops listening.</summary>
+        private sealed class OfferEvents : IVsInfoBarUIEvents
+        {
+            private readonly Action open;
+            private readonly Action<IVsInfoBarUIElement> closed;
+
+            public OfferEvents(Action open, Action<IVsInfoBarUIElement> closed)
+            {
+                this.open = open;
+                this.closed = closed;
+            }
+
+            public uint Cookie;
+
+            public void OnActionItemClicked(IVsInfoBarUIElement infoBarUIElement, IVsInfoBarActionItem actionItem)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                open();
+                infoBarUIElement.Close();
+            }
+
+            public void OnClosed(IVsInfoBarUIElement infoBarUIElement)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                infoBarUIElement.Unadvise(Cookie);
+                closed(infoBarUIElement);
+            }
         }
 
         protected override void Dispose(bool disposing)
@@ -89,6 +211,11 @@ namespace Dabbler.VisualStudio
 #pragma warning disable VSTHRD010
             if (disposing) notices?.Dispose();
 #pragma warning restore VSTHRD010
+            if (disposing)
+            {
+                SolutionEvents.OnAfterOpenSolution -= OnSolutionOpened;
+                SolutionEvents.OnAfterCloseSolution -= OnSolutionClosed;
+            }
             notices = null;
             base.Dispose(disposing);
         }
@@ -124,13 +251,45 @@ namespace Dabbler.VisualStudio
         }
 
         /// <summary>
-        /// Tools > Dabbler: Open Engine Here -- the configured engine in the
-        /// Dabbler Engine pane, or the pane as it is where one is running.
+        /// Tools > Dabbler: Open Engine Here -- the configured engine in a
+        /// Dabbler Engine pane, or the pane of the one running for the open
+        /// solution's repository.
         /// </summary>
         private async Task OpenEngineHereAsync()
         {
-            var window = await ShowToolWindowAsync(typeof(EngineWindow), 0, create: true, DisposalToken);
-            if (window is EngineWindow engine) await engine.OpenAsync();
+            var folder = await SolutionFolderAsync();
+            var root = folder == null ? null : WorkExplorerTree.RepositoryRootOf(folder);
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            // Only an engine of the open solution's repository: one left from another solution runs on in its own pane.
+            var window = root == null ? null : EngineWindows.FirstOrDefault(pane => pane.Busy && string.Equals(pane.Folder, root, StringComparison.OrdinalIgnoreCase));
+            if (window != null) ErrorHandler.ThrowOnFailure(((IVsWindowFrame)window.Frame).Show());
+            else window = await FreeEngineWindowAsync();
+            if (window != null) await window.OpenAsync();
+        }
+
+        /// <summary>
+        /// Tools > Dabbler: End Engine -- ends the engine of the Dabbler
+        /// Engine pane in front, or of the only one with an engine, which
+        /// closing a pane does not.
+        /// </summary>
+        private async Task EndEngineAsync()
+        {
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+            object? active = null;
+            if (await GetServiceAsync(typeof(SVsShellMonitorSelection)) is IVsMonitorSelection selection)
+            {
+                await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+                selection.GetCurrentElementValue((uint)VSConstants.VSSELELEMID.SEID_WindowFrame, out active);
+            }
+            var attached = EngineWindows.Where(pane => pane.Pipe != null).ToList();
+            var window = attached.FirstOrDefault(pane => ReferenceEquals(pane.Frame, active)) ?? (attached.Count == 1 ? attached[0] : null);
+            if (window == null || !window.End())
+            {
+                var text = attached.Count > 1
+                    ? "More than one engine is running here: click into the Dabbler Engine pane of the one to end, then end it."
+                    : "No engine is running in a Dabbler Engine pane of this window.";
+                Show(text, OLEMSGICON.OLEMSGICON_INFO);
+            }
         }
 
         /// <summary>

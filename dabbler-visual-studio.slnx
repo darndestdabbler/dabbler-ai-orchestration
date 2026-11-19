@@ -5,4 +5,5 @@
   <Project Path="tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/Dabbler.VisualStudio.Core.csproj" />
   <Project Path="tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj" />
   <Project Path="tools/dabbler-visual-studio/Dabbler.VisualStudio/Dabbler.VisualStudio.csproj" />
+  <Project Path="tools/dabbler-visual-studio/Dabbler.EngineHost/Dabbler.EngineHost.csproj" />
 </Solution>

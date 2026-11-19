@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The engine host: one engine in a pseudo console, outside Visual
+       Studio's process, so the engine outlives Visual Studio. It runs the
+       command line it is given and decides nothing. net472 because it ships
+       in the .vsix beside the extension and needs nothing installed. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Dabbler.EngineHost</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Win32_Process.Create: the way out of a job that forbids breaking away. -->
+    <Reference Include="System.Management" />
+    <ProjectReference Include="..\Dabbler.VisualStudio.Core\Dabbler.VisualStudio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

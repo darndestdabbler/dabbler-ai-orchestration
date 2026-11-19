@@ -406,7 +406,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 366 | A Word document is written as a document, and its text is reviewed | no | 2026-11-18 |
 | 367 | Release 3.39.0 (release: 3.39.0) | yes | 2026-11-18 |
 | 368 | An engine pane in Visual Studio takes the keys | no | 2026-11-19 |
-| 369 | An engine outlives Visual Studio | — | not declared |
+| 369 | An engine outlives Visual Studio | no | 2026-11-19 |
 | 370 | Start Session opens the engine inside Visual Studio | — | not declared |
 | 371 | A Dabbler layout, and the way back | — | not declared |
 | 372 | Release 3.40.0 (release: 3.40.0) | — | not declared |
@@ -4098,3 +4098,13 @@ Prove that Claude Code and the Copilot CLI can be typed to inside a Visual Studi
 
 - 2026-11-19 — step 'engine': its files: Opening the root solution in Visual Studio for the smoke run wrote .vs/, which nothing ignored; .gitignore now ignores Visual Studio's per-user state (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-19 — step 'walk': its files: The walk showed Shift+Enter sent the prompt in the pane where Windows Terminal makes a new line; the fix is in engine.js, a file the engine step named, which now sends Shift+Enter as Alt+Enter. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 369 — An engine outlives Visual Studio
+
+**Releasable: no.**
+
+Move the engine out of Visual Studio's process so that it outlives Visual Studio. A new project, tools/dabbler-visual-studio/Dabbler.EngineHost (a net472 Windows program with no window, listed in dabbler-visual-studio.slnx and shipped in the .vsix under host/), takes the launch line the extension gives it, starts the engine through ConPTY (PseudoConsole.cs moves into it from the extension, which no longer runs an engine in its own process), and keeps it running with no pane attached. It starts itself again so that it is no child of Visual Studio's and in no job of Visual Studio's, and it runs from a copy under %LOCALAPPDATA%\Dabbler\host so an update of the extension never meets a file a running engine holds. One host per engine, and it decides nothing. While it runs it writes a record under %LOCALAPPDATA%\Dabbler\engines naming its repository folder, title, process and pipe, and removes it when it ends. The Dabbler Engine pane talks to it over a named pipe only the same Windows user can open, in newline-delimited JSON messages defined in the library (EngineMessages.cs): attach, attached, refused, output, input, size, exited and end. One pane types to an engine at a time (EngineSeat.cs); a second is refused and says so. A pane that attaches to a running engine shows its screen as it is now, a full-screen prompt included, and takes typing at once; the session finds which way does that for both engines (replaying kept output, a redraw forced by a resize, or both) and the page says which. The host ends when its engine does. Closing a pane detaches and ends nothing, and says so the first time. Tools > Dabbler: End Engine ends the engine of the pane in front. A host whose engine has printed nothing and had no pane for 24 hours ends its engine and itself. On opening a solution the extension finds the engines still running for that repository and offers each one's pane again in an information bar, and the Dabbler Engine window becomes multi-instance so each has its own. docs/uat/uat-visual-studio-engine-pane.md gains the walk: an engine mid-answer with Visual Studio closed and reopened, the same with Visual Studio killed from Task Manager, and two Visual Studio windows on two solutions with one closed; it ends with Go, or Not go and where it failed.
+
+**Amended after acceptance:**
+
+- 2026-11-19 — step 'attach': its files: The host step linked the moved PseudoConsole.cs into the extension so it still built; once the pane attaches to the host, that link and its Using come out of the extension's project. (claude-code (anthropic, claude-opus-5-5))

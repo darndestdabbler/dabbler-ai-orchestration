@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 341 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 341 transcript</h1>
+<div class="cancelled" id="cancelled"><strong>CANCELLED</strong> <span class="at">at 2026-11-17T12:46:40-05:00</span><div>not needed</div><div>It was cancelled before anything ran.</div></div>
+<p class="stamp">Rendered 2026-11-17T17:46:40.905Z by dabbler-ai-router 3.34.1 at 3f7638eeb37b537dd4496aa4a01a88f224e3ae08.</p>
+<h2>Session Plan</h2>
+<h3>Session 341 of 342: The first two sessions ask what is being made</h3>
+<p>Scope: <code>packages/router/src/bootstrap/templates.ts</code> (<code>PLAN_PROMPT</code>, <code>DECOMPOSITION_PROMPT</code>, the greenfield pieces of <code>bootstrapPlan</code>, one clause of the maintenance session 1 and <code>MAINTENANCE_PLAN_PROMPT</code>), <code>packages/router/src/cli/bootstrap.ts</code> (the hand-off line), <code>packages/router/test/bootstrap.test.ts</code>, <code>tools/dabbler-ai-orchestration/src/commands/bootstrapProject.ts</code> (the two &quot;project set up&quot; offers), <code>tools/dabbler-ai-orchestration/package.json</code> (the walkthrough's second step), <code>tools/dabbler-ai-orchestration/media/walkthrough-session.md</code>, <code>tools/dabbler-ai-orchestration/README.md</code>, <code>docs/quick-start.md</code>, <code>docs/driving-a-session.md</code>, <code>docs/guide/README.md</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Written from the walks.</strong> This session runs after sessions 339 and 340 and is amended from <code>docs/uat/uat-document-walk.md</code> and <code>docs/uat/uat-prose-walk.md</code> before it starts: where a walk contradicts a sentence below, the walk is right and the sentence is changed, with the person's approval, as any plan amendment is.</p>
+<p><strong>Why.</strong> The operator, 2026-11-14, on what the framework is for: a .NET or Java solution, or some other kind of programming solution, &quot;or it could be a blog post, or novel, or policy document or legislation&quot;. The framework needs no built-in support for each, &quot;but it shouldn't choke if a user elects to pursue a novel use case&quot;.</p>
+<p>Session 1 as scaffolded today chokes on all of them but the first. It asks what &quot;the solution&quot; is, then how production is split and which part may talk to the database, and writes a plan of handoff artifacts, modules, and projects in a <code>.sln</code> or a <code>pom.xml</code>. Session 2 challenges the module cuts and plans a skeleton session that writes a solution file. A person writing a standard operating procedure is asked about an API tier.</p>
+<p>So the first two sessions change character. Session 1 is about understanding the goal, in the person's own terms, and its questions are written out word for word so that every engine asks the same ones. Session 2 still challenges and decomposes, toward the aim the operator stated: a series of sessions that produces a draft of the whole work, or of a component of it, with planning for whatever is deferred. The .NET and Java scaffolding stays exactly as it is, and applies only when the goal is a new or rebuilt .NET or Java solution.</p>
+<p>The questions live in session 1's own text in the scaffolded <code>session-plan.md</code>, and in <code>PLAN_PROMPT</code>, which is the same session run untracked. Not in <code>AGENTS.md</code>: that file is read at the start of every session for the life of the repository, and these are asked once.</p>
+<p>What is scaffolded is kept short, because it is the part that cannot be taken back: sessions 1 and 2 are written into a repository once and stay as they were written, whatever a later release learns. So the scaffolded text carries what is common to every kind of work -- the questions, the brief, what a plan must hold -- and the guidance for one kind is printed by the router, which a release does update: <code>dabbler bootstrap --print-plan-prompt</code> and <code>--print-decomposition-prompt</code>, which exist today. The scaffolded session says to run the one that applies once the brief says what is being made. The .NET and Java text moves there whole. A long text with four branches is also where an authoring model goes wrong, asking a person writing a script about handoff artifacts.</p>
+<p><strong>Step 1 -- session 1, &quot;Understand the goal and write the plan&quot;.</strong> The session reads the brief it was given, in the prompt or at <code>docs/planning/brief.md</code>, says back what it understands, and asks only for what the brief leaves open. With no brief it asks the first question, in these words:</p>
+<p>&gt; What are you making? Pick one or more, or say it in your own words. &gt; &gt; 1. Software: an application, a script, a library, a data analysis. &gt; 2. A work document: a policy, legislation, a specification, a standard &gt;    operating procedure, a presentation, a research paper. &gt; 3. A creative work: a story or a novel, a poem, a screenplay, a blog &gt;    post, a podcast episode, a song, a sermon or a lecture, a prayer. &gt; 4. Something else. Say what.</p>
+<p>and then the second:</p>
+<p>&gt; Tell me what you can about it now, and three things if you have them: &gt; &gt; - Who is it for, and what would make a first draft useful to them? &gt; - Is there material to start from: a specification, documentation, a &gt;   plan, a draft, links to related works or ideas? Say where it is. &gt; - What is already fixed: a deadline, a length, a form or a house style &gt;   it must follow? For software, a language, a platform or an &gt;   architecture already decided?</p>
+<p>The categories are a prompt and not a boundary: a research paper with code in it is two of them, and the plan is shaped by what the person said, not by the number they picked.</p>
+<p>Refinement is not asked about before the idea has been heard. When the person has answered, the session says back what it understood, names what is still open, and asks:</p>
+<p>&gt; Is this clear enough to plan a first draft, or shall we work on it &gt; together first? Working on it first is usually worth it. We can stop &gt; and carry on later: I keep what we have agreed, and what is still open, &gt; in the brief.</p>
+<p>Working on it is a conversation held in this session, across as many sittings as it takes: the session asks, proposes and is corrected, and writes nothing but the brief until the person says it is clear enough to plan. The answers go to <code>docs/planning/brief.md</code> with the kind of work on its first line, before any plan is written. The rule that the substance is the person's stays in the same words: no neighbouring directory is searched, and nothing is drafted from the folder's name.</p>
+<p>Where the repository already holds a solution or a build file, the first question becomes a confirmation and names what was found: &quot;This folder holds a Java application. Is that what we are working on?&quot; The person may be writing its operating procedure.</p>
+<p>Before it asks for material, and before it reads any, the session says where the work goes and waits for the person to say go on:</p>
+<p>&gt; Before you point me at any material: what you give me, and the drafts &gt; made from it, are sent to [the authoring AI] and to [the reviewer], and &gt; each session's work is committed and pushed to [the remote, or &quot;no &gt; remote: it stays on this machine&quot;]. Is that all right for this &gt; material? You can change either AI in the Configuration first.</p>
+<p>The names are read from <code>dabbler configuration explain</code> and the remote from git. Round 25's plan made this a sentence that waited for nothing; three of the four advisors, and both of the stronger pair, said to wait. A file read in the same turn as the warning has already left the machine, and a policy draft is not a code sample. It is a question in a conversation that is already asking questions, not a gate in code: the framework does not judge the answer.</p>
+<p>Material in <code>.docx</code>, <code>.pptx</code> or another binary format is not read as it is: the session asks the person to save it into the folder as text or Markdown first.</p>
+<p><strong>Step 2 -- the plan takes the shape of the work.</strong> <code>docs/planning/solution-plan.md</code> keeps its name and carries, for every kind: the objective a reader can act on (what it is for, who uses, reads or hears it, what it must do or cover, what is out of scope); the material it starts from; what is fixed; the parts, each with what it is responsible for; what this plan drafts and what it defers.</p>
+<ul><li><strong>An application in .NET or Java:</strong> today's text, unchanged in what it asks and moved to the router's printed guidance -- the production split and its question, the handoff artifacts, the modules as projects reached by project reference.</li><li><strong>Any other programming solution:</strong> the parts are that language's own units -- scripts, modules, packages -- and one is a fine answer. The production split is asked about only where the person says something runs separately; a script run by hand has no tiers. The plan says how the work is shown to run: the tests the language has, or the command that exercises it.</li><li><strong>A work document or a creative work:</strong> the form (the kind of document or genre, its length, its structure, its voice, the house style or citation rule it follows); the parts as sections, chapters, scenes or slides; and how a draft is judged -- against the brief, against the source material, and against itself. The work is kept as text files a reviewer can read line by line, Markdown unless the person names another text format, written one sentence per line so that a changed sentence is a changed line. Which copy is the authoritative one is asked and agreed, not assumed: where the person's office already keeps the document in Word, with its comments, numbering and tracked changes, the session says plainly that this framework works on a text copy, that a Word copy is made from it by a person, and that changes made in Word come back only by a person bringing them into the text. An office that cannot work that way is told so, and is not told the framework fits.</li><li><strong>Something else:</strong> the common list above, and the person's own words for the parts.</li></ul>
+<p><strong>Step 3 -- session 2 breaks any of them down.</strong> It challenges the parts as it challenges modules now -- whether each should exist, and whether what it promises is something a reader or a test can check -- and breaks the plan into numbered sessions that together produce a draft of the whole work or of the component the plan names. Its own text stops calling a session &quot;one AI coding session&quot;. Where the brief leaves questions open that a conversation, a piece of research or a trial would settle, it may plan those as the first numbered sessions, each ending in an amended brief, and a planning session after them that breaks down the rest: that is how a person gets more than one session of working the idea through, and no session is renumbered for it. What the plan defers is recorded in it; a planning session for the deferred work is written only where the person has said what comes next.</p>
+<p>Every step still has a check the framework can run, and the text says what one is for prose, since the framework refuses a step without one: a command that exits 0 when the file exists and carries the sections the step was to write. Which command is what session 339 found to run on a locked-down machine. The text says what such a check proves and no more: the draft is there and has its sections.</p>
+<p>The rest is a model's review, and the text bounds it. Each drafting session's section names the requirements it answers and the sources it must agree with, and says what counts as an error -- a requirement missed, a source contradicted, an earlier section contradicted, a stated rule broken -- and that wording, structure and taste the brief does not fix are suggestions. Nothing here says a draft was verified, or that it is good: a person reads it and decides, and the guidance says so.</p>
+<p>The skeleton session, the suite it declares, the architecture test, the packaging session and the release sessions are planned where the plan names a .NET, Maven or Gradle solution, in today's words; another language gets a first session that writes its own build and declares its suite where it has either; a document or a creative work gets no skeleton, packaging or release, a suite only where something can be run over it, as session 339's documentation had, and its first drafting session writes prose, laying out the files as it goes. <code>DECOMPOSITION_PROMPT</code> says the same.</p>
+<p>The maintenance posture's session 1 reads &quot;its projects, their target frameworks or JDKs, their project formats, their build tools&quot;; it gains the clause that a repository of scripts has none of those, and is read as the scripts and modules it holds and the way each is run.</p>
+<p><strong>Step 4 -- the sentences around them.</strong> The offer that ends set-up, the hand-off line <code>dabbler bootstrap</code> prints, the walkthrough's second step and its page, the README, the quick start and <code>docs/driving-a-session.md</code> say that session 1 asks what you are making and whether you want to work it through, and stop saying &quot;one module is a fine answer&quot; as though every plan had modules.</p>
+<p><strong>Step 5 -- what is claimed, and the number.</strong> <code>docs/guide/README.md</code> and the extension's README say in one short paragraph what the framework is used for, and claim only what has been taken to a close: programs in any language a person declares a suite for, and what sessions 339 and 340 walked, documentation and a short piece of prose kept in Markdown, with the limits the walks found. The reader it is written for is a person who already works in VS Code and with git: a developer or a technical writer who also has a procedure or a specification to write. Nothing says it is ready for a person who is not one. Session 1's question may name a novel or legislation; the public pages do not, until somebody has taken one to a close. <code>version.json</code> goes to 3.36.0 (a minor: the first sessions ask a new question), stamped with <code>npm run stamp:version</code>, and the changelog's 3.36.0 section says what sessions 339 to 341 changed for a person.</p>
+<p><strong>Non-goals.</strong> The maintenance posture's two sessions beyond that one clause: a repository that already holds code is asked what is to change, as now. A <code>kind</code> in <code>dabbler.yaml</code> or anywhere the framework reads: the kind is a line in the brief, and no code branches on it. A question asked by set-up itself, or a text scaffolded per kind: one text, so a person at a terminal is asked what a person in VS Code is. Renaming <code>solution-plan.md</code> or <code>docs/planning/</code>. Sessions inserted between 1 and</p>
+<ol><li>A setting or a gate in code about what may be sent to a provider: the question is the session's, asked once. Reading, diffing, reviewing or converting <code>.docx</code>, <code>.pptx</code> or any binary format in the framework's own code. Templates for particular genres. Rewriting the sessions 1 and 2 of a repository already set up. Any change to <code>detect.ts</code>, to the suites, to the reviewer's prompt, to the record, or to the rule that a step has a check: where session 339 found one of those wanting, it is a session of its own, planned before this one.</li></ol>
+<p><strong>Tests.</strong> In <code>bootstrap.test.ts</code>: the plan scaffolded into an empty folder carries both questions in session 1 and still parses as two sessions with their steps; scaffolded over a build file, it asks the confirmation in place of the first question and keeps the adoption text; under <code>maintenance</code> it names scripts beside projects; the scaffolded sessions 1 and 2 name no <code>.csproj</code>, <code>pom.xml</code> or database, and the printed plan prompt does. The existing assertions on the .NET and Java text move to the printed guidance and are not relaxed. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes, as 3.36.0 in session 342.</p>
+<h2>Verification</h2>
+<p>No verification round was recorded.</p>
+<h2>Test runs</h2>
+<p>No test run was recorded.</p>
+</main>
+</body>
+</html>

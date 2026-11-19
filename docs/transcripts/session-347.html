@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 347 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 347 transcript</h1>
+<p class="stamp">Rendered 2026-11-18T01:08:28.129Z by dabbler-ai-router 3.35.0 at f7132a6c6b9643582b756029ed53f5fef7878ec1.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-17T19:52:52.677-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 347 of 362: The views follow the records</h3>
+<p>Scope: <code>packages/router/src/views/follow.ts</code> (new), <code>packages/router/src/cli/view.ts</code> (<code>--follow</code>), <code>packages/router/src/cli/status.ts</code> (<code>--stalled-after-seconds</code>), <code>packages/router/test/follow.test.ts</code> (new), <code>tools/dabbler-ai-orchestration/src/extension.ts</code>, <code>tools/dabbler-ai-orchestration/src/utils/projection.ts</code>, <code>tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> A view is only right until a record changes. The VS Code extension knows which files to watch: the ledger, the plan, a run's records, the catalog and the preferences. That list is in <code>extension.ts</code>, in <code>SolutionTreeProvider.ts</code> and again in the key of the reading's cache. It is a rule about the router's own files, kept outside the router, in three places. A second interface would make it four.</p>
+<p><strong>Step 1 -- one list.</strong> <code>packages/router/src/views/follow.ts</code> says which paths each view depends on, for a repository. The extension's watchers and its cache key are built from it, and their own lists go.</p>
+<p>**Step 2 -- <code>--follow</code>.** <code>dabbler view work-explorer --follow</code> and <code>dabbler view configuration --follow</code> print the view, then print it again whenever a path it depends on changes, one JSON document to a line, until interrupted. Changes close together make one printing. A document is whole each time: an interface replaces what it shows and compares nothing.</p>
+<p><strong>Step 3 -- the stalled threshold.</strong> <code>dabbler status</code> and the views take <code>--stalled-after-seconds</code>, which only the in-process call could pass.</p>
+<p><strong>Step 4 -- the number.</strong> <code>version.json</code> goes to 3.36.0 (a minor: new verbs), stamped with <code>npm run stamp:version</code>, and the changelog's 3.36.0 section says what sessions 343 to 347 give a person: <code>dabbler terminal</code> and <code>dabbler view</code> at a bare terminal, and nothing changed in VS Code.</p>
+<p><strong>Non-goals.</strong> Sending only what changed. A server, a port or a socket: an interface starts the verb and reads its output. Any change to how often VS Code refreshes.</p>
+<p><strong>Tests.</strong> In <code>follow.test.ts</code>: a change to the ledger prints the Work Explorer again and a change to a preference file does not; two changes close together print once. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes, as 3.36.0 in session 348.</p>
+<h2>Work Plan</h2>
+<p>Make the router the one place that says which files each view depends on, and let a view follow them. A new <code>packages/router/src/views/follow.ts</code> names, for a repository, the paths the Work Explorer is read from (the sessions root's sessions.json, activity-log.json, session-plan.md and change-log.md; the runs directory; and the current run's step-execution.jsonl, approved-plan.json, rounds.jsonl, driver/run.json and driver/plan.json) and the paths the Configuration is read from (the model catalog and preferences under this platform's per-user data directory, and the repository's .vscode/settings.json and dabbler.yaml), both as concrete files for a key or a poll and as base-plus-glob patterns for a watcher, from one list. The extension's file watchers in extension.ts, its user-configuration watchers in SolutionTreeProvider.ts and the cache key in projection.ts are built from it, and their own lists (CACHE_INPUTS, taskRecordInputs, the hand-written globs, host.ts's userConfigurationDirs) go. <code>dabbler view work-explorer --follow</code> and <code>dabbler view configuration --follow</code> print the view once, then print it again, whole, one JSON document to a line, whenever a path it depends on changes, with changes close together making one printing, until interrupted; it polls the paths' modification times, so nothing is listened on. <code>dabbler status</code> and <code>dabbler view work-explorer</code> take <code>--stalled-after-seconds N</code>, which reaches the projection exactly as the in-process call's option does. Finally version.json goes to 3.36.0, stamped with <code>npm run stamp:version</code>, and the changelog gains a 3.36.0 section saying what sessions 343 to 347 give a person: <code>dabbler terminal</code> and <code>dabbler view</code> at a bare terminal, <code>--follow</code>, and nothing changed in VS Code.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/11f6f7e2f92786454eb7377461739383ef94d17a"><code>11f6f7e2f92786454eb7377461739383ef94d17a</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>One list</td><td><p>Create packages/router/src/views/follow.ts: one list of the files the Work Explorer is read from and one of the files the Configuration is read from, exposed as (a) <code>followedPaths(view, roots, session?)</code> -- concrete paths, with the run records of the given session or, where none is given, of the highest-numbered run under .dabbler/runs (the rule taskRecordInputs has now) -- and (b) <code>followedPatterns(view, root)</code> -- {base, glob} pairs a file watcher takes, the runs as <code>*/...</code> globs. The Configuration's user-level files come from configurationSourceDirs(); with no repository root it is those alone. Export both from packages/router/src/index.ts. Tests in packages/router/test/follow.test.ts: the Work Explorer's paths include the ledger and the named run's records and not a preference file; with no session named they are the highest run's.</p></td><td><span class="mono">packages/router/src/views/follow.ts</span><br><span class="mono">packages/router/src/index.ts</span><br><span class="mono">packages/router/test/follow.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/follow.test.ts</code></td><td>yes</td></tr>
+<tr><td>Extension reads the list</td><td><p>Build the extension's watchers and cache key from the router's list. In tools/dabbler-ai-orchestration/src/extension.ts, bindWatchers makes one watcher per followedPatterns('work-explorer', root) pair instead of its three hand-written RelativePatterns. In src/utils/projection.ts, projectionCacheKey stats followedPaths('work-explorer', [repositoryRoot], session) and CACHE_INPUTS and taskRecordInputs go (RUNS_REL stays only if something still imports it). In src/providers/SolutionTreeProvider.ts, the user-configuration watchers come from followedPatterns('configuration', root) and userConfigurationDirs goes from src/router/host.ts. Update src/test/suite/projection.test.ts: the taskRecordInputs tests are now follow.test.ts's, and the key tests keep proving the key moves with a run record and with the runs directory. How often anything refreshes does not change.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/src/extension.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/utils/projection.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/router/host.ts</span><br><span class="mono">tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</span></td><td><code>npm --prefix packages/router run build</code><br><code>node node_modules/typescript/bin/tsc --noEmit -p tools/dabbler-ai-orchestration</code><br><code>npm --prefix tools/dabbler-ai-orchestration run lint</code><br><code>node tools/dabbler-ai-orchestration/scripts/run-unit.mjs tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts</code></td><td>yes</td></tr>
+<tr><td>Follow</td><td><p>Add <code>--follow</code> to <code>dabbler view</code> in packages/router/src/cli/view.ts, for both views: print the view as one line of JSON, then poll the modification times of followedPaths for that view (recomputed each poll, so a new run is picked up) and, once a change has been quiet for a short settle window, print the whole view again as one line; run until interrupted. Without --follow the output is unchanged. The polling and settling live in follow.ts as one function taking the paths, the printer and the intervals, returning a stop. The help says what --follow does. Tests in follow.test.ts: a change to the ledger prints the Work Explorer again and a change to a preference file does not; two changes close together print once.</p></td><td><span class="mono">packages/router/src/views/follow.ts</span><br><span class="mono">packages/router/src/cli/view.ts</span><br><span class="mono">packages/router/test/follow.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node packages/router/scripts/check-boundaries.ts</code><br><code>node --test packages/router/test/follow.test.ts packages/router/test/workExplorer.test.ts packages/router/test/configurationView.test.ts</code></td><td>yes</td></tr>
+<tr><td>Stalled threshold</td><td><p>Add <code>--stalled-after-seconds N</code> (a positive number; anything else is a usage error) to <code>dabbler status</code> in packages/router/src/cli/status.ts and to <code>dabbler view work-explorer</code> in packages/router/src/cli/view.ts, passed to buildProjection as the in-process call passes it; both helps name it. Tests: in packages/router/test/cli.test.ts, status with the flag publishes that threshold on a repository with a session in flight and refuses a non-number; in packages/router/test/workExplorer.test.ts, parseViewArgs takes it for work-explorer.</p></td><td><span class="mono">packages/router/src/cli/status.ts</span><br><span class="mono">packages/router/src/cli/view.ts</span><br><span class="mono">packages/router/test/cli.test.ts</span><br><span class="mono">packages/router/test/workExplorer.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code><br><code>node --test --test-name-pattern status packages/router/test/cli.test.ts</code><br><code>node --test packages/router/test/workExplorer.test.ts</code><br><code>node packages/router/src/cli/dabbler.ts status --stalled-after-seconds 120 --sessions-dir docs/sessions</code></td><td>yes</td></tr>
+<tr><td>The number</td><td><p>Set version.json to 3.36.0 and run <code>npm run stamp:version</code>, which writes the router and extension manifests and the lock file. Add a <code>## [3.36.0]</code> section to tools/dabbler-ai-orchestration/CHANGELOG.md, under [Unreleased], saying in a person's words what sessions 343 to 347 give: <code>dabbler terminal</code> and <code>dabbler view work-explorer</code> / <code>dabbler view configuration</code> at a bare terminal, with <code>--follow</code> and <code>--stalled-after-seconds</code>, and that nothing changed in VS Code.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');if(!/## \[3\.36\.0\]/.test(t)||!/--follow/.test(t))process.exit(1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Sending only what changed: every printing under --follow is the whole view.</li><li>A server, a port or a socket: an interface starts the verb and reads its output.</li><li>Any change to how often VS Code refreshes: the backstop poll, its setting and the solution projection's own source globs stay as they are.</li><li>A stalled threshold on the configuration view, which has no stalled reading.</li><li>Releasing: 3.36.0 is stamped here and released in session 348.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[00:52:52]</span> <span class="muted">run-started</span> session=347 mode=pull</div>
+<div class="line"><span class="at">[00:52:52]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[00:54:43]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[00:54:43]</span> <span class="muted">answer-taken</span> steps=5</div>
+<div class="line"><span class="at">[00:54:43]</span> <span class="muted">plan-accepted</span> steps=[&quot;one-list&quot;,&quot;extension-reads-the-list&quot;,&quot;follow&quot;,&quot;stalled-threshold&quot;,&quot;the-number&quot;] non_goals=5</div>
+<div class="line"><span class="at">[00:54:44]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[00:54:44]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=one-list</div>
+<div class="line"><span class="at">[00:56:16]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[00:56:16]</span> <span class="muted">answer-taken</span> seq=2 step=one-list status=done notes=follow.ts names the Work Explorer's and the Configuration's files as paths and as watcher patterns, from one list; exported</div>
+<div class="line"><span class="at">[00:56:17]</span> <span class="muted">check-started</span> step=one-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[00:56:22]</span> <span class="muted">check-ended</span> step=one-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[00:56:22]</span> <span class="muted">check-started</span> step=one-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[00:56:28]</span> <span class="muted">check-ended</span> step=one-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[00:56:28]</span> <span class="muted">check-started</span> step=one-list argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[00:56:29]</span> <span class="muted">check-ended</span> step=one-list argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[00:56:29]</span> <span class="muted">check-started</span> step=one-list argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/follow.test.ts&quot;]</div>
+<div class="line"><span class="at">[00:56:30]</span> <span class="muted">check-ended</span> step=one-list argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/follow.test.ts&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[00:56:30]</span> <span class="muted">check-started</span> step=one-list suite=typescript command=node scripts/suite.mjs container packages/router/test/follow.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[00:56:36]</span> <span class="muted">check-ended</span> step=one-list suite=typescript command=node scripts/suite.mjs container packages/router/test/follow.test.ts packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[00:56:36]</span> <span class="muted">report-accepted</span> seq=2 step=one-list files=[&quot;packages/router/src/views/follow.ts&quot;,&quot;packages/router/src/index.ts&quot;,&quot;packages/router/test/follow.test.ts&quot;] notes=follow.ts names the Work Explorer's and the Configuration's files as paths and as watcher patterns, from one list; exported</div>
+<div class="line"><span class="at">[00:56:36]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=extension-reads-the-list</div>
+<div class="line"><span class="at">[00:58:41]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[00:58:41]</span> <span class="muted">answer-taken</span> seq=3 step=extension-reads-the-list status=done notes=watchers, cache key and configuration watchers built from followedPaths/followedPatterns; CACHE_INPUTS, taskRecordInputs, RUNS_REL and userConfigurationDirs removed</div>
+<div class="line"><span class="at">[00:58:42]</span> <span class="muted">check-started</span> step=extension-reads-the-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;build&quot;]</div>
+<div class="line"><span class="at">[00:58:44]</span> <span class="muted">check-ended</span> step=extension-reads-the-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;build&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[00:58:44]</span> <span class="muted">check-started</span> step=extension-reads-the-list argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;]</div>
+<div class="line"><span class="at">[00:58:48]</span> <span class="muted">check-ended</span> step=extension-reads-the-list argv=[&quot;node&quot;,&quot;node_modules/typescript/bin/tsc&quot;,&quot;--noEmit&quot;,&quot;-p&quot;,&quot;tools/dabbler-ai-orchestration&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[00:58:48]</span> <span class="muted">check-started</span> step=extension-reads-the-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[00:58:51]</span> <span class="muted">check-ended</span> step=extension-reads-the-list argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;tools/dabbler-ai-orchestration&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[00:58:51]</span> <span class="muted">check-started</span> step=extension-reads-the-list argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts&quot;]</div>
+<div class="line"><span class="at">[00:58:56]</span> <span class="muted">check-ended</span> step=extension-reads-the-list argv=[&quot;node&quot;,&quot;tools/dabbler-ai-orchestration/scripts/run-unit.mjs&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[00:58:56]</span> <span class="muted">check-started</span> step=extension-reads-the-list suite=typescript command=node scripts/suite.mjs container packages/router/test/projection.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[00:59:02]</span> <span class="muted">check-ended</span> step=extension-reads-the-list suite=typescript command=node scripts/suite.mjs container packages/router/test/projection.test.ts packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[00:59:02]</span> <span class="muted">check-started</span> step=extension-reads-the-list suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts</div>
+<div class="line"><span class="at">[00:59:08]</span> <span class="muted">check-ended</span> step=extension-reads-the-list suite=extension command=node scripts/suite.mjs extension tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[00:59:08]</span> <span class="muted">report-accepted</span> seq=3 step=extension-reads-the-list files=[&quot;tools/dabbler-ai-orchestration/src/extension.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/utils/projection.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/providers/SolutionTreeProvider.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/router/host.ts&quot;,&quot;tools/dabbler-ai-orchestration/src/test/suite/projection.test.ts&quot;] notes=watchers, cache key and configuration watchers built from followedPaths/followedPatterns; CACHE_INPUTS, taskRecordInputs, RUNS_REL and userConfigurationDirs removed</div>
+<div class="line"><span class="at">[00:59:08]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=follow</div>
+<div class="line"><span class="at">[01:00:42]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[01:00:42]</span> <span class="muted">answer-taken</span> seq=4 step=follow status=done notes=view --follow prints one whole JSON line, then again after a followed file changes and settles; follow() polls mtimes and stops on SIGINT</div>
+<div class="line"><span class="at">[01:00:43]</span> <span class="muted">check-started</span> step=follow argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[01:00:48]</span> <span class="muted">check-ended</span> step=follow argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[01:00:48]</span> <span class="muted">check-started</span> step=follow argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[01:00:54]</span> <span class="muted">check-ended</span> step=follow argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[01:00:54]</span> <span class="muted">check-started</span> step=follow argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;]</div>
+<div class="line"><span class="at">[01:00:55]</span> <span class="muted">check-ended</span> step=follow argv=[&quot;node&quot;,&quot;packages/router/scripts/check-boundaries.ts&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[01:00:55]</span> <span class="muted">check-started</span> step=follow argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/follow.test.ts&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;,&quot;packages/router/test/configurationView.test.ts&quot;]</div>
+<div class="line"><span class="at">[01:00:57]</span> <span class="muted">check-ended</span> step=follow argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/follow.test.ts&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;,&quot;packages/router/test/configurationView.test.ts&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[01:00:57]</span> <span class="muted">check-started</span> step=follow suite=typescript command=node scripts/suite.mjs container packages/router/test/follow.test.ts packages/router/test/schema.test.ts</div>
+<div class="line"><span class="at">[01:01:04]</span> <span class="muted">check-ended</span> step=follow suite=typescript command=node scripts/suite.mjs container packages/router/test/follow.test.ts packages/router/test/schema.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[01:01:04]</span> <span class="muted">report-accepted</span> seq=4 step=follow files=[&quot;packages/router/src/views/follow.ts&quot;,&quot;packages/router/src/cli/view.ts&quot;,&quot;packages/router/test/follow.test.ts&quot;] notes=view --follow prints one whole JSON line, then again after a followed file changes and settles; follow() polls mtimes and stops on SIGINT</div>
+<div class="line"><span class="at">[01:01:04]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=stalled-threshold</div>
+<div class="line"><span class="at">[01:02:37]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[01:02:37]</span> <span class="muted">answer-taken</span> seq=5 step=stalled-threshold status=done notes=status and view work-explorer take --stalled-after-seconds N (one parser, parseStalledAfterSeconds), passed to buildProjection; configuration refuses it</div>
+<div class="line"><span class="at">[01:02:39]</span> <span class="muted">check-started</span> step=stalled-threshold argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[01:02:44]</span> <span class="muted">check-ended</span> step=stalled-threshold argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;] outcome=<span class="good">passed</span> seconds=4</div>
+<div class="line"><span class="at">[01:02:44]</span> <span class="muted">check-started</span> step=stalled-threshold argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[01:02:49]</span> <span class="muted">check-ended</span> step=stalled-threshold argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;] outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[01:02:49]</span> <span class="muted">check-started</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;--test&quot;,&quot;--test-name-pattern&quot;,&quot;status&quot;,&quot;packages/router/test/cli.test.ts&quot;]</div>
+<div class="line"><span class="at">[01:02:51]</span> <span class="muted">check-ended</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;--test&quot;,&quot;--test-name-pattern&quot;,&quot;status&quot;,&quot;packages/router/test/cli.test.ts&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[01:02:51]</span> <span class="muted">check-started</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;]</div>
+<div class="line"><span class="at">[01:02:53]</span> <span class="muted">check-ended</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[01:02:53]</span> <span class="muted">check-started</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;packages/router/src/cli/dabbler.ts&quot;,&quot;status&quot;,&quot;--stalled-after-seconds&quot;,&quot;120&quot;,&quot;--sessions-dir&quot;,&quot;docs/sessions&quot;]</div>
+<div class="line"><span class="at">[01:02:54]</span> <span class="muted">check-ended</span> step=stalled-threshold argv=[&quot;node&quot;,&quot;packages/router/src/cli/dabbler.ts&quot;,&quot;status&quot;,&quot;--stalled-after-seconds&quot;,&quot;120&quot;,&quot;--sessions-dir&quot;,&quot;docs/sessions&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[01:02:54]</span> <span class="muted">check-started</span> step=stalled-threshold suite=typescript command=node scripts/suite.mjs container packages/router/test/cli.test.ts packages/router/test/schema.test.ts packages/router/test/workExplorer.test.ts</div>
+<div class="line"><span class="at">[01:03:01]</span> <span class="muted">check-ended</span> step=stalled-threshold suite=typescript command=node scripts/suite.mjs container packages/router/test/cli.test.ts packages/router/test/schema.test.ts packages/router/test/workExplorer.test.ts outcome=<span class="good">passed</span> seconds=6</div>
+<div class="line"><span class="at">[01:03:01]</span> <span class="muted">report-accepted</span> seq=5 step=stalled-threshold files=[&quot;packages/router/src/cli/status.ts&quot;,&quot;packages/router/src/cli/view.ts&quot;,&quot;packages/router/test/cli.test.ts&quot;,&quot;packages/router/test/workExplorer.test.ts&quot;] notes=status and view work-explorer take --stalled-after-seconds N (one parser, parseStalledAfterSeconds), passed to buildProjection; configuration refuses it</div>
+<div class="line"><span class="at">[01:03:01]</span> <span class="muted">instruction-issued</span> seq=6 kind=step step=the-number</div>
+<div class="line"><span class="at">[01:03:47]</span> <span class="muted">run-resumed</span> session=347 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[01:03:47]</span> <span class="muted">answer-taken</span> seq=6 step=the-number status=done notes=version.json 3.36.0 stamped into both manifests and the lock file; changelog 3.36.0 says what 343-347 give a person</div>
+<div class="line"><span class="at">[01:03:49]</span> <span class="muted">check-started</span> step=the-number argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[01:03:50]</span> <span class="muted">check-ended</span> step=the-number argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[01:03:50]</span> <span class="muted">check-started</span> step=the-number argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');if(!/## \\[3\\.36\\.0\\]/.test(t)||!/--follow/.test(t))process.exit(1)&quot;]</div>
+<div class="line"><span class="at">[01:03:51]</span> <span class="muted">check-ended</span> step=the-number argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');if(!/## \\[3\\.36\\.0\\]/.test(t)||!/--follow/.test(t))process.exit(1)&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[01:03:52]</span> <span class="muted">report-accepted</span> seq=6 step=the-number files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.36.0 stamped into both manifests and the lock file; changelog 3.36.0 says what 343-347 give a person</div>
+<div class="line"><span class="at">[01:03:52]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[01:03:53]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[01:03:54]</span> <span class="muted">job-started</span> name=verification pid=7280 log=.dabbler/runs/s347/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[01:05:39]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s347/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[01:05:39]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[01:05:39]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[01:05:39]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[01:05:40]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=64180 log=.dabbler/runs/s347/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[01:05:45]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s347/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[01:05:45]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[01:05:46]</span> <span class="muted">job-started</span> name=run of record: typescript pid=34204 log=.dabbler/runs/s347/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[01:07:50]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s347/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[01:07:51]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[01:07:51]</span> <span class="muted">job-started</span> name=run of record: extension pid=17780 log=.dabbler/runs/s347/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[01:08:12]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s347/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[01:08:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[01:08:13]</span> <span class="muted">committing</span> subject=Session 347: The views follow the records</div>
+<div class="line"><span class="at">[01:08:14]</span> <span class="muted">pushing</span></div>
+<div class="line"><span class="at">[01:08:17]</span> <span class="muted">landed</span> commit=11f6f7e2f92786454eb7377461739383ef94d17a</div>
+<div class="line"><span class="at">[01:08:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[01:08:17]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[01:08:17]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[01:08:18]</span> <span class="muted">job-started</span> name=close pid=56416 log=.dabbler/runs/s347/driver/jobs/close.log</div>
+<div class="line"><span class="at">[01:08:28]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s347/driver/jobs/close.log</div>
+<div class="line"><span class="at">[01:08:28]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div>
+<div class="line"><span class="at">[01:08:28]</span> <span class="muted">transcript-rendering</span> carry=outline</div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>4 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>`viewVerb` calls `followedPaths(parsed.view, parsed.roots)` without a session, causing `latestRun()` to choose the highest `sN`. A restored older session can therefore render from its current records but follow another run’s files.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>Both writes occur synchronously before a poll, so the test would pass even without resetting the settle timer after a second poll detects another change.</td><td>not answered</td></tr>
+<tr><td>2</td><td><strong>minor</strong></td><td>No visible test invokes `viewVerb` with `--follow`, verifies the initial compact JSON line, changes a dependency, and verifies a second complete JSON line.</td><td>not answered</td></tr>
+<tr><td>3</td><td><strong>minor</strong></td><td>A projection that records `stalledAfterSeconds` but ignores it when classifying an outstanding instruction could still pass the visible assertions.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>3s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>123s</td><td>1677</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>18s</td><td>193</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

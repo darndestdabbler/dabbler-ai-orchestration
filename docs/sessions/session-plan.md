@@ -21664,3 +21664,242 @@ here supplies.
 ### Session 367 of 367: Release 3.39.0 (release: 3.39.0)
 
 The framework publishes session 366 as 3.39.0, and nothing else.
+
+## Why sessions 368–372 exist: the engine inside Visual Studio
+
+The operator, 2026-11-19, with the Visual Studio extension finished as a
+draft: the AI CLI should be inside Visual Studio and not in a separate
+Windows Terminal window, and there should be a standard Dabbler layout --
+Solution Explorer and Work Explorer on the left, the AI CLI in the
+middle, the Dabbler Terminal on the right -- with an easy way back to a
+coding layout. Consult round 30 (`docs/design/consults/round30-*.md`)
+asked `gpt-6.2-sol` and `gemini-4-argon` how; the synthesis's eight
+recommendations are what these sessions build. This overturns decision 1
+of `docs/design/visual-studio-extension-scope.md` (the engine runs in
+Windows Terminal), which was the operator's and is the operator's to
+overturn; Windows Terminal stays as a choice.
+
+The order is the point. Session 368 proves the terminal takes the keys,
+with the two real engines, before anything is built on it. If its page
+does not say go, 369 to 372 are re-planned by the operator, with
+Microsoft's WPF terminal control as the next candidate.
+
+### Session 368 of 372: An engine pane in Visual Studio takes the keys
+
+Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (an Engine
+tool window, its terminal page and its key handling),
+`tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/` and
+`Dabbler.VisualStudio.Core.Tests/` (what is decided without Visual
+Studio: which keys the pane keeps, the size sent to the engine),
+`docs/uat/uat-visual-studio-engine-pane.md`
+
+**Why.** Every later session rests on one thing nobody has tried: that
+Claude Code and the Copilot CLI can be typed to inside a Visual Studio
+pane as they are in a terminal. Visual Studio takes Esc, Shift+Tab,
+Ctrl+C and Ctrl+V before a pane sees them, and another extension's
+change log is a list of what a developer meets when that is got wrong.
+
+**Step 1 -- the pane.** An Engine tool window that opens as a tab in the
+editor area (`VsDockStyle.MDI`), holding a WebView2 control that shows
+xterm.js from files shipped in the package and from nowhere else. Its
+WebView2 data folder is Dabbler's own. The step records which WebView2
+assembly Visual Studio actually loads, the package's or its own.
+
+**Step 2 -- the engine.** A command, Open Engine Here, runs the launch
+line the router prints (`dabbler session launch`) through ConPTY, inside
+Visual Studio's process for this session only, and joins it to the pane.
+The pane's size in rows and columns goes to the engine on every resize,
+and never a size of zero.
+
+**Step 3 -- the keys.** While the terminal has focus it keeps Esc,
+Shift+Tab, the arrows, Enter with its modifiers, Ctrl+C and Ctrl+V.
+Ctrl+C copies a selection and otherwise interrupts. Pasted text goes in
+as text. A pasted image does what the engine does with one in Windows
+Terminal, or the page says exactly what it does instead. Ctrl+Tab and
+Visual Studio's window keys still leave the pane.
+
+**Step 4 -- how it looks.** The terminal takes Visual Studio's theme
+(light, dark, blue) and follows a change of it, and has a font and size
+of its own.
+
+**Step 5 -- the walk,** in Visual Studio 2026, with Claude Code and then
+the Copilot CLI, Windows Terminal beside it as the reference: every key
+in step 3 while the engine is answering and while it is asking; a long
+answer redrawn; the pane resized quickly, split beside a code file,
+hidden and shown; the theme changed; the window moved to a monitor of
+another scaling. `docs/uat/uat-visual-studio-engine-pane.md` records each
+as it went, and ends with one line: go, or what failed and where
+(Visual Studio's key routing, the WebView, the terminal's encoding, or
+the engine).
+
+**Non-goals.** Start Session, which still opens Windows Terminal. An
+engine that outlives Visual Studio: session 369. More than one engine,
+the layout, the guide. Visual Studio 2022: this machine has 2026 only,
+and the page says so.
+
+**Tests.** In the Visual Studio library, named after the files that
+decide: which keys the pane keeps and which it lets go; a selection
+makes Ctrl+C a copy; a zero size is never sent. The rest is the walk.
+
+**Releasable.** No.
+
+### Session 369 of 372: An engine outlives Visual Studio
+
+Scope: `tools/dabbler-visual-studio/` (a new project, the engine host: a
+small program shipped in the package; the pane's connection to it; the
+package's build), `Dabbler.VisualStudio.Core/` and its tests (the
+messages between pane and host), `ci-suites.json` if the host brings a
+test project, `docs/uat/uat-visual-studio-engine-pane.md`
+
+**Runs only if session 368's page says go.**
+
+**Why.** A session runs for an hour without the person, and Visual
+Studio is closed, restarted for an update or crashes within that hour as
+a matter of course. An engine that is a child of Visual Studio dies with
+it, and the work in flight is lost. Visual Studio's own terminal keeps
+its console host apart from the IDE for the same reason.
+
+**Step 1 -- the host.** A program outside Visual Studio's process tree
+that starts the engine through ConPTY and keeps it running with no pane
+attached. One host per engine. It owns a process and its bytes and
+decides nothing: it takes the launch line it is given.
+
+**Step 2 -- attaching.** The pane talks to the host over a named pipe
+only the same Windows user can open: output, input, size, and the
+engine's exit. One pane types to an engine at a time.
+
+**Step 3 -- coming back.** A pane that attaches to a running engine shows
+the engine's screen as it is now, a full-screen prompt included, and
+takes typing at once. The step finds the way that does this for both
+engines (replaying what was kept, having the engine redraw, or both) and
+the page says which.
+
+**Step 4 -- ending.** The host ends when its engine does. Closing a pane
+detaches and ends nothing, and the pane says so the first time. Ending
+an engine is a named action on the pane. A host whose engine has printed
+nothing and had no pane for a stated time ends its engine and itself.
+
+**Step 5 -- Visual Studio reopened.** On opening a solution the
+extension finds the engines still running for that folder and offers
+each one's pane again.
+
+**Step 6 -- the walk,** added to the page: an engine mid-answer, Visual
+Studio closed and reopened; the same with Visual Studio killed from Task
+Manager; two Visual Studio windows on two solutions, one closed. Each
+time the live prompt is back and takes typing, or the page says go no
+further.
+
+**Non-goals.** Surviving a sign-out or a restart of Windows. Start
+Session. Any decision in the host: what runs, and whether it may, is the
+router's.
+
+**Tests.** The messages between pane and host, each kind once, in the
+file named after them. That a second pane cannot type to an engine that
+has one. The rest is the walk.
+
+**Releasable.** No.
+
+### Session 370 of 372: Start Session opens the engine inside Visual Studio
+
+Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (`EngineTab.cs`,
+`SessionStarter.cs`, the Engine window, an options page),
+`Dabbler.VisualStudio.Core/` and its tests
+
+**Step 1 -- where the engine opens.** One option in Tools > Options >
+Dabbler: in Visual Studio, or in Windows Terminal. It is this
+interface's own preference and no rule of the router's. A new install
+opens the engine in Visual Studio.
+
+**Step 2 -- every engine the extension starts.** Start Session, Continue
+Session, a consult and a Mechanic each open as an Engine tab of their
+own in the editor area, titled as their Windows Terminal tab is today,
+through the host of session 369. Open Engine Here, the proving command,
+goes.
+
+**Step 3 -- when it cannot start.** If the pane or the host fails before
+an engine exists, the extension says why in one sentence and opens the
+engine in Windows Terminal. If an engine for that session is already
+running, it attaches to that one: a session never has two.
+
+**Step 4 -- the session's row.** Continue Session on a session whose
+engine is running brings its tab forward and starts nothing. A session
+that ends closes its tab and its engine, as the VS Code extension closes
+a finished session's terminal.
+
+**Step 5 -- closing Visual Studio with an engine running.** One sentence
+before it closes: the session carries on, and its tab is offered when
+the solution is opened again.
+
+**Non-goals.** The layout: session 371. Store a Key, which still asks in
+Windows Terminal. A chat pane.
+
+**Tests.** In the Visual Studio library: the option decides where an
+engine opens; a failure before an engine exists falls back and a running
+engine is attached to; a finished session's tab is the one closed.
+
+**Releasable.** No.
+
+### Session 371 of 372: A Dabbler layout, and the way back
+
+Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (the layout
+command, the package's window registrations, the options page),
+`Dabbler.VisualStudio.Core/` and its tests, `docs/guide/visual-studio.md`,
+`tools/dabbler-visual-studio/README.md` (the listing),
+`docs/uat/uat-visual-studio.md`, `version.json`,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The VS Code extension arranges its windows for a session. In
+Visual Studio the Work Explorer is already beside the Solution Explorer
+and the engine is now in the middle, but the Dabbler Terminal sits
+behind Output at the bottom, and a developer who wants their coding
+windows back has no single move for it.
+
+**Step 1 -- what Visual Studio will do.** Tried on this machine and
+written into the walk's page: whether `EnvDTE.WindowConfigurations`
+records an arrangement and puts it back in Visual Studio 2026, and which
+call docks the Dabbler Terminal on the right. Round 30's two advisors
+disagreed on the first, and its documentation is for Visual Studio 2015.
+
+**Step 2 -- Dabbler Layout.** One command with a key and a button on the
+Work Explorer: the Work Explorer shown beside the Solution Explorer, the
+session's engine in the middle, the Dabbler Terminal docked on the
+right.
+
+**Step 3 -- the same command back.** If step 1 found that an arrangement
+can be recorded and restored, the command records the person's
+arrangement before it changes anything and restores exactly that. If it
+cannot, the command hides the Dabbler Terminal and brings the code
+forward, and moves no window that is not Dabbler's. Either way the
+engine keeps running.
+
+**Step 4 -- starting a session.** Start Session opens the engine's tab
+and moves nothing else. An option, off in a new install, applies the
+Dabbler layout when a session starts. Nothing is re-applied when a
+debugger starts or stops.
+
+**Step 5 -- the guide and the listing.** The Visual Studio page loses
+"no terminal inside Visual Studio" and gains the engine tab, what
+closing it does, the option for Windows Terminal, and the layout
+command; it says Visual Studio's own saved layouts (Window > Save Window
+Layout) are there for whoever wants more than two arrangements. The
+listing says the same in a sentence.
+
+**Step 6 -- the number.** `version.json` goes to 3.40.0 (a minor: the
+engine inside Visual Studio), stamped, and the changelog says what a
+developer in Visual Studio now has.
+
+**Non-goals.** A coding layout of Dabbler's choosing: whether a developer
+keeps Class View or Test Explorer on the right is theirs. Writing into
+Visual Studio's list of saved layouts. Any change to the VS Code
+extension.
+
+**Tests.** In the Visual Studio library: the command's second use undoes
+its first; the option decides whether a start applies the layout. The
+docs check reads the changed guide page. The walk's page gains the
+layout, with a debugger started and stopped under it.
+
+**Releasable.** Yes, as 3.40.0 in session 372.
+
+### Session 372 of 372: Release 3.40.0 (release: 3.40.0)
+
+The framework publishes sessions 368 to 371 as 3.40.0, and nothing else.

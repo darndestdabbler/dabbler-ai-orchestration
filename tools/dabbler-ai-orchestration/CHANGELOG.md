@@ -12,6 +12,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.40.0] — 2026-11-19
+
+### Added
+
+- **The engine runs inside Visual Studio.** In the Visual Studio
+  extension, Start Session, Continue Session, a consult and a Mechanic
+  open the engine in a tab of its own in the editor area, beside your
+  files, instead of in Windows Terminal. A session never has two: Start or
+  Continue Session while its engine runs brings its tab forward. Closing
+  the tab ends nothing, and the session's row brings it back; when the
+  session closes, its engine ends and its tab closes. Closing Visual Studio
+  ends nothing either, and the tab is offered when the solution opens
+  again.
+- **Windows Terminal stays available.** Tools > Options > Dabbler > Engine,
+  *Open engines in*, opens engines in Windows Terminal as before. If an
+  engine cannot open in Visual Studio, it opens there, and Dabbler says
+  why.
+- **Dabbler Layout.** Tools > Dabbler: Layout, Ctrl+Shift+Alt+L, or the
+  new button on the Work Explorer's toolbar shows the Work Explorer beside
+  the Solution Explorer, the session's engine in front, and the Dabbler
+  Terminal on the right. It records your arrangement first, and using it
+  again puts back the windows you had, without ending the engine
+  and without adding to your saved window layouts. An option, off by
+  default, applies it when a session starts.
+
+### Changed
+
+- **Starting a session moves nothing but the engine's tab.** The Dabbler
+  Terminal is no longer brought up at a start.
+- **The Dabbler Terminal is docked on the right**, under the Solution
+  Explorer, the first time Visual Studio shows it, where it used to sit
+  behind Output. After that it stays wherever you put it.
+
 ## [3.39.0] — 2026-11-18
 
 ### Changed

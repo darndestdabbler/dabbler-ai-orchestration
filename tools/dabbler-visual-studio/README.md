@@ -9,7 +9,10 @@ stay in your repository after the conversation that produced them is gone.
 
 This extension brings Dabbler's windows into Visual Studio, beside the
 solution you already have open. The AI, Claude Code or the GitHub Copilot
-CLI, works in a Windows Terminal tab next to Visual Studio.
+CLI, works in a tab of its own in Visual Studio's editor area, and
+**Dabbler Layout** (Ctrl+Shift+Alt+L) arranges the Work Explorer, the
+engine and the Dabbler Terminal around it, then, used again, puts back
+the windows you had.
 
 **Walked on Visual Studio 2026.** A whole session and a stop were taken
 from start to finish in Visual Studio 2026 on an ASP.NET MVC 5 solution on
@@ -29,6 +32,9 @@ Visual Studio 2022 yet.
 - **Dabbler Terminal**: the framework's own account of the session in
   flight, line by line, with times: each step, each check, each review
   round, the test run and the close.
+- **The engine's tab**: one per session, in the editor area. Closing it
+  ends nothing, and the session's row brings it back. Tools > Options >
+  Dabbler opens engines in Windows Terminal instead, if you prefer.
 - **Set Up Dabbler in This Solution**: one click reads your solution,
   finds its build and its tests, and commits the few files Dabbler needs.
 - **A bar across the editor** when a session closes or needs you, and
@@ -54,19 +60,17 @@ Visual Studio 2022 yet.
 - Node.js 22.18 or later on PATH, from [nodejs.org](https://nodejs.org).
 - An engine CLI you are logged in to: Claude Code or the GitHub Copilot
   CLI.
-- Windows Terminal. Without it, each engine opens in a console window of
-  its own.
 - API keys for the reviewing providers, as user environment variables.
   The Configuration window shows which ones this machine has.
 - A solution in a git repository.
 
 ## What is not there
 
-- No terminal inside Visual Studio: the engine runs in Windows Terminal.
 - No new-project set-up: Dabbler sets itself up in a solution that already
   exists.
-- The engine's Windows Terminal tab stays open after its session closes,
-  and is closed by hand.
+- No coding layout of Dabbler's: which windows you code with is yours, and
+  Visual Studio's own **Window > Save Window Layout** keeps as many
+  arrangements as you like.
 - When the engine changes an old-style project file, Visual Studio raises
   its own **File Modification Detected** dialog. Answer **Reload All**.
 

@@ -18,7 +18,9 @@ namespace Dabbler.VisualStudio
     /// prints for the git repository holding the open solution, a row to a
     /// line, as the VS Code extension's terminal shows them.
     /// </summary>
-    [Guid("c2d7e4a1-58b3-4f06-8e2d-91a7b3c40f62")]
+    // A profile places a window once, where its registration says, and
+    // keeps it there; this identity is the one registered on the right.
+    [Guid("5f0b8e3c-2a71-4d96-b4e8-7c13d9a62f05")]
     public sealed class TerminalWindow : ToolWindowPane
     {
         private readonly TerminalRows rows = new TerminalRows();

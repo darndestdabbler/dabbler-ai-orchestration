@@ -4,8 +4,8 @@ What this page covers: installing the Visual Studio extension built from
 `tools/dabbler-visual-studio/`, proving it reaches the router with
 **Tools > Dabbler: Version**, the sentence it shows when Node is missing,
 what Windows Terminal does with the tabs the later sessions open in it,
-and what Visual Studio does when an engine edits files under a solution it
-has open.
+what Visual Studio does when an engine edits files under a solution it
+has open, and what it does with Dabbler Layout's window arrangements.
 
 Nothing here is published. The extension is built from this checkout.
 
@@ -684,6 +684,133 @@ it comes back with nothing that stops a developer; anything that does is
 a finding like those in section 7, planned before the release that would
 claim it.
 
+## 9. Window layouts: what Visual Studio 2026 will do
+
+Tried on 2026-11-19 in Visual Studio Community 2026 18.12.12405.243, before
+Dabbler Layout was written, to settle two questions: whether
+`EnvDTE.WindowConfigurations` still records an arrangement and puts it
+back (its documentation is for Visual Studio 2015, and round 30's two
+advisors disagreed), and which call docks a window on the right.
+
+**How.** A second Visual Studio with a profile of its own, so the
+developer's own layouts were never touched, opened on a scratch folder so
+its main window was showing (behind the start window, nothing is drawn):
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\devenv.exe" /rootsuffix DabblerProbe C:\scratch\probe-folder
+```
+
+It was driven from Windows PowerShell 5.1 (`-STA`) through a small C# class
+compiled with `Add-Type`, referencing `envdte.dll` and
+`Microsoft.VisualStudio.Interop.dll` from `Common7\IDE\PublicAssemblies`
+(EnvDTE's types are forwarded to the second), and finding that instance's
+`DTE` in the running object table as `!VisualStudio.DTE.18.0:<process id>`.
+PowerShell's own late binding of the same object returned empty
+properties, and `Marshal.GetActiveObject` would have taken whichever
+Visual Studio registered first; the compiled class was the reliable way.
+Windows were watched through Solution Explorer, Output, Properties and
+Error List, each window's `Visible`, `IsFloating`, `Left`, `Top`, `Width`
+and `Height`, and a screenshot of the main window.
+
+### What each call did
+
+| Call | What it did |
+| --- | --- |
+| `WindowConfigurations` before anything | Three: `Design` (active), `Debug`, `NoToolWin`. A developer's own saved layouts are not among them. |
+| `WindowConfigurations.Add("Dabbler before layout")` | Recorded the current arrangement as a fourth configuration. `Design` stayed active. |
+| Hiding Properties and Error List, then `Item("Dabbler before layout").Apply(true)` | Both came back, at their sizes and places. The record became the active configuration. |
+| `Item("Design").Update()`, `Item("Design").Apply(true)`, then `Item("Dabbler before layout").Delete()` | Every window where it was before the record was made, to the pixel; three configurations again, `Design` active. |
+| `Delete()` of the record while it is the active one | Visual Studio re-applied `Design` -- which had taken in every change made while it was active, so the windows went back to the moved arrangement, not the recorded one. |
+| `Window.ApplyWindowLayout1`, before, while a record existed, and after | Not available throughout: the record never became one of the layouts **Window > Apply Window Layout** lists. |
+| A docked window's `LinkedWindowFrame.LinkedWindows.Add(Output)` | Refused: *"targetView is not a valid target for docking"* (the frame is the main window). |
+| `Windows.CreateLinkedWindowFrame(Solution Explorer, Output, tabbed)` | Made a new **floating** frame holding both. |
+| That frame's `IsFloating = false` | Refused: *"The IsFloating property cannot be set or retrieved on this type of window."* |
+| Each window's own `IsFloating = false` | Each went back to where it was last docked: Solution Explorer on the right, Output at the bottom. |
+| `IVsWindowFrame.SetFramePos` on Output, reached through the instance's `SVsUIShell` (tried during session 371's first review) | `E_NOTIMPL` (0x80004001) for `SFP_fDockRight`, for `SFP_fDockBottom`, and for `SFP_fTab` relative to the Solution Explorer; nothing moved. |
+
+### What the layout builds on
+
+- **An arrangement can be recorded and put back exactly**, without writing
+  into the developer's saved layouts. The active configuration is live --
+  it takes in whatever is moved while it is active -- so the way back is
+  four calls in this order: apply the record, update the configuration
+  that was active when the record was made with what is now showing,
+  apply that configuration, and delete the record. Deleting the record
+  while it is still active is the one order that loses the arrangement.
+- **No call docks a window somewhere new in a profile that has already
+  placed it.** Visual Studio remembers each tool window's place; the only
+  thing that chooses a new one is the package's `ProvideToolWindow`
+  registration, read the first time a profile shows that window. So the
+  Dabbler Terminal is registered on the right, under the Solution
+  Explorer, and under a window identity of its own that no profile has
+  placed yet -- a profile that put the earlier one under Output would
+  otherwise keep it there. After its first showing it stays wherever the
+  developer leaves it, as any window does.
+- **Debugging is Visual Studio's own switch** between `Design` and `Debug`,
+  and the record is never the active configuration except inside the way
+  back, so starting and stopping a debugger should not touch Dabbler
+  Layout. That is a reading of the calls above, not yet a walk: the
+  layout's own walk, section 10, starts and stops a debugger under it.
+
+## 10. Dabbler Layout, with a debugger under it
+
+### What was tried on 2026-11-19
+
+The build of session 371 was installed into the section 9 instance only
+(`VSIXInstaller.exe /quiet /rootSuffix:DabblerProbe <the .vsix>`, then
+`devenv /rootsuffix DabblerProbe /updateconfiguration`, since a fresh
+install registered no command until that), and driven by its commands
+through the same DTE: `ExecuteCommand("Dabbler.Layout")`, and
+`Debugger.Go` on a console project that sleeps 20 seconds.
+
+| Move | What Visual Studio showed |
+| --- | --- |
+| Before | Solution Explorer on the right, Output at the bottom; three window configurations. |
+| **Dabbler: Layout** | The Work Explorer in front of the Solution Explorer's tab group, with a toolbar carrying the layout button; the Dabbler Terminal docked under it on the right; Output unmoved. A fourth configuration, *Dabbler: before the layout, over Design*. |
+| **Dabbler: Layout** again | The Solution Explorer in front again, both Dabbler windows gone, every other window where it was; three configurations. |
+| **Dabbler: Layout**, then the debugger started | Visual Studio made `Debug` active: the Dabbler windows were not shown while it ran. |
+| The program ended | `Design` active again, the Work Explorer and the Dabbler Terminal back where the layout put them. Dabbler did nothing on either change. |
+| **Dabbler: Layout** again | The arrangement from before the layout, and *Diagnostic Tools* added as an auto-hidden tab on the right edge: Visual Studio opened that window during the debug run, and the record, made before it existed, does not move it. |
+
+So "exactly" holds for every window the record knows. A window Visual
+Studio first opens after the record is made is not in it and is left
+where Visual Studio put it, which the guide says.
+
+No engine was running in that instance, so the engine's tab coming to
+the front was not seen there.
+
+### The walk, for a person
+
+On a solution with Dabbler set up and a session that can be started,
+with the extension installed from section 1's build:
+
+1. Note where your windows are. **Tools > Options > Dabbler > Engine**:
+   *Open engines in* says **Visual Studio**, and *Apply the Dabbler
+   layout when a session starts* is **False**.
+2. **Start Session** on the session's row. **Expect** an Engine tab in
+   the editor area, in front, and no other window moved or shown: the
+   Dabbler Terminal is not brought up.
+3. Press **Ctrl+Shift+Alt+L**. **Expect** the Work Explorer beside the
+   Solution Explorer, the engine's tab in front, and the Dabbler Terminal
+   on the right, under the Solution Explorer -- on a machine where an
+   earlier version put it under Output, too, since it is a new window to
+   Visual Studio.
+4. Start your own project under the debugger (**F5**), let it run a
+   moment, and stop it (**Shift+F5**). **Expect** Visual Studio's
+   debugging arrangement while it runs, and the Dabbler layout back when
+   it stops, with nothing from Dabbler on either.
+5. Press the Work Explorer toolbar's layout button. **Expect** your
+   windows as they were at step 1, the engine's tab still open, and the
+   engine still working in it.
+6. Turn *Apply the Dabbler layout when a session starts* to **True**,
+   close the engine's tab, and **Continue Session** on the row. **Expect**
+   the tab back, attached to the same engine, and the layout applied.
+   Press **Ctrl+Shift+Alt+L** to put your windows back.
+7. Turn the option back to **False**.
+
+Send back what each step showed where it differs from **Expect**, and a
+screenshot after steps 3 and 5.
+
 ## What was not walked
 
 - Visual Studio 2022: this machine has only Visual Studio 2026. See
@@ -702,5 +829,8 @@ claim it.
 - Visual Studio started with VS Code uninstalled: VS Code ran throughout,
   kept out of Visual Studio's environment instead.
 - Installing from the Visual Studio Marketplace: nothing is published.
+- Section 10's walk by a person, with a session's engine in its tab: the
+  layout, its way back and a debugger run were tried in an isolated
+  instance with no engine running.
 
 Publish: the walk found nothing that stops a developer once session 361 lands, and the listing claims Visual Studio 2026 only.

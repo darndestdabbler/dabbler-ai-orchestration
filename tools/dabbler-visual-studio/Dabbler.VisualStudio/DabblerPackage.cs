@@ -28,8 +28,8 @@ namespace Dabbler.VisualStudio
     [ProvideMenuResource("Menus.ctmenu", 1)]
     // Docked beside the Solution Explorer, as VS Code's sits in its explorer.
     [ProvideToolWindow(typeof(WorkExplorerWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
-    // Docked with the Output window, where a developer looks for what is running.
-    [ProvideToolWindow(typeof(TerminalWindow), Style = VsDockStyle.Tabbed, Window = "34e76e81-ee4a-11d0-ae2e-00a0c90fffc3")]
+    // On the right, under the Solution Explorer and the Work Explorer, as Dabbler Layout arranges it.
+    [ProvideToolWindow(typeof(TerminalWindow), Style = VsDockStyle.Linked, Orientation = ToolWindowOrientation.Bottom, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     // Beside the Work Explorer, as VS Code's Configuration section sits under its tree.
     [ProvideToolWindow(typeof(ConfigurationWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     // A tab in the editor area, where a file opens: one per engine.
@@ -41,12 +41,16 @@ namespace Dabbler.VisualStudio
     {
         public const string PackageGuidString = "425b072f-e523-4795-9b61-5716674585bd";
 
-        private static readonly Guid CommandSet = new Guid("a9db3fec-b5ee-439b-acfe-21f711d1ec33");
+        internal static readonly Guid CommandSet = new Guid("a9db3fec-b5ee-439b-acfe-21f711d1ec33");
         private const int VersionCommandId = 0x0100;
         private const int WorkExplorerCommandId = 0x0101;
         private const int TerminalCommandId = 0x0102;
         private const int ConfigurationCommandId = 0x0103;
         private const int EndEngineCommandId = 0x0105;
+        private const int LayoutCommandId = 0x0106;
+
+        /// <summary>The Work Explorer's toolbar, which carries Dabbler Layout's button.</summary>
+        internal const int WorkExplorerToolbarId = 0x1030;
 
         private bool nodePassed;
         private NoticeWatcher? notices;
@@ -63,6 +67,9 @@ namespace Dabbler.VisualStudio
 
         /// <summary>Where Tools > Options > Dabbler > Engine says an engine opens.</summary>
         internal EnginePlace EnginePlace => ((EngineOptionsPage)GetDialogPage(typeof(EngineOptionsPage))).OpensIn;
+
+        /// <summary>Whether Tools > Options > Dabbler > Engine says a session's start applies the Dabbler layout.</summary>
+        internal bool LayoutAtStart => ((EngineOptionsPage)GetDialogPage(typeof(EngineOptionsPage))).LayoutAtStart;
 
         /// <summary>Every Dabbler Engine pane this Visual Studio has made, open or closed. Main thread only.</summary>
         internal List<EngineWindow> EngineWindows { get; } = new List<EngineWindow>();
@@ -96,6 +103,9 @@ namespace Dabbler.VisualStudio
             commands.AddCommand(new MenuCommand(
                 (_, _) => JoinableTaskFactory.RunAsync(EndEngineAsync).FileAndForget("dabbler/engine/end"),
                 new CommandID(CommandSet, EndEngineCommandId)));
+            commands.AddCommand(new MenuCommand(
+                (_, _) => JoinableTaskFactory.RunAsync(new DabblerLayoutCommand(this).RunAsync).FileAndForget("dabbler/layout"),
+                new CommandID(CommandSet, LayoutCommandId)));
             notices = new NoticeWatcher(this);
             SolutionEvents.OnAfterOpenSolution += OnSolutionOpened;
             SolutionEvents.OnAfterCloseSolution += OnSolutionClosed;
@@ -347,17 +357,6 @@ namespace Dabbler.VisualStudio
                     : "No engine is running in a Dabbler Engine pane of this window.";
                 Show(text, OLEMSGICON.OLEMSGICON_INFO);
             }
-        }
-
-        /// <summary>
-        /// The Dabbler Terminal shown, created if it was not, without taking
-        /// the keyboard from wherever the developer has it.
-        /// </summary>
-        internal async Task ShowTerminalQuietlyAsync()
-        {
-            var window = await FindToolWindowAsync(typeof(TerminalWindow), 0, create: true, DisposalToken);
-            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
-            if (window?.Frame is IVsWindowFrame frame) frame.ShowNoActivate();
         }
 
         /// <summary>

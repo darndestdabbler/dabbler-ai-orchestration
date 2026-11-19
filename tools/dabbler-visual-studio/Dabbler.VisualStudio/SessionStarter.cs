@@ -188,8 +188,9 @@ namespace Dabbler.VisualStudio
                 await package.JoinableTaskFactory.SwitchToMainThreadAsync();
                 if (answer?.Registered == true)
                 {
-                    await package.ShowTerminalQuietlyAsync();
+                    // The engine's tab, and nothing else moved unless Tools > Options says so.
                     await new EngineTab(package).OpenAsync(repositoryRoot, action, choice, session);
+                    await new DabblerLayoutCommand(package).StartedAsync();
                     return;
                 }
                 var refusal = answer?.Refusal ?? words;

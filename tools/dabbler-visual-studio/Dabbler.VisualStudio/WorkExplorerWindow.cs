@@ -37,6 +37,7 @@ namespace Dabbler.VisualStudio
             : base(null)
         {
             Caption = "Dabbler Work Explorer";
+            ToolBar = new System.ComponentModel.Design.CommandID(DabblerPackage.CommandSet, DabblerPackage.WorkExplorerToolbarId);
             var control = new WorkExplorerControl { DataContext = tree };
             control.ActionChosen += OnActionChosen;
             control.DifferentModelsChosen += OnDifferentModelsChosen;

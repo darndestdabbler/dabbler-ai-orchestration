@@ -408,7 +408,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 368 | An engine pane in Visual Studio takes the keys | no | 2026-11-19 |
 | 369 | An engine outlives Visual Studio | no | 2026-11-19 |
 | 370 | Start Session opens the engine inside Visual Studio | no | 2026-11-19 |
-| 371 | A Dabbler layout, and the way back | — | not declared |
+| 371 | A Dabbler layout, and the way back | no | 2026-11-19 |
 | 372 | Release 3.40.0 (release: 3.40.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -4118,3 +4118,13 @@ Every engine the Visual Studio extension starts -- Start Session, Continue Sessi
 **Amended after acceptance:**
 
 - 2026-11-19 — step 'tabs': its files: Set Up Dabbler's first start and Start Session with Different Models also start a session's engine, so they must pass the row's session as Start Session does (claude-code (anthropic, claude-opus-5-5))
+
+### Session 371 — A Dabbler layout, and the way back
+
+**Releasable: no.**
+
+Give the Visual Studio extension one Dabbler Layout command, and the same command back. Step 1 tries on this machine's Visual Studio 2026, through its DTE, whether EnvDTE.WindowConfigurations records an arrangement and puts it back (and whether doing so writes into Window > Apply Window Layout's list), and which call docks a tool window on the right, and writes what was found into the walk's page. Dabbler Layout -- Tools > Dabbler: Layout, a key, and a button on a new Work Explorer toolbar -- shows the Work Explorer beside the Solution Explorer, brings the session's engine tab forward in the middle, and docks the Dabbler Terminal on the right (its registration moves there too, for a profile that has never shown it). The command's second use goes back: to the recorded arrangement where step 1 found one can be recorded without touching the saved-layouts list, and otherwise by hiding only the Dabbler windows the layout brought up and bringing the code forward, moving no window that is not Dabbler's; the engine keeps running either way. Whether a use applies or goes back, and what going back undoes, is one small Core class, DabblerLayout, with its tests. Start Session opens the engine's tab and moves nothing else -- the Dabbler Terminal is no longer shown at a start -- unless a new Tools > Options > Dabbler option, off in a new install, says to apply the layout when a session starts; nothing listens for the debugger. The Visual Studio guide page, the listing and the walk's page say what a developer now has, and version.json goes to 3.40.0, stamped, with a changelog entry.
+
+**Amended after acceptance:**
+
+- 2026-11-19 — step 'layout': its files: Step 1 found no call re-docks a window a profile has already placed; only the registration places it, so the Dabbler Terminal takes a new window identity (its Guid, in TerminalWindow.cs) for the right-hand registration to reach profiles that put it under Output (claude-code (anthropic, claude-opus-5-5))

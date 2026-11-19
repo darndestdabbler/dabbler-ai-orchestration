@@ -5,28 +5,29 @@ the solution you already have open. It is the same framework the VS Code
 extension carries, and it works the same way: the same `dabbler` command
 decides everything, and the extension shows what that command prints and
 runs the verbs it names. The engine, the AI that writes the code, runs in
-Windows Terminal, and Visual Studio stays on your solution.
+a tab of its own in Visual Studio's editor area, beside your files.
 
-Everything on this page was walked on 2026-11-18 in Visual Studio 2026
-(18.12), on an ASP.NET MVC 5 solution on .NET Framework 4.8.1 whose
-projects are all in the old format. The full record of that walk, with
-every dialog Visual Studio raised, is
-[the Visual Studio UAT page](../uat/uat-visual-studio.md).
+The windows, the set-up, a session and a stop were walked on 2026-11-18 in
+Visual Studio 2026 (18.12), on an ASP.NET MVC 5 solution on .NET Framework
+4.8.1 whose projects are all in the old format, with the engine in Windows
+Terminal. The engine's tab and Dabbler Layout came in 3.40.0; what Visual
+Studio does with the layout was tried on 2026-11-19, and the layout has a
+walk of its own. Both records, with every dialog Visual Studio raised, are
+on [the Visual Studio UAT page](../uat/uat-visual-studio.md).
 
 ## What is not there
 
 Read this first, because each one is a choice you would otherwise go
 looking for:
 
-- **No terminal inside Visual Studio.** The engine opens in a Windows
-  Terminal tab beside Visual Studio, and you answer its own questions
-  there. The **Dabbler Terminal** window shows the framework's lines,
-  not the engine's.
+- **The Dabbler Terminal is not the engine.** The engine's tab is where
+  the AI works and where you answer its own questions. The **Dabbler
+  Terminal** window shows the framework's lines, not the engine's.
 - **No new-project set-up.** Dabbler sets itself up in a solution that
   already exists. It does not create a solution or a project for you.
-- **The engine's tab is yours to close.** When a session closes, the
-  engine's Windows Terminal tab stays open with the engine idle in it.
-  The extension starts the tab and has no hold on it afterwards.
+- **No coding layout of Dabbler's.** Dabbler Layout arranges Dabbler's
+  own windows and, used again, puts back what you had. Which
+  windows you code with is yours.
 - **Visual Studio 2022 has not been walked.** The extension installs on
   Visual Studio 2022 17.14 and later, but nobody has walked a session on
   it yet. Only Visual Studio 2026 has been walked.
@@ -40,9 +41,8 @@ looking for:
 2. **An engine CLI you are logged in to**: Claude Code, or the GitHub
    Copilot CLI. The first time it runs in a folder it asks its own
    questions, such as whether to trust the folder, in its own tab.
-3. **Windows Terminal.** It comes with Windows 11. Without it, each
-   session's engine opens in a console window of its own, and nothing
-   else changes.
+3. **Windows Terminal**, only if you want engines there instead (see
+   *The engine's tab*, below). It comes with Windows 11.
 4. **The extension**, from the Visual Studio Marketplace: in Visual Studio,
    **Extensions > Manage Extensions**, search for Dabbler, install, and
    restart Visual Studio.
@@ -100,21 +100,77 @@ choose **Start Session**.
   in progress, it asks first and offers **Save All and Go On**, **Go On
   Anyway** and **Not Now**. It never stops a build or closes a document.
 
-Windows Terminal then opens a tab with the engine in it and its first
-instruction already typed. From there the session runs without you: the
+The engine then opens in a tab of its own in the editor area, with its
+first instruction already typed, and nothing else moves. From there the
+session runs without you: the
 framework hands the engine one step at a time, runs the checks and the
 tests, has a model from another provider review the work, commits it and
 closes the session. You watch it in the Work Explorer and the Dabbler
 Terminal. When it closes, Visual Studio shows a bar across the editor,
 *"Dabbler: session N is closed."*, with **Show in Work Explorer**.
 
-**If you close the engine's tab mid-session**, choose **Continue Session**
-on the session's row. It opens a new tab on the session where the record
-stands.
-
 **Compare With Its Start**, on a session's row, lists every file the
 session changed and opens Visual Studio's own comparison window on the one
 you choose.
+
+## The engine's tab
+
+Each engine Dabbler starts -- a session's, a consult's or a Mechanic's --
+has a tab of its own in the editor area, titled with the engine. A
+session never has two: choosing Start Session or Continue Session while
+its engine runs brings its tab forward and starts nothing.
+
+- **Closing the tab ends nothing.** The engine carries on, and the first
+  time, the tab says so. **Continue Session** on the session's row brings
+  its tab back, attached to the same engine. **Tools > Dabbler: End
+  Engine** ends the engine of the tab in front.
+- **When the session closes**, its engine ends and its tab closes.
+- **Closing Visual Studio ends nothing either.** It says once that the
+  session carries on, and when you open the solution again a bar offers
+  the engine's tab.
+
+**Tools > Options > Dabbler > Engine**, *Open engines in*, says where an
+engine opens: **Visual Studio**, the default, or **Windows Terminal**,
+where each engine is a tab in a Dabbler window beside Visual Studio (or a
+console window of its own, without Windows Terminal), and stays open with
+the engine idle in it after its session closes. If an engine cannot open
+in Visual Studio, it opens in Windows Terminal, and Dabbler says why in
+one sentence.
+
+## Dabbler Layout
+
+**Tools > Dabbler: Layout**, or **Ctrl+Shift+Alt+L**, or the button on
+the Work Explorer's toolbar, arranges Dabbler's windows for a session:
+
+- the **Work Explorer** beside the Solution Explorer,
+- the session's **engine tab** in the middle, in front,
+- the **Dabbler Terminal** on the right, under the Solution Explorer.
+
+Before it moves anything it records your arrangement, and **using it
+again puts back exactly what you had**, every window where it was. The
+engine keeps running either way. A window Visual Studio first opened
+after the layout, such as **Diagnostic Tools** at a first debugging run,
+is not in the record, so it stays where Visual Studio put it. The record is Dabbler's own: it never
+appears among your saved layouts.
+
+The Dabbler Terminal goes on the right the first time Visual Studio
+shows it. After that it stays wherever you put it, as any window does,
+and the layout shows it there.
+
+**Tools > Options > Dabbler > Engine**, *Apply the Dabbler layout when a
+session starts*, off in a new install, makes Start Session and Continue
+Session apply the layout once the engine's tab is open. A start never
+takes the layout back off; the command does. With it off, a start opens
+the engine's tab and moves nothing else.
+
+**Debugging is Visual Studio's own.** Starting a debugger switches Visual
+Studio to its debugging arrangement, without the Dabbler windows, and
+stopping it switches back, with them. Dabbler applies nothing on either.
+Use the command again after the debugger stops to put your windows back.
+
+For more than these two arrangements, Visual Studio's own
+**Window > Save Window Layout** keeps as many as you like, and
+**Window > Apply Window Layout** brings one back.
 
 ## Answering a stop
 

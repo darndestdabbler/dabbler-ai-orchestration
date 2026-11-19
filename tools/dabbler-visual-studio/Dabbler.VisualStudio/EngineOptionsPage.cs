@@ -6,8 +6,9 @@ namespace Dabbler.VisualStudio
 {
     /// <summary>
     /// Tools > Options > Dabbler > Engine. Kept in Visual Studio's own
-    /// settings: where an engine opens is this interface's preference, and
-    /// nothing the router reads.
+    /// settings: where an engine opens, and whether a start arranges the
+    /// windows around it, are this interface's preferences, and nothing the
+    /// router reads.
     /// </summary>
     public sealed class EngineOptionsPage : DialogPage
     {
@@ -17,6 +18,12 @@ namespace Dabbler.VisualStudio
         [DefaultValue(EnginePlace.VisualStudio)]
         [TypeConverter(typeof(PlaceConverter))]
         public EnginePlace OpensIn { get; set; } = EnginePlace.VisualStudio;
+
+        [Category("Layout")]
+        [DisplayName("Apply the Dabbler layout when a session starts")]
+        [Description("Start Session and Continue Session arrange the Work Explorer, the engine's tab and the Dabbler Terminal, as Tools > Dabbler: Layout does; using that command again puts your windows back. Off, a start opens the engine's tab and moves nothing else.")]
+        [DefaultValue(false)]
+        public bool LayoutAtStart { get; set; }
 
         /// <summary>The two places as a person reads them.</summary>
         private sealed class PlaceConverter : EnumConverter

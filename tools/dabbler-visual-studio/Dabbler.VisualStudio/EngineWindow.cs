@@ -252,10 +252,11 @@ namespace Dabbler.VisualStudio
             EngineHost.Connection connection;
             EngineMessage answer;
             string pipe;
+            var router = Dabbler.Router?.BundlePath;
             try
             {
                 await TaskScheduler.Default;
-                pipe = EngineHost.Start(root, launch.Title, commandLine, launch.Cwd, environment, size, session);
+                pipe = EngineHost.Start(root, launch.Title, commandLine, launch.Cwd, environment, size, session, router);
                 connection = EngineHost.Attach(pipe, size, out answer);
             }
             catch (Exception error) when (error is InvalidOperationException || error is IOException || error is Win32Exception || error is UnauthorizedAccessException)

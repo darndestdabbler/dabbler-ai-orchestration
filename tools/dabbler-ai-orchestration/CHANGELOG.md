@@ -12,6 +12,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A session's engine ends when the session closes, even if
+  Visual Studio is not running.** Before, an engine left running after you closed
+  Visual Studio kept running after its session closed; now it ends then,
+  as it does when Visual Studio is open.
+
 ## [3.40.0] — 2026-11-19
 
 ### Added

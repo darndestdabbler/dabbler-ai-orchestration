@@ -18,7 +18,7 @@ namespace Dabbler.EngineHost
 {
     /// <summary>
     /// One engine, kept running whether or not a pane is attached:
-    /// <c>Dabbler.EngineHost --folder F --title T --columns C --rows R --pipe P [--session N] -- "command line"</c>,
+    /// <c>Dabbler.EngineHost --folder F --title T --columns C --rows R --pipe P [--session N --router B] -- "command line"</c>,
     /// in the working folder and environment it is started with. It runs the
     /// command line it is given and decides nothing.
     /// </summary>
@@ -106,7 +106,10 @@ namespace Dabbler.EngineHost
                 {
                     host.Serve(engine);
                     WriteRecord(record, options);
-                    exited.Wait();
+                    using (host.FollowSession())
+                    {
+                        exited.Wait();
+                    }
                     host.OnExit(code);
                 }
             }
@@ -207,6 +210,31 @@ namespace Dabbler.EngineHost
                     // The console's close ends the engine, and its exit ends this host.
                     engine?.Dispose();
                     return;
+                }
+            }
+
+            /// <summary>
+            /// A session's engine ends when its session closes, Visual Studio
+            /// running or not: the host follows its repository's stream, and
+            /// ends the engine where no pane holds it -- a pane that does is
+            /// Visual Studio's, whose tab ends it and closes. Null where the
+            /// engine is no session's, no router was given, or node cannot run.
+            /// </summary>
+            public IDisposable? FollowSession()
+            {
+                if (options.Session == null || options.Router.Length == 0) return null;
+                var notices = new TerminalNotices(options.Folder, null);
+                try
+                {
+                    return new RouterFollow(new Router(options.Router), options.Folder, new[] { "terminal", "--follow", "--json" }, line =>
+                    {
+                        if (EngineOpening.HostEnds(options.Folder, options.Session, options.Folder, notices.Read(line)) && !seat.Held) engine?.Dispose();
+                    });
+                }
+                catch (Exception error) when (error is Win32Exception || error is InvalidOperationException)
+                {
+                    // No node to follow with: the engine still ends when left idle.
+                    return null;
                 }
             }
 
@@ -379,6 +407,8 @@ namespace Dabbler.EngineHost
             public string CommandLine = "";
             // The session the engine is for; null for a consult or a Mechanic.
             public int? Session;
+            // The router bundle the host follows the session's close with; empty where none was given.
+            public string Router = "";
 
             /// <summary>The options, or null where one is missing or the command line is not the one argument after <c>--</c>.</summary>
             public static HostOptions? Parse(string[] args)
@@ -399,6 +429,7 @@ namespace Dabbler.EngineHost
                         case "--folder": options.Folder = value; break;
                         case "--title": options.Title = value; break;
                         case "--pipe": options.Pipe = value; break;
+                        case "--router": options.Router = value; break;
                         case "--columns": int.TryParse(value, out options.Columns); break;
                         case "--rows": int.TryParse(value, out options.Rows); break;
                         case "--session":

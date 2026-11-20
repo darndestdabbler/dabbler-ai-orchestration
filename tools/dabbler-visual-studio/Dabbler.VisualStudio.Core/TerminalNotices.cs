@@ -43,7 +43,8 @@ namespace Dabbler.VisualStudio.Core
     public sealed class TerminalNotices
     {
         private readonly string repositoryRoot;
-        private readonly string raisedFile;
+        // Null keeps what has been raised in memory only, for a following that lives once.
+        private readonly string? raisedFile;
         private readonly HashSet<string> raised = new HashSet<string>(StringComparer.Ordinal);
 
         // The sessions this following saw in a phase other than complete and
@@ -57,11 +58,11 @@ namespace Dabbler.VisualStudio.Core
         // it changes, and an overdue notice never does.
         private string? session;
 
-        public TerminalNotices(string repositoryRoot, string raisedFile)
+        public TerminalNotices(string repositoryRoot, string? raisedFile)
         {
             this.repositoryRoot = repositoryRoot.TrimEnd('\\', '/');
             this.raisedFile = raisedFile;
-            if (File.Exists(raisedFile)) raised.UnionWith(File.ReadAllLines(raisedFile));
+            if (raisedFile != null && File.Exists(raisedFile)) raised.UnionWith(File.ReadAllLines(raisedFile));
         }
 
         /// <summary>Whether a session this following saw open has not yet been seen to close.</summary>
@@ -157,6 +158,7 @@ namespace Dabbler.VisualStudio.Core
             // One key to a line of the file, whatever a reason holds.
             var key = string.Join("\t", parts).Replace('\r', ' ').Replace('\n', ' ');
             if (!raised.Add(key)) return null;
+            if (raisedFile == null) return notice;
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(raisedFile))!);

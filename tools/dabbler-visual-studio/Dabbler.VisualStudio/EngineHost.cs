@@ -24,16 +24,20 @@ namespace Dabbler.VisualStudio
         /// Starts a host running <paramref name="commandLine"/> in
         /// <paramref name="cwd"/> with exactly <paramref name="environment"/>,
         /// and returns its pipe; <paramref name="session"/> is the session the
-        /// engine is for, kept in its record. The host runs from a copy outside the
+        /// engine is for, kept in its record, and <paramref name="router"/> the
+        /// bundle the host follows that session's close with, so the engine
+        /// ends when its session closes whether Visual Studio is running or
+        /// not. The host runs from a copy outside the
         /// extension's folder, so an update of the extension never meets a
         /// file a running engine holds.
         /// </summary>
         /// <exception cref="InvalidOperationException">The host could not be started.</exception>
-        public static string Start(string folder, string title, string commandLine, string cwd, IReadOnlyDictionary<string, string> environment, TerminalSize size, int? session = null)
+        public static string Start(string folder, string title, string commandLine, string cwd, IReadOnlyDictionary<string, string> environment, TerminalSize size, int? session = null, string? router = null)
         {
             var pipe = "dabbler-engine-" + Guid.NewGuid().ToString("N");
             var args = new List<string> { "--folder", folder, "--title", title, "--columns", size.Columns.ToString(), "--rows", size.Rows.ToString(), "--pipe", pipe };
             if (session != null) args.AddRange(new[] { "--session", session.Value.ToString() });
+            if (session != null && router != null) args.AddRange(new[] { "--router", router });
             args.AddRange(new[] { "--", commandLine });
             var start = new ProcessStartInfo(Installed())
             {

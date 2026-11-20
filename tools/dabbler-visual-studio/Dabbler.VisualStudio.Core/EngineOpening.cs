@@ -73,6 +73,18 @@ namespace Dabbler.VisualStudio.Core
             return records.Where(record => Closes(record.Folder, record.Session, root, closedSession)).ToList();
         }
 
+        /// <summary>
+        /// Whether <paramref name="notice"/>, raised by the stream of the
+        /// repository at <paramref name="root"/>, ends the engine a host runs
+        /// for <paramref name="session"/> in <paramref name="folder"/>: the
+        /// close of that session of that repository, as <see cref="Closes"/>
+        /// says of a tab, and no other notice.
+        /// </summary>
+        public static bool HostEnds(string folder, int? session, string root, TerminalNotice? notice)
+        {
+            return notice?.Kind == TerminalNotice.SessionClosed && Closes(folder, session, root, notice.Session);
+        }
+
         private static string Normal(string folder) => Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         /// <summary>

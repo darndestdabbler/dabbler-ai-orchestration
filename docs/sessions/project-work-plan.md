@@ -414,7 +414,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 374 | A session that ends also ends its engine whose tab was closed | no | 2026-11-20 |
 | 375 | A person may review the work, and the record says a person did | no | 2026-11-20 |
 | 376 | Release 3.40.0 (release: 3.40.0) | yes | 2026-11-20 |
-| 377 | A session that closes while Visual Studio is not running ends its engine | — | not declared |
+| 377 | A session that closes while Visual Studio is not running ends its engine | no | 2026-11-20 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4175,3 +4175,9 @@ Make a person a legitimate reviewer, with a verdict of its own. A new closed-voc
 **Releasable: yes.**
 
 Release 3.40.0: the framework packs and publishes what is on the trunk.
+
+### Session 377 — A session that closes while Visual Studio is not running ends its engine
+
+**Releasable: no.**
+
+Make the engine host end its own session's engine when that session closes while no Visual Studio holds it. Today only the extension's notice watcher ends a closed session's engine, so a session that closes after Visual Studio was closed leaves its engine running until the host's 24-hour idle limit. The host already knows its repository folder and its session; for a session's engine (never a consult's or a Mechanic's), Visual Studio passes the host the router bundle it carries, and the host follows `dabbler terminal --follow --json` in its folder exactly as the extension's notice watcher does, reading each line through the existing TerminalNotices (given no raised-notices file, since a host's following is one lifetime). One new decision in the Visual Studio library, EngineOpening.HostEnds, says whether a notice ends the host's engine: a session-closed notice for the host's own session of the host's own repository, by the same rule Closes already applies to a tab. When it does and no pane holds the host's seat, the host ends its engine as an End message does; when a pane holds it, Visual Studio is running and its tab ends and closes as it does today. The changelog's Unreleased section says it in a sentence.

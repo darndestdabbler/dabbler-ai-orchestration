@@ -41,6 +41,19 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void HostEnds_on_its_own_sessions_close_and_never_another()
+        {
+            var closed = new TerminalNotice(TerminalNotice.SessionClosed, "370", "Dabbler: session 370 is closed.");
+
+            Assert.True(EngineOpening.HostEnds(@"C:\Repos\Shop", 370, @"c:\repos\shop\", closed));
+            Assert.False(EngineOpening.HostEnds(@"C:\Repos\Shop", 369, @"C:\Repos\Shop", closed));
+            Assert.False(EngineOpening.HostEnds(@"C:\Repos\Shop", 370, @"C:\Repos\Other", closed));
+            Assert.False(EngineOpening.HostEnds(@"C:\Repos\Shop", null, @"C:\Repos\Shop", closed));
+            Assert.False(EngineOpening.HostEnds(@"C:\Repos\Shop", 370, @"C:\Repos\Shop", new TerminalNotice(TerminalNotice.Paused, "370", "paused")));
+            Assert.False(EngineOpening.HostEnds(@"C:\Repos\Shop", 370, @"C:\Repos\Shop", null));
+        }
+
+        [Fact]
         public void RunningFor_is_that_sessions_engine_and_never_another()
         {
             var consult = Record(null);

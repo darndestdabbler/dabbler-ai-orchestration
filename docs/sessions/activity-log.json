@@ -13884,6 +13884,13 @@
       "what": "step 'pages': its files",
       "reason": "docs/guide/verification.md's 'At the cap' and the two READMEs' review row say the final fix at the cap lands marked unreviewed, which this session ends; left as they are they describe behaviour the router no longer has.",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 374,
+      "dateTime": "2026-11-20T07:58:37.204000-05:00",
+      "task": "When a session ends, the Visual Studio extension ends every engine the host is running for that session of that repository, whether a tab holds it or not, and no engine of another session or another repository. The library decides which of the host's records a closing session ends -- a new EngineOpening.Ends beside EngineOpening.Closes, with its test in EngineOpeningTests -- and EngineHost gains End(record), which attaches to the record's pipe and sends End. DabblerPackage.EndSessionEngines keeps closing the tabs that hold the session's engine, and then, off the UI thread, ends each record Ends names that no closing tab held. Session 370's Step 3 in the session plan says, in one sentence approved by the operator on 2026-11-20, that 'a session never has two' is about the engines the host runs and that an engine opened in Windows Terminal is outside it. The 3.40.0 changelog entry says in a sentence that a closing session ends its engine even when its tab was closed.",
+      "releasable": false
     }
   ]
 }

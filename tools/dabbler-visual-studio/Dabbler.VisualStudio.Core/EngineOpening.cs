@@ -62,6 +62,17 @@ namespace Dabbler.VisualStudio.Core
             return string.Equals(Normal(tabFolder), Normal(root), StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Of the host's <paramref name="records"/>, the engines that end when
+        /// session <paramref name="closedSession"/> of the repository at
+        /// <paramref name="root"/> closes, whether a tab holds them or not:
+        /// as <see cref="Closes"/> says of a tab.
+        /// </summary>
+        public static IReadOnlyList<EngineRecord> Ends(IEnumerable<EngineRecord> records, string root, string? closedSession)
+        {
+            return records.Where(record => Closes(record.Folder, record.Session, root, closedSession)).ToList();
+        }
+
         private static string Normal(string folder) => Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         /// <summary>

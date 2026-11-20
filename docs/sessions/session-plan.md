@@ -21819,7 +21819,10 @@ goes.
 **Step 3 -- when it cannot start.** If the pane or the host fails before
 an engine exists, the extension says why in one sentence and opens the
 engine in Windows Terminal. If an engine for that session is already
-running, it attaches to that one: a session never has two.
+running, it attaches to that one: a session never has two. That is said
+of the engines the host runs, and an engine opened in
+Windows Terminal is outside it, for the reason Step 4 gives. (Amended
+with the operator's approval, 2026-11-20, in session 374.)
 
 **Step 4 -- the session's row.** Continue Session on a session whose
 engine is running brings its tab forward and starts nothing. A session

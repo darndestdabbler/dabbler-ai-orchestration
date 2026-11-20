@@ -312,12 +312,19 @@ namespace Dabbler.VisualStudio
         /// Session <paramref name="session"/> of the repository at
         /// <paramref name="root"/> has closed: each tab holding its engine
         /// ends that engine and closes, as VS Code closes a finished session's
-        /// terminal.
+        /// terminal, and an engine of it whose tab was closed is ended too.
         /// </summary>
         internal void EndSessionEngines(string root, string? session)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            foreach (var window in EngineWindows.Where(pane => EngineOpening.Closes(pane.Folder, pane.Session, root, session)).ToList()) window.EndAndClose();
+            var tabs = EngineWindows.Where(pane => EngineOpening.Closes(pane.Folder, pane.Session, root, session)).ToList();
+            var held = new HashSet<string>(tabs.Select(pane => pane.Pipe).OfType<string>());
+            foreach (var window in tabs) window.EndAndClose();
+            JoinableTaskFactory.RunAsync(async () =>
+            {
+                await TaskScheduler.Default;
+                foreach (var record in EngineOpening.Ends(EngineHost.Running(root), root, session).Where(record => !held.Contains(record.Pipe))) EngineHost.End(record);
+            }).FileAndForget("dabbler/engine/end-session");
         }
 
         /// <summary>

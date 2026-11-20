@@ -178,6 +178,24 @@ namespace Dabbler.VisualStudio
             return connection;
         }
 
+        /// <summary>
+        /// Ends the engine <paramref name="record"/> names, which no tab holds:
+        /// a host that has gone, or is held by another Visual Studio, is left alone.
+        /// </summary>
+        public static void End(EngineRecord record)
+        {
+            try
+            {
+                using (var connection = Attach(record.Pipe, new TerminalSize(120, 30), out var answer))
+                {
+                    if (answer.Kind == EngineMessageKind.Attached) connection.Send(EngineMessage.End());
+                }
+            }
+            catch (IOException)
+            {
+            }
+        }
+
         /// <summary>A pane's end of the pipe to a host.</summary>
         internal sealed class Connection : IDisposable
         {

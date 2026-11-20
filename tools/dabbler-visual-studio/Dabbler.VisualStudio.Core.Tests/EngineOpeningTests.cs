@@ -27,6 +27,20 @@ namespace Dabbler.VisualStudio.Core.Tests
         }
 
         [Fact]
+        public void Ends_the_closing_sessions_engines_and_never_another()
+        {
+            var consult = Record(null);
+            var other = Record(369);
+            var elsewhere = Record(370, @"C:\Repos\Other");
+            var mine = Record(370);
+            var records = new[] { consult, other, elsewhere, mine };
+
+            Assert.Equal(new[] { mine }, EngineOpening.Ends(records, @"c:\repos\shop\", "370"));
+            Assert.Empty(EngineOpening.Ends(records, @"C:\Repos\Shop", "371"));
+            Assert.Empty(EngineOpening.Ends(records, @"C:\Repos\Shop", null));
+        }
+
+        [Fact]
         public void RunningFor_is_that_sessions_engine_and_never_another()
         {
             var consult = Record(null);

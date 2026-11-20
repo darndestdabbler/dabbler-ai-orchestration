@@ -22,7 +22,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   files, instead of in Windows Terminal. A session never has two: Start or
   Continue Session while its engine runs brings its tab forward. Closing
   the tab ends nothing, and the session's row brings it back; when the
-  session closes, its engine ends and its tab closes. Closing Visual Studio
+  session closes, its engine ends and its tab closes, and its engine ends
+  even if its tab was closed before. Closing Visual Studio
   ends nothing either, and the tab is offered when the solution opens
   again.
 - **Windows Terminal stays available.** Tools > Options > Dabbler > Engine,

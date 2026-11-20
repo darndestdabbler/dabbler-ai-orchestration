@@ -411,7 +411,10 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 371 | A Dabbler layout, and the way back | no | 2026-11-19 |
 | 372 | A session closed at the cap can be reviewed again | no | 2026-11-19 |
 | 373 | A fix made at the cap is reviewed before the session closes | no | 2026-11-20 |
-| 374 | Release 3.40.0 (release: 3.40.0) | — | not declared |
+| 374 | A session that ends also ends its engine whose tab was closed | no | 2026-11-20 |
+| 375 | Release 3.40.0 (release: 3.40.0) | — | not declared |
+| 376 | A person may review the work, and the record says a person did | — | not declared |
+| 377 | Release 3.41.0 (release: 3.41.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4150,3 +4153,9 @@ Make a fix landed at the verification cap get its review before the session clos
 - 2026-11-20 — step 'cap-reviewed-ways-reach': its files: Rounds bought at the cap-reviewed stop must send that round's findings back to the author before the next round opens; without it the driver re-runs verify over an unchanged tree. That routing is in drive.ts's verify phase. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-20 — step 'unreviewed-words': its files: gates.test.ts asserts the verification_clean row's old words for a remediated_at_cap row, which this step replaces with ended at the cap, unreviewed. (claude-code (anthropic, claude-opus-5-5))
 - 2026-11-20 — step 'pages': its files: docs/guide/verification.md's 'At the cap' and the two READMEs' review row say the final fix at the cap lands marked unreviewed, which this session ends; left as they are they describe behaviour the router no longer has. (claude-code (anthropic, claude-opus-5-5))
+
+### Session 374 — A session that ends also ends its engine whose tab was closed
+
+**Releasable: no.**
+
+When a session ends, the Visual Studio extension ends every engine the host is running for that session of that repository, whether a tab holds it or not, and no engine of another session or another repository. The library decides which of the host's records a closing session ends -- a new EngineOpening.Ends beside EngineOpening.Closes, with its test in EngineOpeningTests -- and EngineHost gains End(record), which attaches to the record's pipe and sends End. DabblerPackage.EndSessionEngines keeps closing the tabs that hold the session's engine, and then, off the UI thread, ends each record Ends names that no closing tab held. Session 370's Step 3 in the session plan says, in one sentence approved by the operator on 2026-11-20, that 'a session never has two' is about the engines the host runs and that an engine opened in Windows Terminal is outside it. The 3.40.0 changelog entry says in a sentence that a closing session ends its engine even when its tab was closed.

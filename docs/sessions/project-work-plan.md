@@ -413,7 +413,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 373 | A fix made at the cap is reviewed before the session closes | no | 2026-11-20 |
 | 374 | A session that ends also ends its engine whose tab was closed | no | 2026-11-20 |
 | 375 | A person may review the work, and the record says a person did | no | 2026-11-20 |
-| 376 | Release 3.40.0 (release: 3.40.0) | — | not declared |
+| 376 | Release 3.40.0 (release: 3.40.0) | yes | 2026-11-20 |
 | 377 | A session that closes while Visual Studio is not running ends its engine | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -4169,3 +4169,9 @@ Make a person a legitimate reviewer, with a verdict of its own. A new closed-voc
 **Amended after acceptance:**
 
 - 2026-11-20 — step 'person-review-verb': its files: the review card says how each finding was answered with the transcript's findingResponse, exported rather than restated (claude-code (anthropic, claude-opus-5-5))
+
+### Session 376 — Release 3.40.0 (release: 3.40.0)
+
+**Releasable: yes.**
+
+Release 3.40.0: the framework packs and publishes what is on the trunk.

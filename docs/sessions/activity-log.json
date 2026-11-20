@@ -13906,6 +13906,13 @@
       "what": "step 'person-review-verb': its files",
       "reason": "the review card says how each finding was answered with the transcript's findingResponse, exported rather than restated",
       "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 376,
+      "dateTime": "2026-11-20T11:49:57.005000-05:00",
+      "task": "Release 3.40.0: the framework packs and publishes what is on the trunk.",
+      "releasable": true
     }
   ]
 }

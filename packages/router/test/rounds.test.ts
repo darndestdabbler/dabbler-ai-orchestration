@@ -8,7 +8,9 @@ import {
   DRIVER_RUNS_THE_REST,
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
+  NO_ROUND_CAP_REVIEWED,
   NO_ROUND_TERMINAL,
+  PHASE_CAP_REVIEW,
   blockingFindings,
   dispatchVerification,
   droppedParams,
@@ -162,12 +164,23 @@ describe("whether another round may open", () => {
     assert.equal(noRoundReason(tempDir(), 1, [round(1, true), round(2, true), round(3, false)], 3), NO_ROUND_CAP_CLEAN);
   });
 
-  it("at the cap with blocking findings, terminates when they were fixed and adjudicates when every one is disputed", () => {
+  it("at the cap with blocking findings, leaves the round past the cap to open and adjudicates when every one is disputed", () => {
     const rows = [round(1, true), round(2, true), round(3, true)];
     assert.equal(noRoundReason(tempDir(), 1, rows, 3), null);
     const repo = tempDir();
     appendDispute(repo, 1, { round: 3, finding_index: 0, filed_after_round: 3, grounds: "wrong", evidence_paths: ["a.py"], recorded_at: "2026-01-01T00:00:00+00:00" });
     assert.equal(noRoundReason(repo, 1, rows, 3), NO_ROUND_CAP_DISPUTED);
+  });
+
+  it("stops for a person when the round past the cap still blocks", () => {
+    const rows = [round(1, true), round(2, true), round(3, true), round(4, true, { phase: PHASE_CAP_REVIEW })];
+    assert.equal(noRoundReason(tempDir(), 1, rows, 3), NO_ROUND_CAP_REVIEWED);
+    // A larger cap from a caller is not the person's grant the stop waits for,
+    // and a dispute recorded against the round routes it to adjudication.
+    assert.equal(noRoundReason(tempDir(), 1, rows, 9), NO_ROUND_CAP_REVIEWED);
+    const repo = tempDir();
+    appendDispute(repo, 1, { round: 4, finding_index: 0, filed_after_round: 4, grounds: "wrong", evidence_paths: ["a.py"], recorded_at: "2026-01-01T00:00:00+00:00" });
+    assert.equal(noRoundReason(repo, 1, rows, 9), NO_ROUND_CAP_DISPUTED);
   });
 });
 

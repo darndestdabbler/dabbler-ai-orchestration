@@ -35,12 +35,13 @@ import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts"
 import { SESSION_PLAN_FILENAME, planSection } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { TRANSCRIPTS_DIRNAME, runGit } from "./journal.ts";
-import { readExceptions, readRounds } from "./ledger.ts";
+import { ROW_REMEDIATED_AT_CAP, readExceptions, readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
 import { STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
+import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP } from "./verdict.ts";
 import { VERSION } from "./version.ts";
 import type { DriverEvent, DriverRun, DriverWorkPlan } from "./generated/index.ts";
 
@@ -648,6 +649,20 @@ function clockOf(instant: string): string {
 }
 
 /** One framework line, painted by the same grammar the terminal paints it by. */
+/**
+ * An event as a reader is shown it. An older driver logged
+ * `verification-passed` when a fix landed at the cap and no reviewer read
+ * it; the record keeps the line as it was written, and the page says what
+ * it was -- the ledger's last row before it is that `remediated_at_cap`.
+ */
+export function unreviewedAsSuch(event: DriverEvent, rounds: readonly Record<string, unknown>[]): DriverEvent {
+  if (event.event !== "verification-passed") return event;
+  const at = Date.parse(event.at);
+  const before = rounds.filter((row) => Date.parse(String(row["recorded_at"] ?? "")) <= at).at(-1);
+  if (before?.["type"] !== ROW_REMEDIATED_AT_CAP) return event;
+  return { ...event, event: "verification-unreviewed", fields: { reason: TERMINAL_HEADLINES[VERDICT_REMEDIATED_AT_CAP] } };
+}
+
 function renderEvent(event: DriverEvent, secrets: readonly string[]): string {
   // A report's notes and a dispute's reason are an engine's own words.
   const fields = Object.entries(event.fields ?? {}).map(
@@ -785,7 +800,11 @@ function renderRounds(
   return table(
     ROUND_COLUMNS,
     rounds.map((round) => {
-      const verdict = text(round["verdict"]);
+      // A fix no reviewer read is said as that, never as its token.
+      const verdict =
+        round["type"] === ROW_REMEDIATED_AT_CAP
+          ? TERMINAL_HEADLINES[VERDICT_REMEDIATED_AT_CAP]
+          : text(round["verdict"]);
       const count = found(round);
       // The toggle hides the row after it by the stylesheet alone; a round
       // still owed a fix opens, a settled one does not.
@@ -1087,7 +1106,9 @@ export function renderSessionTranscript(
       "What the framework said",
       reading.events.length === 0
         ? ""
-        : `<div class="lines">${reading.events.map((event) => renderEvent(event, secrets)).join("\n")}</div>`,
+        : `<div class="lines">${reading.events
+            .map((event) => renderEvent(unreviewedAsSuch(event, reading.rounds), secrets))
+            .join("\n")}</div>`,
     ),
     // The two absences a reader can act on are said in their own sections;
     // a session without a verification round or a test run is news.

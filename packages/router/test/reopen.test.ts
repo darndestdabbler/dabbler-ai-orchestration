@@ -26,6 +26,7 @@ import { capture } from "../src/output.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_TERMINAL,
+  PHASE_CAP_REVIEW,
   noRoundReason,
   standingTerminal,
 } from "../src/verify/rounds.ts";
@@ -215,6 +216,19 @@ describe("what the reopen verb refuses", () => {
     assert.deepEqual(stuck, { kind: "reopenable", afterRound: 4, terminal: "remediated_at_cap" });
   });
 
+  it("offers a round past the cap that still blocks the same exit, after that round", () => {
+    const repo = tempDir();
+    const rows = [
+      { round: 3, blocking: true, findings: [{ description: "d", severity: "major", blocking: true }] },
+      { round: 4, phase: PHASE_CAP_REVIEW, blocking: true, findings: [{ description: "d", severity: "major", blocking: true }] },
+    ];
+    assert.deepEqual(classifyStuck(repo, 137, rows, 3), {
+      kind: "reopenable",
+      afterRound: 4,
+      terminal: "cap-reviewed",
+    });
+  });
+
   it("offers a cap-clean end the same exit, because a moved tree deadlocks there too", () => {
     const repo = tempDir();
     const rows = [{ round: 3, blocking: false, findings: [] }];
@@ -260,8 +274,15 @@ describe("a review of a session that closed at the cap", () => {
   });
   after(() => restore());
 
-  /** Session 2 closed at the cap with one finding unreviewed. */
-  function closedAtCap(verdict = "REMEDIATED_AT_CAP"): string {
+  /**
+   * Session 2 closed at the cap with one finding unreviewed -- or, with
+   * `ending`, closed after a different second row: the round past the cap,
+   * or an adjudication.
+   */
+  function closedAtCap(
+    verdict = "REMEDIATED_AT_CAP",
+    ending: "remediated" | "cap-review" | "adjudication" = "remediated",
+  ): string {
     const repo = tempDir();
     seed(repo, {
       "docs/sessions/session-plan.md":
@@ -290,18 +311,68 @@ describe("a review of a session that closed at the cap", () => {
       completion_tree: "b".repeat(40),
       recorded_at: "2026-11-19T10:00:00.000000-05:00",
     });
-    appendRound(repo, 2, { ...cappedAt(2), remediated: { reviewed_round: 1, findings: [finding] } });
+    const reviewedAt = {
+      round: 2,
+      verdict: "ISSUES_FOUND",
+      blocking: true,
+      reviewer_model: "m",
+      reviewer_provider: "openai",
+      orchestrator_provider: "anthropic",
+      findings: [finding],
+      completion_tree: "b".repeat(40),
+      previous_tree: "b".repeat(40),
+      recorded_at: "2026-11-19T11:00:00.000000-05:00",
+    };
+    if (ending === "remediated") {
+      appendRound(repo, 2, { ...cappedAt(2), remediated: { reviewed_round: 1, findings: [finding] } });
+    } else if (ending === "cap-review") {
+      appendRound(repo, 2, { ...reviewedAt, phase: PHASE_CAP_REVIEW });
+    } else {
+      appendRound(repo, 2, {
+        ...reviewedAt,
+        type: "adjudication",
+        findings: [],
+        outcomes: [{ finding_index: 0, outcome: "UPHELD", reasons: "it does" }],
+        excluded_providers: ["anthropic", "openai"],
+      });
+    }
     return repo;
   }
 
-  it("refuses a session that did not close at the cap, naming the verdict it found", async () => {
-    const repo = closedAtCap("ISSUES_FOUND");
-    const run = await capture(() =>
-      reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "r", engine: false }),
+  it("refuses a session no review after its close can reach, naming why", async () => {
+    for (const [repo, why] of [
+      [closedAtCap("ISSUES_FOUND", "adjudication"), /it was ended by an adjudication/],
+      [closedAtCap("VERIFIED"), /its verdict is VERIFIED/],
+    ] as const) {
+      const run = await capture(() =>
+        reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "r", engine: false }),
+      );
+      assert.notEqual(run.value, 0);
+      assert.match(run.stderr, why);
+      assert.equal(readRounds(repo, 2).length, 2);
+    }
+  });
+
+  it("reviews a session closed ISSUES_FOUND after the round past the cap, and a clean round makes it VERIFIED", async () => {
+    const repo = closedAtCap("ISSUES_FOUND", "cap-review");
+    const calls: RoutedCall[] = [];
+    const restoreRoute = routeAnswers([["openai", "VERIFIED\n\nNothing blocks.\n"]], { calls });
+    try {
+      const run = await capture(() =>
+        reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "closed as it was", engine: false }),
+      );
+      assert.equal(run.value, 0, run.stderr);
+    } finally {
+      restoreRoute();
+    }
+    assert.match(calls[0]?.content ?? "", /it closed with the findings below still standing/);
+    assert.equal(readReopens(repo, 2)[0]?.["terminal"], "cap-reviewed");
+    assert.equal(
+      (JSON.parse(readFileSync(join(repo, "docs", "sessions", "sessions.json"), "utf8")).sessions[1] as Record<string, unknown>)[
+        "verificationVerdict"
+      ],
+      "VERIFIED",
     );
-    assert.notEqual(run.value, 0);
-    assert.match(run.stderr, /session 2 cannot be reviewed again: its verdict is ISSUES_FOUND/);
-    assert.equal(readRounds(repo, 2).length, 2);
   });
 
   it("is refused to an engine, and writes nothing", async () => {

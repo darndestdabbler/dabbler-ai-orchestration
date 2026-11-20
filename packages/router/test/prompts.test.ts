@@ -12,6 +12,7 @@ import {
   adjudicationPrompt,
   buildTaskBlock,
   citedEvidenceLines,
+  planChangeBlock,
   priorFindingsBlock,
   splitDisputes,
   splitEvidenceRange,
@@ -254,6 +255,57 @@ describe("the task block a round opens with", () => {
       assert.ok(block.includes("Decisions recorded during this session"), block);
       assert.ok(block.includes("The persistence non-goal gives way"), block);
       assert.ok(!block.includes("Another session's business"), block);
+    } finally {
+      restore();
+    }
+  });
+
+  it("shows the round past the cap a plan-only answer as a plan change, and nothing for a fix that touches the cited code", () => {
+    const repo = tempDir();
+    const before = "### Session 1 of 1: First things\n1. Build the widget, and dock its pane.\n";
+    const after = "### Session 1 of 1: First things\n1. Build the widget.\n";
+    seed(repo, { "docs/sessions/session-plan.md": after });
+    const sessionsDir = join(repo, "docs", "sessions");
+    const restore = gitAnswers([
+      [["rev-parse", "--show-toplevel"], (_args, root) => ({ stdout: root.split("\\").join("/") })],
+      [["status", "--porcelain", "-uall"], { stdout: "" }],
+      [["status", "--porcelain"], { stdout: "" }],
+      [(args) => args[0] === "show" && String(args[1]).startsWith(`${"a".repeat(40)}:`), { stdout: before }],
+    ]);
+    try {
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+      const previous = {
+        round: 3,
+        recorded_at: "2000-01-01T00:00:00.000000+00:00",
+        completion_tree: "a".repeat(40),
+        findings: [{ description: "the pane never docks", severity: "major", blocking: true, evidencePaths: ["src/pane.ts"] }],
+      };
+      appendDecision(sessionsDir, {
+        sessionNumber: 1,
+        decider: "operator",
+        headline: "Docking moves to a later session",
+        body: "The pane docks in session 2.",
+      });
+      const shown = planChangeBlock(sessionsDir, 1, repo, previous, ["docs/sessions/session-plan.md"]);
+      assert.match(shown, /answered by changing the plan/);
+      assert.ok(shown.includes("1. Build the widget, and dock its pane."), shown);
+      assert.ok(shown.indexOf("The section now:") < shown.lastIndexOf("1. Build the widget.\n"), shown);
+      assert.match(shown, /Docking moves to a later session/);
+      assert.equal(planChangeBlock(sessionsDir, 1, repo, previous, ["docs/sessions/session-plan.md", "src/pane.ts"]), "");
+      assert.equal(planChangeBlock(sessionsDir, 1, repo, previous, ["src/pane.ts"]), "");
+      // Two findings, one fixed in its own code: the other, answered by the
+      // plan alone, is still shown as a plan change, and only it is named.
+      const two = {
+        ...previous,
+        findings: [
+          ...previous.findings,
+          { description: "the title is wrong", severity: "major", blocking: true, evidencePaths: ["src/title.ts"] },
+        ],
+      };
+      const mixed = planChangeBlock(sessionsDir, 1, repo, two, ["docs/sessions/session-plan.md", "src/title.ts"]);
+      assert.match(mixed, /answered by changing the plan/);
+      assert.match(mixed, /- the pane never docks/);
+      assert.doesNotMatch(mixed, /the title is wrong/);
     } finally {
       restore();
     }

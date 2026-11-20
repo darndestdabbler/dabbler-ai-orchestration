@@ -1048,6 +1048,7 @@ describe("a stop, as a person reads it", () => {
       "dispute-refused",
       "cap-unresolved",
       "cap-disputed",
+      "cap-reviewed",
       "cap-terminal-tree-moved",
     ];
     const accounts = new Set<string>();
@@ -1083,6 +1084,21 @@ describe("a stop, as a person reads it", () => {
     assert.match(unreachable.happened, /not reached/);
     assert.doesNotMatch(unreachable.happened, /without a verdict/);
     assert.match(unreachable.choices.map((choice) => choice.command).join(" "), /dabbler configure/);
+  });
+
+  it("offers a round past the cap that still blocks three ways on, the last naming the review a release waits for", () => {
+    const words = renderStop(
+      { kind: "verification", code: "cap-reviewed", reason: "round 4 still holds 1 blocking finding(s)" },
+      { session_number: 7, phase: "verify", engine: "cli" },
+    );
+    assert.equal(words.actor, "operator");
+    assert.deepEqual(
+      // The Mechanic, offered at every stop, follows them.
+      words.choices.slice(0, 3).map((choice) => choice.command),
+      ["dabbler verify adjudicate", 'dabbler verify reopen --rounds 1 --reason "<why>"', 'dabbler session waive --reason "<why>"'],
+    );
+    assert.match(words.choices[0]!.cost, /dabbler verify dispute/);
+    assert.match(words.choices[2]!.cost, /No release can include it until it has been reviewed again[\s\S]*verify reopen --session-number 7/);
   });
 
   it("names the free refresh, never a model to choose, when a seat round has no catalog", () => {
@@ -1137,7 +1153,7 @@ describe("a stop, as a person reads it", () => {
       ...RUN,
       stop: { kind: "verification", code, reason: "the dispute was refused", at: RUN.updated_at },
     });
-    for (const code of ["no-verdict", "provider-unreachable", "reviewer-unreachable", "dispute-refused", "cap-unresolved", "cap-disputed", "cap-terminal-tree-moved", null]) {
+    for (const code of ["no-verdict", "provider-unreachable", "reviewer-unreachable", "dispute-refused", "cap-unresolved", "cap-disputed", "cap-reviewed", "cap-terminal-tree-moved", null]) {
       assert.equal(validateRun(stopped(code)).stop?.code ?? null, code);
     }
     assert.throws(() => validateRun(stopped("verification-went-wrong")), LedgerError);

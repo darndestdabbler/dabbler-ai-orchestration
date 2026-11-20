@@ -368,7 +368,7 @@ export function judgeVerification(facts: VerificationFacts, sessionsDir: string)
   }
   // Before the rounds are judged at all. The newest row is still the cap
   // terminal a grant reopened, and reading it would answer with the very
-  // "remediated at the cap" line the operator spent a grant to get past.
+  // "ended at the cap, unreviewed" line the operator spent a grant to get past.
   if (facts.unspentGrant !== null) {
     return [
       false,
@@ -455,11 +455,9 @@ export function judgeTreeSinceRound(
     const count = Array.isArray(findings) ? findings.length : 0;
     return [
       true,
-      `remediated at the cap: ${count} blocking finding(s) from ` +
-        `round ${pythonStr(remediated["reviewed_round"])} each had their ` +
-        "cited site changed, and the cap left the fix unreviewed. THIS " +
-        "WORK LANDS UNREVIEWED — no verifier saw the repair. It is not " +
-        "a waiver: nothing was accepted over a standing finding",
+      `ended at the cap, unreviewed: the fix to ${count} blocking finding(s) from ` +
+        `round ${pythonStr(remediated["reviewed_round"])} landed and no reviewer read it. ` +
+        "This is not a pass",
     ];
   }
   return [true, ""];

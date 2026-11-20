@@ -286,6 +286,31 @@ describe("one session's transcript", () => {
     }
   });
 
+  it("says a fix that landed at the cap unread in those words, never as a verdict token", () => {
+    const root = repoWithASession();
+    const finding = { severity: "major", blocking: true, description: "the pane never docks" };
+    write(
+      roundsPath(root, 5),
+      `${JSON.stringify({
+        round: 1, phase: "full", verdict: "ISSUES_FOUND", blocking: true, findings: [finding],
+        reviewer_model: "gpt-5.6-sol", reviewer_provider: "openai", transport: "api",
+        completion_tree: "abcdef1234567", recorded_at: "2026-10-16T09:30:00-04:00",
+      })}\n${JSON.stringify({
+        round: 2, type: "remediated_at_cap", verdict: "REMEDIATED_AT_CAP", blocking: false, findings: [],
+        remediated: { reviewed_round: 1, findings: [finding], fix_paths: ["src/pane.ts"] },
+        completion_tree: "abcdef1234568", previous_tree: "abcdef1234567", recorded_at: "2026-10-16T09:40:00-04:00",
+      })}\n`,
+    );
+    // What a driver before this logged for that ending, kept as written.
+    appendDriverEvent(root, 5, "verification-passed", {}, "verify");
+    const html = render(root);
+    assert.match(html, /ended at the cap, unreviewed/);
+    assert.ok(!html.includes(">REMEDIATED_AT_CAP<"), "the round's verdict cell carried the token");
+    const said = html.slice(html.indexOf("What the framework said"));
+    assert.match(said, /verification-unreviewed/);
+    assert.ok(!said.includes("verification-passed"), "the old event was shown as a pass");
+  });
+
   it("answers each finding in its round's row, opening only a round still owed a fix", () => {
     // A count says there were issues; only the subtable says what became of them.
     const root = repoWithASession();

@@ -13837,6 +13837,53 @@
       "dateTime": "2026-11-19T20:47:43.410000-05:00",
       "task": "Give a release refused over a closed session's REMEDIATED_AT_CAP verdict a forward exit. `dabbler verify reopen --session-number N --reason \"<why>\"` -- a person's verb, refused to an engine with the persons-verb sentence the other person's verbs use -- accepts only a session that is complete with the verdict REMEDIATED_AT_CAP while no session is in flight, and refuses every other case in one sentence naming the verdict (or status) it found. It buys exactly one round by the Primary Reviewer, dispatched through the existing `dispatchVerification` with N's authoring provider excluded, whose evidence is the diff from N's startCommit to HEAD restricted to the paths N's own `Session N: ` commit touched, N's section of session-plan.md as it reads now, and the findings N's last round left unreviewed. The grant and the round are appended to N's own ledger after its existing rows, changing none of them. A round with no blocking finding sets N's verdict to VERIFIED in sessions.json through one writer in writers.ts, which refuses any verdict but REMEDIATED_AT_CAP to change, and the router commits and pushes that file the way the close does; a blocking round changes no verdict, and nothing accepts a verdict from the caller. The release start's refusal (`judgeReleasePreflight`) names each unverified session with its verdict and the step-1 command whole and ready to paste, and, where that session's last closed review left blocking findings, names them and says to plan a session that fixes them and then review the session again; the old \"Plan a session that fixes and verifies it\" sentence goes. docs/driving-a-session.md gains this stop and its exit beside the cap terminal, and the changelog's 3.40.0 section says a release refused over an unreviewed session now has a way on.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T03:40:30.123000-05:00",
+      "task": "Make a fix landed at the verification cap get its review before the session closes. When the cap is reached over undisputed blocking findings and the tree has moved since that round, `dabbler verify` opens one round past the cap (phase `cap-review`) over the fix instead of writing a `remediated_at_cap` terminal: no report or flag asks for it, it sends nothing back, a clean one stamps the session VERIFIED and the driver carries on to the run of record and the close, and an unmoved tree stays UNRESOLVED as today. The cited-path heuristic that let unreviewed work land (`unremediatedFindings`) goes with the writer it served. A `cap-review` round that still blocks is a new no-round reason, `cap-reviewed`, and a stop for the person (code `cap-reviewed`) that names what the reviewer still holds and three ways on with their costs: the Auxiliary Reviewer judges the findings (record a dispute per finding, then `dabbler verify adjudicate`), the person buys rounds (`dabbler verify reopen`, which now accepts this state), or the session closes as it is (`dabbler session waive`), with the stop saying in so many words that no release can include it until it is reviewed again by `dabbler verify reopen --session-number N`, which now also accepts a session closed ISSUES_FOUND whose last row is a reviewer's round, never an adjudication. Where the fix answers a finding by changing `session-plan.md` and no other path the findings cited, the cap-review round is shown the session's section as it read when the finding was made, as it reads now, and the decisions and amendments recorded since, and is asked whether the amendment answers the finding. An ending at the cap that no reviewer read (a `remediated_at_cap` row already on a record) is never called passed: it reads \"ended at the cap, unreviewed\" in the run's events, the Dabbler Terminal, `dabbler status` and the transcript, and a close that takes it says once that a release will refuse the session and names the command of session 372. `docs/driving-a-session.md` and the changelog describe the cap as it now is.",
+      "releasable": false
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T03:50:14.600000-05:00",
+      "what": "step 'cap-review-round': its files",
+      "reason": "The rounds ledger schema admits only the phases full and fix-delta, so the round past the cap cannot be recorded until its phase cap-review is added to rounds.schema.json and the generated type is regenerated.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T04:09:18.118000-05:00",
+      "what": "step 'cap-reviewed-ways-reach': its files",
+      "reason": "closedSessionReview in rounds.ts tells the reviewer the cap left the fix unreviewed; for a session closed ISSUES_FOUND after the round past the cap that is false, so its task text must say the findings stand.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T04:10:54.715000-05:00",
+      "what": "step 'cap-reviewed-ways-reach': its files",
+      "reason": "Rounds bought at the cap-reviewed stop must send that round's findings back to the author before the next round opens; without it the driver re-runs verify over an unchanged tree. That routing is in drive.ts's verify phase.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T04:25:31.610000-05:00",
+      "what": "step 'unreviewed-words': its files",
+      "reason": "gates.test.ts asserts the verification_clean row's old words for a remediated_at_cap row, which this step replaces with ended at the cap, unreviewed.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
+    },
+    {
+      "kind": "amendment",
+      "sessionNumber": 373,
+      "dateTime": "2026-11-20T04:33:00.232000-05:00",
+      "what": "step 'pages': its files",
+      "reason": "docs/guide/verification.md's 'At the cap' and the two READMEs' review row say the final fix at the cap lands marked unreviewed, which this session ends; left as they are they describe behaviour the router no longer has.",
+      "by": "claude-code (anthropic, claude-opus-5-5)"
     }
   ]
 }

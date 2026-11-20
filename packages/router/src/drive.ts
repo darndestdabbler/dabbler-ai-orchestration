@@ -158,6 +158,7 @@ import {
 import {
   LedgerError,
   OUTCOME_PUBLISHED,
+  ROW_REMEDIATED_AT_CAP,
   RUNS_DIRNAME,
   type Row,
   latestRound,
@@ -213,7 +214,10 @@ import { EXIT_FUNDS } from "./contracts/exitCodes.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
+  NO_ROUND_CAP_REVIEWED,
   NO_ROUND_TERMINAL,
+  PHASE_CAP_REVIEW,
+  blockingFindings,
   capDisputedRefusal,
   noRoundReason,
 } from "./verify/rounds.ts";
@@ -4211,6 +4215,23 @@ class Driver {
 
   // --- verification ----------------------------------------------------------
 
+  /**
+   * The round past the cap still blocks: stop for the person with what the
+   * reviewer holds. The ways on are the situation's, printed with the stop.
+   */
+  private capReviewedStop(): never {
+    const latest = readRounds(this.repoRoot, this.sessionNumber).at(-1) as Row;
+    const held = blockingFindings(latest)
+      .map((finding) => String(finding["description"] ?? "").split("\n")[0])
+      .join("; ");
+    throw new Stop(
+      "verification",
+      `round ${String(latest["round"])} reviewed the fix made at the cap and still holds ` +
+        `${blockingFindings(latest).length} blocking finding(s): ${held}`,
+      "cap-reviewed",
+    );
+  }
+
   private async phaseVerify(): Promise<void> {
     // A session that changed nothing has nothing to review, test, land or
     // release, and `verify` refuses an empty change: sending it there is a
@@ -4252,15 +4273,21 @@ class Driver {
       // is one rule for "is the tree the verified one" and it lives there.
       const [clean, why] = checkVerificationClean(this.sessionsDir);
       if (clean) {
-        this.log("verification-settled", { reason: noRound });
+        // A fix no reviewer read is never called settled: it is said as
+        // what it is, in the events and the terminal that read them.
+        const standing = latestRound(this.repoRoot, this.sessionNumber);
+        if (noRound === NO_ROUND_TERMINAL && standing?.["type"] === ROW_REMEDIATED_AT_CAP) {
+          this.log("verification-unreviewed", { reason: "ended at the cap, unreviewed" });
+        } else {
+          this.log("verification-settled", { reason: noRound });
+        }
         this.setPhase("run-of-record");
         return;
       }
       // The verb named here is `verify reopen`, not `plan amend
       // --max-rounds`. The amendment moves the cap and is answered only
-      // BEFORE the cap is reached: once `terminateAtCap` has written its
-      // row, the terminal is read ahead of the cap and a raised number
-      // changes nothing. Session 137 was sent here, took that advice, had
+      // BEFORE the cap is reached: once a terminal row stands, it is read
+      // ahead of the cap and a raised number changes nothing. Session 137 was sent here, took that advice, had
       // it accepted and recorded, and did not move.
       throw new Stop(
         "verification",
@@ -4272,6 +4299,19 @@ class Driver {
           "Putting the tree back is the other answer.",
         "cap-terminal-tree-moved",
       );
+    }
+    if (noRound === NO_ROUND_CAP_REVIEWED) this.capReviewedStop();
+    // Rounds bought past a round past the cap: its findings go to the author
+    // first, because the next round reviews the answer to them.
+    const latest = latestRound(this.repoRoot, this.sessionNumber);
+    if (
+      noRound === null &&
+      latest?.["phase"] === PHASE_CAP_REVIEW &&
+      latest["blocking"] === true &&
+      readDispositions(this.repoRoot, this.sessionNumber)?.round !== Number(latest["round"])
+    ) {
+      this.setPhase("dispositions");
+      return;
     }
     if (noRound === NO_ROUND_CAP_DISPUTED) {
       // Asked before anything is spawned, because the answer is on the
@@ -4323,6 +4363,18 @@ class Driver {
       // has, in the colour of ordinary progress. The verb's own verdict line
       // is above this one, and it is the verb's; this is the driver's.
       this.log("verification-blocking");
+      // The round past the cap sends nothing back: its findings are a
+      // person's to answer, never the engine's to dispose of.
+      if (
+        noRoundReason(
+          this.repoRoot,
+          this.sessionNumber,
+          readRounds(this.repoRoot, this.sessionNumber),
+          this.run.verification?.max_rounds || verificationRoundCap(this.config()),
+        ) === NO_ROUND_CAP_REVIEWED
+      ) {
+        this.capReviewedStop();
+      }
       this.setPhase("dispositions");
       return;
     }

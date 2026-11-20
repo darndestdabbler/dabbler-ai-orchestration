@@ -53,6 +53,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **The Dabbler Terminal is docked on the right**, under the Solution
   Explorer, the first time Visual Studio shows it, where it used to sit
   behind Output. After that it stays wherever you put it.
+- **A fix made at the round cap is reviewed before the session closes.**
+  One more round reads it, unasked. If it still finds something blocking,
+  the session stops for you with three ways on: the Auxiliary Reviewer
+  judges, you buy more rounds, or the session closes as it is and stays out
+  of every release until it is reviewed again. A fix that landed unread on
+  an older record now reads "ended at the cap, unreviewed", never passed.
 
 ## [3.39.0] — 2026-11-18
 

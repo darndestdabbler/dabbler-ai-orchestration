@@ -20,7 +20,8 @@
       "type": "string",
       "enum": [
         "full",
-        "fix-delta"
+        "fix-delta",
+        "cap-review"
       ]
     },
     "verdict": {

@@ -15,7 +15,7 @@ export type VerificationReopen = {
   /**
    * Which cap terminal stood when the grant was made, as the record read it. 'adjudication' and 'cap-disputed' are absent by design and refused by the verb.
    */
-  terminal: "remediated_at_cap" | "cap-clean";
+  terminal: "remediated_at_cap" | "cap-clean" | "cap-reviewed";
   /**
    * The absolute round cap this grant sets, which must exceed after_round -- a grant that buys no round is refused rather than recorded. It wins over the configured cap and over --max-rounds for as long as it stands, because it is the more recent and more explicit act, and because a grant whose number could be silently overridden by a config file is not a grant.
    */

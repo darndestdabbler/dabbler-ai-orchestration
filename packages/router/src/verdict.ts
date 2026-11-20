@@ -47,7 +47,7 @@ export const SESSION_VERDICTS: ReadonlySet<string> = new Set([
 export const TERMINAL_HEADLINES: Readonly<Record<string, string>> = {
   [VERDICT_VERIFIED]: "verified",
   [VERDICT_ISSUES_FOUND]: "unresolved at the cap",
-  [VERDICT_REMEDIATED_AT_CAP]: "remediated at the cap",
+  [VERDICT_REMEDIATED_AT_CAP]: "ended at the cap, unreviewed",
 };
 
 export const SEVERITIES = ["critical", "major", "minor"] as const;
@@ -379,47 +379,6 @@ export function isBlockingIssue(issue: Finding): boolean {
       .trim()
       .toLowerCase() !== "minor"
   );
-}
-
-/**
- * The findings a fix delta cannot be shown to have answered.
- *
- * This is the whole bar on "remediated at the cap", and it is deliberately
- * per-finding: a changed tree says only that *something* moved, and landing
- * unreviewed work on that would be the retired waiver wearing a machine's
- * name. A finding is shown remediated when the delta touches a path the
- * finding itself cited -- the one claim a machine can check without a
- * reviewer.
- *
- * A finding citing no evidence path can never be shown remediated, and that is
- * correct rather than harsh: there is no site to check, so there is nothing to
- * prove, and the honest outcome is unresolved.
- */
-export function unremediatedFindings(
-  findings: readonly Finding[] | null | undefined,
-  changedPaths: readonly string[],
-): Finding[] {
-  const touched = new Set(
-    changedPaths.map((path) => strip(String(path).replace(/\\/g, "/"), "/")),
-  );
-  const unshown: Finding[] = [];
-  for (const issue of findings ?? []) {
-    const cited = (issue.evidencePaths ?? []).map((path) =>
-      strip(normalizeEvidencePath(path), "/"),
-    );
-    const answered = cited.some((path) => path !== "" && deltaTouches(path, touched));
-    if (!answered) unshown.push(issue);
-  }
-  return unshown;
-}
-
-/** A cited file, or a cited directory holding a changed file. */
-function deltaTouches(cited: string, touched: ReadonlySet<string>): boolean {
-  const prefix = cited + "/";
-  for (const path of touched) {
-    if (path === cited || path.startsWith(prefix)) return true;
-  }
-  return false;
 }
 
 export interface BlockingClassification {

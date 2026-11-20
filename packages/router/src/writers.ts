@@ -49,7 +49,12 @@ import {
 } from "./progress.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
-import { VERDICT_REMEDIATED_AT_CAP, VERDICT_VERIFIED, validateSessionVerdict } from "./verdict.ts";
+import {
+  VERDICT_ISSUES_FOUND,
+  VERDICT_REMEDIATED_AT_CAP,
+  VERDICT_VERIFIED,
+  validateSessionVerdict,
+} from "./verdict.ts";
 import { VERSION } from "./version.ts";
 
 export { SCHEMA_VERSION } from "./progress.ts";
@@ -546,11 +551,25 @@ export function recordSessionVerification(
   validateAndWriteState(sessionsDir, raw);
 }
 
+/** The closed verdicts a review bought after the close may turn into VERIFIED. */
+const REVIEWABLE_AFTER_CLOSE: ReadonlySet<unknown> = new Set([VERDICT_REMEDIATED_AT_CAP, VERDICT_ISSUES_FOUND]);
+
 /**
- * The one write to a CLOSED session's verdict: REMEDIATED_AT_CAP becomes
- * VERIFIED, once a review bought after the close found nothing blocking.
- * The verdict is not the caller's to name, and every other session --
- * open, or closed with any other verdict -- is refused.
+ * Whether a closed session may be reviewed again after its close: it closed
+ * REMEDIATED_AT_CAP, or ISSUES_FOUND with a reviewer's round last -- never an
+ * adjudication, which is a third provider's judgment and not a budget.
+ * `last` is the last row of its rounds ledger.
+ */
+export function reviewableAfterClose(verdict: unknown, last: Record<string, unknown> | undefined): boolean {
+  if (verdict === VERDICT_REMEDIATED_AT_CAP) return true;
+  return verdict === VERDICT_ISSUES_FOUND && last !== undefined && last["type"] !== "adjudication";
+}
+
+/**
+ * The one write to a CLOSED session's verdict: REMEDIATED_AT_CAP or
+ * ISSUES_FOUND becomes VERIFIED, once a review bought after the close found
+ * nothing blocking. The verdict is not the caller's to name, and every other
+ * session -- open, or closed with any other verdict -- is refused.
  */
 export function recordClosedSessionVerified(
   sessionsDir: string,
@@ -566,12 +585,12 @@ export function recordClosedSessionVerified(
     raw === null ||
     record === undefined ||
     record["status"] !== STATUS_COMPLETE ||
-    record["verificationVerdict"] !== VERDICT_REMEDIATED_AT_CAP
+    !REVIEWABLE_AFTER_CLOSE.has(record["verificationVerdict"])
   ) {
     throw new SessionStateInvariantError(
       2,
-      `session ${sessionNumber} is not a session closed ${VERDICT_REMEDIATED_AT_CAP} under ` +
-        `${sessionsDir}, and no other closed verdict is ever rewritten`,
+      `session ${sessionNumber} is not a session closed ${VERDICT_REMEDIATED_AT_CAP} or ` +
+        `${VERDICT_ISSUES_FOUND} under ${sessionsDir}, and no other closed verdict is ever rewritten`,
     );
   }
   record["verificationVerdict"] = VERDICT_VERIFIED;

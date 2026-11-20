@@ -111,14 +111,15 @@ import {
 } from "../src/drive.ts";
 import type { SuiteSpec, TestRunRecord } from "../src/testEvidence.ts";
 import { beginJobRecord, jobRecord, jobStatusPath, setJobStarter } from "../src/jobs.ts";
-import { EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
+import { EXIT_BLOCKING, EXIT_FUNDS } from "../src/contracts/exitCodes.ts";
+import { appendReopen, appendRound } from "../src/ledger.ts";
 import { rewindPhaseFor } from "../src/gates.ts";
 import { judgeLandReadiness, type LandSuiteFact } from "../src/land.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { readProjectGraph } from "../src/projectGraph.ts";
 import { checkRunGreen } from "../src/checks.ts";
 import type { RouterConfig } from "../src/config.ts";
-import { capDisputedRefusal } from "../src/verify/rounds.ts";
+import { PHASE_CAP_REVIEW, capDisputedRefusal } from "../src/verify/rounds.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { gitAnswers, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -339,6 +340,114 @@ describe("a verification call refused for funds", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("a round past the cap that still blocks", () => {
+  it("stops for the person with code cap-reviewed, never sending its findings to dispositions", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1, verification: { max_rounds: 1, transport: null },
+      started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
+    });
+    const held = { description: "the widget still returns 3", severity: "major", blocking: true };
+    const row = (round: number, phase: string) => ({
+      round, phase, verdict: "ISSUES_FOUND", blocking: true, findings: [held],
+      reviewer_model: "o-gpt", reviewer_provider: "openai", orchestrator_provider: "anthropic",
+      completion_tree: "a".repeat(40), recorded_at: "2026-10-21T10:00:00.000000-04:00",
+      ...(round > 1 ? { previous_tree: "a".repeat(40) } : {}),
+    });
+    appendRound(repo, 1, row(1, "full"));
+    // verify, as the round past the cap answers: its row, and EXIT_BLOCKING.
+    const restore = setJobStarter((root, session, options) => {
+      appendRound(root, session, row(2, PHASE_CAP_REVIEW));
+      const { log, status } = beginJobRecord(root, session, options.name);
+      writeFileSync(log, "verify: round 2 reviewed the fix made at the cap and still holds 1 blocking finding(s)\n");
+      writeFileSync(status, JSON.stringify({ exit: EXIT_BLOCKING, ended_at: new Date().toISOString() }));
+      return jobRecord(root, session, options, process.pid);
+    });
+    try {
+      await capture(() => sessionNext(sessionsDir, {}));
+    } finally {
+      restore();
+    }
+    const stopped = readRun(repo, 1)!;
+    assert.equal(stopped.stop?.code, "cap-reviewed");
+    assert.match(stopped.stop?.reason ?? "", /still holds 1 blocking finding\(s\): the widget still returns 3/);
+    assert.equal(stopped.phase, "verify");
+  });
+
+  it("sends its findings to the author once a person buys rounds past it, before any round opens", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1, verification: { max_rounds: 1, transport: null },
+      started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
+    });
+    const row = (round: number, phase: string) => ({
+      round, phase, verdict: "ISSUES_FOUND", blocking: true,
+      findings: [{ description: "the widget still returns 3", severity: "major", blocking: true }],
+      reviewer_model: "o-gpt", reviewer_provider: "openai", orchestrator_provider: "anthropic",
+      completion_tree: "a".repeat(40), recorded_at: "2026-10-21T10:00:00.000000-04:00",
+      ...(round > 1 ? { previous_tree: "a".repeat(40) } : {}),
+    });
+    appendRound(repo, 1, row(1, "full"));
+    appendRound(repo, 1, row(2, PHASE_CAP_REVIEW));
+    appendReopen(repo, 1, {
+      schema_version: 1, session_number: 1, after_round: 2, terminal: "cap-reviewed", cap: 3,
+      reason: "one more", by: "a person", recorded_at: "2026-10-21T10:05:00-04:00",
+    });
+    const started: string[] = [];
+    const restore = setJobStarter((root, session, options) => {
+      started.push(options.name);
+      return jobRecord(root, session, options, process.pid);
+    });
+    try {
+      await capture(() => sessionNext(sessionsDir, {}));
+    } finally {
+      restore();
+    }
+    assert.deepEqual(started, []);
+    assert.equal(readRun(repo, 1)!.phase, "dispositions");
+  });
+});
+
+describe("a fix that landed at the cap unread", () => {
+  it("is logged as ended at the cap, unreviewed, never as settled or passed", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1, verification: { max_rounds: 1, transport: null },
+      started_at: "2026-10-21T10:00:00-04:00", updated_at: "2026-10-21T10:00:00-04:00",
+    });
+    const tree = snapshotWorktreeTree(repo) ?? "a".repeat(40);
+    const finding = { description: "the widget still returns 3", severity: "major", blocking: true };
+    appendRound(repo, 1, {
+      round: 1, phase: "full", verdict: "ISSUES_FOUND", blocking: true, findings: [finding],
+      reviewer_model: "o-gpt", reviewer_provider: "openai", orchestrator_provider: "anthropic",
+      completion_tree: tree, recorded_at: "2026-10-21T10:00:00.000000-04:00",
+    });
+    appendRound(repo, 1, {
+      round: 2, type: "remediated_at_cap", verdict: "REMEDIATED_AT_CAP", blocking: false, findings: [],
+      remediated: { reviewed_round: 1, findings: [finding], fix_paths: ["src/widget.ts"] },
+      completion_tree: tree, previous_tree: tree, recorded_at: "2026-10-21T10:05:00.000000-04:00",
+    });
+    const restore = setJobStarter((root, session, options) => jobRecord(root, session, options, process.pid));
+    try {
+      await capture(() => sessionNext(sessionsDir, {}));
+    } finally {
+      restore();
+    }
+    const events = readDriverEvents(repo, 1).map((event) => String(event["event"]));
+    assert.ok(events.includes("verification-unreviewed"), events.join(" "));
+    assert.ok(!events.includes("verification-settled") && !events.includes("verification-passed"), events.join(" "));
   });
 });
 

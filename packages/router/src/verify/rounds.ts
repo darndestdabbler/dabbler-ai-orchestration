@@ -1,5 +1,5 @@
-// One verification round, and the two terminal states a capped session can
-// end in.
+// One verification round, and what the cap does to the loop: a fix made at
+// the cap is reviewed once more, by a round that sends nothing back.
 //
 // Round 1 evidence is the full session: spec excerpt, `git status`, the
 // complete diff, and untracked file contents. Rounds >=2 see only the
@@ -83,7 +83,8 @@ import {
   type OrchestratorIdentity,
 } from "../identity.ts";
 import { DRIVEN_MARKER } from "../jobs.ts";
-import { nowIso } from "../journal.ts";
+import { nowIso, repoRelativePath } from "../journal.ts";
+import { isSetBookkeeping } from "../checks.ts";
 import {
   ROW_ADJUDICATION,
   ROW_REMEDIATED_AT_CAP,
@@ -100,13 +101,11 @@ import {
 import { readSessionState } from "../progress.ts";
 import { NoCandidateError, RouterError, type RouteResult } from "../route.ts";
 import {
-  VERDICT_REMEDIATED_AT_CAP,
   classifyBlocking,
   normalizeSeverity,
   type Finding,
   parseVerificationResponse,
   sessionVerdict,
-  unremediatedFindings,
 } from "../verdict.ts";
 import { buildVerificationPrompt } from "../verifyjob.ts";
 import { appendChangeLogBlock, recordSessionVerification } from "../writers.ts";
@@ -122,7 +121,7 @@ import {
 } from "./errors.ts";
 import { EXIT_FUNDS } from "../contracts/exitCodes.ts";
 import { FundsError } from "../transports/api.ts";
-import { type FailedRunOfRecord, buildTaskBlock, sliceCodePoints } from "./prompts.ts";
+import { type FailedRunOfRecord, buildTaskBlock, planChangeBlock, sliceCodePoints } from "./prompts.ts";
 import { undisputedBlockingIndices } from "./disputes.ts";
 
 /**
@@ -362,12 +361,21 @@ export const NO_ROUND_TERMINAL = "terminal-row";
 export const NO_ROUND_CAP_CLEAN = "cap-clean";
 /** The cap is reached and blocking findings are disputed rather than fixed. */
 export const NO_ROUND_CAP_DISPUTED = "cap-disputed";
+/** The round past the cap reviewed the last fix and still found it blocking. */
+export const NO_ROUND_CAP_REVIEWED = "cap-reviewed";
 
 export type NoRoundReason =
   | typeof NO_ROUND_TERMINAL
   | typeof NO_ROUND_CAP_CLEAN
   | typeof NO_ROUND_CAP_DISPUTED
+  | typeof NO_ROUND_CAP_REVIEWED
   | null;
+
+/**
+ * The phase of the one round that opens past the cap: it reviews the fix the
+ * author made to the last round's findings, and it sends nothing back.
+ */
+export const PHASE_CAP_REVIEW = "cap-review";
 
 /**
  * The cap in force: a standing grant's, or the one the caller resolved.
@@ -410,11 +418,11 @@ export function standingTerminal(
 /**
  * Why no further verification round may open, or null when one may.
  *
- * Null covers both the ordinary case and the one terminal path that still
- * has work to do: the cap reached with undisputed blocking findings, which
- * `terminateAtCap` may still resolve into a `REMEDIATED_AT_CAP` row or an
- * UNRESOLVED refusal. That decision needs the tree, so it is not asked here
- * -- this answers only what the ledger alone can settle.
+ * Null covers both the ordinary case and the one path at the cap that still
+ * has work to do: the cap reached with undisputed blocking findings that no
+ * round past the cap has reviewed, which `capRefusal` resolves into that
+ * round or an UNRESOLVED refusal. That decision needs the tree, so it is not
+ * asked here -- this answers only what the ledger alone can settle.
  *
  * `cap` is what the caller resolved; an operator's grant is read here rather
  * than by the caller, so no call site can ask this question having missed
@@ -433,12 +441,55 @@ export function noRoundReason(
   if (standingTerminal(priorRounds, grant) !== undefined) return NO_ROUND_TERMINAL;
   if (priorRounds.length === 0) return null;
   const latest = priorRounds[priorRounds.length - 1] as Row;
-  if (Number(latest["round"]) + 1 <= (grant?.cap ?? cap)) return null;
+  // A round past the cap that still blocks holds whatever cap a caller
+  // passes: only a person's grant made after it buys another round.
+  const capReviewHeld =
+    latest["phase"] === PHASE_CAP_REVIEW &&
+    latest["blocking"] === true &&
+    (grant === null || grant.afterRound < Number(latest["round"]));
+  if (!capReviewHeld && Number(latest["round"]) + 1 <= (grant?.cap ?? cap)) return null;
   if (!latest["blocking"]) return NO_ROUND_CAP_CLEAN;
   const disputes = readDisputes(repoRoot, current);
-  return undisputedBlockingIndices(latest, disputes).length < blockingFindings(latest).length
-    ? NO_ROUND_CAP_DISPUTED
-    : null;
+  if (undisputedBlockingIndices(latest, disputes).length < blockingFindings(latest).length) {
+    return NO_ROUND_CAP_DISPUTED;
+  }
+  return latest["phase"] === PHASE_CAP_REVIEW ? NO_ROUND_CAP_REVIEWED : null;
+}
+
+/**
+ * What the round past the cap still holds, and the three ways on, said once:
+ * `verify` prints it when that round blocks, and the driver stops in it.
+ * Each way is a person's, and each says what it costs.
+ */
+export function capReviewedWays(sessionsDir: string, sessionNumber: number, row: Row): string {
+  const round = String(row["round"]);
+  const held = blockingFindings(row)
+    .map(
+      (finding) =>
+        `  - [${String(finding["severity"])}] ` +
+        `${sliceCodePoints(String(finding["description"] ?? ""), 200)}\n` +
+        `    cited: ${((finding["evidencePaths"] as string[]) ?? []).join(", ") || "(no path cited)"}\n`,
+    )
+    .join("");
+  return (
+    `verify: round ${round} reviewed the fix made at the cap and still holds ` +
+    `${blockingFindings(row).length} blocking finding(s):\n${held}` +
+    "This round sends nothing back: the session stops for a person, and there are three ways on.\n" +
+    "  1. The Auxiliary Reviewer judges the findings. One call to a provider that has neither " +
+    "written nor reviewed this session; its judgment ends the loop either way. Record the grounds " +
+    "against each finding, then route them:\n" +
+    `       dabbler verify dispute --sessions-dir ${sessionsDir} --round ${round} --finding <F> ` +
+    '--grounds "..." --evidence <path>\n' +
+    `       dabbler verify adjudicate --sessions-dir ${sessionsDir}\n` +
+    "  2. Buy further rounds. Each is one more review by the Primary Reviewer, the fix goes back " +
+    "to the author, and reaching the new cap stops the session again:\n" +
+    `       dabbler verify reopen --rounds 1 --reason "<why>" --sessions-dir ${sessionsDir}\n` +
+    "  3. Close the session as it is. The findings stay written as they stand, beside your reason. " +
+    "No release can include this session until it has been reviewed again, and once it is closed " +
+    "this is the command that does that:\n" +
+    `       dabbler session waive --reason "<why>"\n` +
+    `       dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n`
+  );
 }
 
 /**
@@ -521,25 +572,23 @@ export async function runOfRecordLines(
 }
 
 /**
- * The cap is reached, so no further round opens. Which of the two
- * cap-terminal states this is is decided from the record, never asked of
- * anyone.
+ * The cap is reached. Why no round opens, as an exit code -- or null, when
+ * the one round past the cap opens over the author's last fix.
  *
- * A contested finding still goes to adjudication first: consensus precedes
- * termination, and a dispute says the finding is wrong rather than fixed.
- * Otherwise the tree answers it -- a tree that moved since the reviewed
- * round carries the repair, and one that did not carries nothing. The repair
- * must also have passed its own targeted tests, which is the same bar a
- * round would have had to clear.
+ * A contested finding has already been refused by the caller, to
+ * adjudication: a dispute says the finding is wrong rather than fixed.
+ * Otherwise the tree answers it: a tree that moved since the reviewed round
+ * carries an answer, and that answer is reviewed once more -- a fix made at
+ * the cap and landed unread is the work no reviewer saw being called done. A
+ * tree that did not move carries nothing, and is UNRESOLVED.
  */
-export async function terminateAtCap(
+export function capRefusal(
   repoRoot: string,
   sessionsDir: string,
-  config: RouterConfig,
   current: number,
   priorRounds: readonly Row[],
   cap: number,
-): Promise<number> {
+): number | null {
   const latest = priorRounds[priorRounds.length - 1] as Row;
   const noRound = noRoundReason(repoRoot, current, priorRounds, cap);
   if (noRound === NO_ROUND_CAP_CLEAN) {
@@ -556,12 +605,6 @@ export async function terminateAtCap(
     return EXIT_USAGE;
   }
 
-  if (noRound === NO_ROUND_CAP_DISPUTED) {
-    writeErr(`${capDisputedRefusal(sessionsDir, cap, latest["round"])}\n`);
-    return EXIT_USAGE;
-  }
-
-  const unreviewed = blockingFindings(latest);
   const completionTree = snapshotWorktreeTree(repoRoot);
   if (completionTree === null) {
     writeErr(
@@ -570,7 +613,6 @@ export async function terminateAtCap(
     );
     return EXIT_CALL_FAILED;
   }
-
   const fixPaths = changedPathsBetween(
     repoRoot,
     String(latest["completion_tree"]),
@@ -583,99 +625,35 @@ export async function terminateAtCap(
     );
     return EXIT_CALL_FAILED;
   }
-  const unshown = unremediatedFindings(unreviewed as Finding[], fixPaths) as Row[];
-  if (unshown.length > 0 || unreviewed.length === 0) {
-    const shown = unshown.length > 0 ? unshown : unreviewed;
-    const listing = shown
-      .map(
-        (finding) =>
-          `  - [${String(finding["severity"])}] ` +
-          `${sliceCodePoints(String(finding["description"] ?? ""), 160)}\n` +
-          `    cited: ` +
-          (((finding["evidencePaths"] as string[]) ?? []).join(", ") ||
-            "(no path cited)") +
-          "\n",
-      )
-      .join("");
-    const count = unshown.length || unreviewed.length;
-    writeErr(
-      `verify: UNRESOLVED -- the cap (${cap}) is reached and ` +
-        `${count} blocking finding(s) from ` +
-        `round ${String(latest["round"])} cannot be shown remediated:\n` +
-        `${listing}` +
-        "REMEDIATED AT THE CAP lands work no verifier reviewed, so it " +
-        "is granted only when the fix delta touches a path each " +
-        "finding itself cited. A changed tree is not that: it says " +
-        "something moved, not that this finding was answered. Nothing " +
-        "lands but the record; the close stays BLOCKED and these " +
-        "findings are read at the next planning session.\n",
-    );
-    // Its own code, never BLOCKING: no round is written here, so there is
-    // nothing to dispose of. An orchestrator told "blocking" sends the
-    // engine back to the disposition set it already acted on, then to the
-    // same fix and the same suite, and arrives here again -- a cycle that
-    // reads as ordinary progress and cannot break, because a finding citing
-    // no path can never be shown remediated by any amount of work.
-    return EXIT_UNRESOLVED;
-  }
+  // What the close itself commits is not an answer to a finding.
+  const setRel = repoRelativePath(repoRoot, sessionsDir);
+  if (fixPaths.some((path) => !isSetBookkeeping(path.replace(/\\/g, "/"), setRel))) return null;
 
-  // The targeted-evidence gate that stood here went with the selection it
-  // demanded; what REMEDIATED AT THE CAP now rests on is the run of record
-  // against the final tree, which the close still requires.
-
-  const row: Row = {
-    round: Number(latest["round"]) + 1,
-    type: ROW_REMEDIATED_AT_CAP,
-    verdict: VERDICT_REMEDIATED_AT_CAP,
-    blocking: false,
-    findings: [],
-    remediated: {
-      reviewed_round: latest["round"],
-      findings: unreviewed,
-      fix_paths: [...fixPaths].sort(),
-    },
-    completion_tree: completionTree,
-    previous_tree: latest["completion_tree"],
-    recorded_at: nowIso("microseconds"),
-  };
-  appendRound(repoRoot, current, row);
-  recordSessionVerification(sessionsDir, current, VERDICT_REMEDIATED_AT_CAP, {
-    rounds: latest["round"],
-    // Both spellings, because archived rows are not rewritten: a round
-    // recorded before the rename carries the old key and is still the round
-    // this terminal is about.
-    verifierModel: latest["reviewer_model"] ?? latest["verifier_model"] ?? null,
-    verifierProvider: latest["reviewer_provider"] ?? latest["verifier_provider"] ?? null,
-    transport: latest["transport"] ?? null,
-    unreviewedFindings: unreviewed.length,
-  });
-  const findingLines = unreviewed
+  const unreviewed = blockingFindings(latest);
+  const listing = unreviewed
     .map(
       (finding) =>
-        `- Fixed, unreviewed: [${String(finding["severity"])}] ` +
-        `${sliceCodePoints(String(finding["description"] ?? ""), 200)}\n`,
+        `  - [${String(finding["severity"])}] ` +
+        `${sliceCodePoints(String(finding["description"] ?? ""), 160)}\n` +
+        `    cited: ` +
+        (((finding["evidencePaths"] as string[]) ?? []).join(", ") ||
+          "(no path cited)") +
+        "\n",
     )
     .join("");
-  appendChangeLogBlock(
-    sessionsDir,
-    `## Session ${current} verification — REMEDIATED AT THE CAP after ` +
-      `${cap} round(s)\n\n` +
-      `- Every blocking finding of round ${String(latest["round"])} was fixed; ` +
-      "the cap left the fix unreviewed.\n" +
-      `${findingLines}` +
-      "- This work lands UNREVIEWED. It is not a waiver: nothing was " +
-      "accepted over a standing finding — what is unproved is the " +
-      "repair.\n",
+  writeErr(
+    `verify: UNRESOLVED -- the cap (${cap}) is reached and ` +
+      `${unreviewed.length} blocking finding(s) from ` +
+      `round ${String(latest["round"])} stand, and the tree has not moved since that round, ` +
+      `so nothing answers them:\n${listing}` +
+      "Nothing lands but the record; the close stays BLOCKED and these " +
+      "findings are read at the next planning session.\n",
   );
-  writeOut(
-    `verify: REMEDIATED AT THE CAP -- the ${unreviewed.length} blocking ` +
-      `finding(s) of round ${String(latest["round"])} were fixed and the cap ` +
-      `(${cap}) left the fix unreviewed. The work lands labelled ` +
-      "UNREVIEWED; no verifier saw the repair.\n" +
-      (await runOfRecordLines(sessionsDir, config)) +
-      "\n",
-  );
-  return EXIT_OK;
+  // Its own code, never BLOCKING: no round is written here, so there is
+  // nothing to dispose of. An orchestrator told "blocking" sends the engine
+  // back to the disposition set it already acted on, and arrives here again
+  // -- a cycle that reads as ordinary progress and cannot break.
+  return EXIT_UNRESOLVED;
 }
 
 /**
@@ -743,10 +721,15 @@ export function closedSessionReview(
       `${commit.slice(0, 12)} touched. A later session's change to one of these paths is shown too: ` +
       "this is the text that would ship.",
   );
-  const findings = standingFindings(rounds[rounds.length - 1]);
+  const last = rounds[rounds.length - 1];
+  const findings = standingFindings(last);
+  const ending =
+    last?.["type"] === ROW_REMEDIATED_AT_CAP
+      ? "its verification ended at the round cap with the fix to the findings below unreviewed"
+      : "it closed with the findings below still standing";
   const task = [
-    `Session ${sessionNumber} is closed, and its verification ended at the round cap with the fix to ` +
-      "the findings below unreviewed. This is that review, bought by a person after the close. Review " +
+    `Session ${sessionNumber} is closed, and ${ending}. ` +
+      "This is that review, bought by a person after the close. Review " +
       "what the session changed against its plan; for each finding below say whether the text now " +
       "resolves it, and raise anything the plan requires that the text does not do.",
     "",
@@ -859,8 +842,25 @@ export async function runRound(
     priorRounds.length > 0
       ? Number((priorRounds[priorRounds.length - 1] as Row)["round"]) + 1
       : 1;
-  if (roundNumber > cap) {
-    return terminateAtCap(repoRoot, sessionsDir, config, current, priorRounds, cap);
+  // Asked before the cap is compared, because a larger --max-rounds is not
+  // the person's decision this stop waits for.
+  // A dispute recorded against it routes to adjudication, and is no more a
+  // grant than the cap is.
+  const held = noRoundReason(repoRoot, current, priorRounds, cap);
+  if (held === NO_ROUND_CAP_REVIEWED) {
+    writeErr(capReviewedWays(sessionsDir, current, priorRounds[priorRounds.length - 1] as Row));
+    return EXIT_USAGE;
+  }
+  if (held === NO_ROUND_CAP_DISPUTED) {
+    writeErr(`${capDisputedRefusal(sessionsDir, cap, (priorRounds[priorRounds.length - 1] as Row)["round"])}\n`);
+    return EXIT_USAGE;
+  }
+  // Past the cap one round still opens, over the author's answer to the
+  // last round's findings, and it sends nothing back.
+  const pastCap = roundNumber > cap;
+  if (pastCap) {
+    const refused = capRefusal(repoRoot, sessionsDir, current, priorRounds, cap);
+    if (refused !== null) return refused;
   }
 
   let evidence: string;
@@ -997,6 +997,7 @@ export async function runRound(
       postureOf(config) === "maintenance"
         ? (facts.controls.find((fact) => fact.kind === KIND_CONTRACT) ?? null)
         : null,
+      pastCap ? planChangeBlock(sessionsDir, current, repoRoot, priorRounds[priorRounds.length - 1] as Row, changed) : "",
     ),
     "session-verification",
     evidence,
@@ -1091,7 +1092,7 @@ export async function runRound(
 
   const row: Row = {
     round: roundNumber,
-    phase: roundNumber === 1 ? "full" : "fix-delta",
+    phase: pastCap ? PHASE_CAP_REVIEW : roundNumber === 1 ? "full" : "fix-delta",
     verdict,
     blocking: classification.blocking,
     reviewer_model: result.model_name,
@@ -1158,12 +1159,20 @@ export async function runRound(
   if (substituted !== null) writeErr(substituted);
 
   if (classification.blocking) {
-    writeOut(
+    const said =
       `verify: round ${roundNumber} — ${verdict} with ` +
-        `${classification.blockingIssues.length} blocking finding(s) ` +
-        `(verifier ${result.model_name}/${result.provider}). Raw output: ` +
-        `${rawPath}\n` +
-        `${summaryLine(agencyRecord)}\n` +
+      `${classification.blockingIssues.length} blocking finding(s) ` +
+      `(verifier ${result.model_name}/${result.provider}). Raw output: ` +
+      `${rawPath}\n` +
+      `${summaryLine(agencyRecord)}\n`;
+    if (pastCap) {
+      // No terminal is written: the record says what the reviewer holds,
+      // and what follows is a person's.
+      writeOut(said + capReviewedWays(sessionsDir, current, row));
+      return EXIT_BLOCKING;
+    }
+    writeOut(
+      said +
         "Fix what the findings cite, then re-run " +
         `\`dabbler verify --sessions-dir ${sessionsDir}\`: the next round ` +
         "reviews the fix delta, and the complete suite remains the run of " +

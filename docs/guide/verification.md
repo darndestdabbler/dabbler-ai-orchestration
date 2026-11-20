@@ -98,14 +98,27 @@ up to the cap: seven rounds, unless the repository's configuration sets
 
 ## At the cap
 
-When the last round still has blocking findings, the session ends one of
-two ways:
+When the last round still has blocking findings and the author has changed
+the work to answer them, one more round reviews that change. No one has to
+ask for it, and it sends nothing back to the author:
 
-- **Remediated at the cap.** The final fix touched the code every blocking
-  finding pointed at, but no round reviewed it. The work may land, and the
-  change log says in so many words that it lands unreviewed.
-- **Unresolved.** It did not. The close stays blocked, and the findings are
-  read when the next session is planned.
+- **It finds nothing blocking.** The session is verified.
+- **It still finds something blocking.** The session stops for a person,
+  with three ways on: the **Auxiliary Reviewer** judges the findings
+  (`dabbler verify adjudicate`, after recording a dispute against each);
+  more rounds are bought (`dabbler verify reopen`); or the session closes
+  as it is (`dabbler session waive`). A session closed as it is cannot be
+  in any release until it has been reviewed again, with `dabbler verify
+  reopen --session-number N`.
+- **Nothing changed since the last round.** The session is unresolved. The
+  close stays blocked, and the findings are read when the next session is
+  planned.
+
+If the change that answers a finding is to the session plan alone, that
+last round is shown the plan as it read before and after the change, and
+the decision that changed it. A fix that landed at the cap with no review,
+on a record from before that round existed, reads "ended at the cap,
+unreviewed" and is never called passed.
 
 If every blocking finding at the cap is disputed, the decision goes to a
 person, who can send the disputes to the **Auxiliary Reviewer** with

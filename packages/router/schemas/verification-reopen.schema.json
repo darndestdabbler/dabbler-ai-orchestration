@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "verification-reopens.jsonl row (one operator grant of further rounds)",
-  "description": "One row per operator grant that reopens a verification loop the round cap ended, in .dabbler/runs/s<N>/verification-reopens.jsonl. The cap terminals are evidence of a BUDGET, not of a judgment: 'remediated_at_cap' says the last round's blocking findings were fixed and the cap left the fix unreviewed, and 'cap-clean' says the cap was reached with nothing blocking outstanding. Neither is anyone's opinion that the work is right, so an operator may buy the review the budget refused. Adjudication is the opposite -- a third provider's judgment of the disputes -- and is never reopened; nor is a cap reached with findings still disputed, which is routed to adjudication rather than re-reviewed. Written only by the CLI (dabbler verify reopen). The reason is mandatory and permanent, and 'by' is who was working as the session record from 'dabbler session start' says, written by the verb and never typed: a cap moved past for no stated reason is the bare override this row exists to replace.",
+  "description": "One row per operator grant that reopens a verification loop the round cap ended, in .dabbler/runs/s<N>/verification-reopens.jsonl. The cap terminals are evidence of a BUDGET, not of a judgment: 'remediated_at_cap' says the last round's blocking findings were fixed and the cap left the fix unreviewed, 'cap-clean' says the cap was reached with nothing blocking outstanding, and 'cap-reviewed' says the one round past the cap reviewed the last fix and still found it blocking. None is anyone's opinion that the work is right, so an operator may buy the review the budget refused. Adjudication is the opposite -- a third provider's judgment of the disputes -- and is never reopened; nor is a cap reached with findings still disputed, which is routed to adjudication rather than re-reviewed. Written only by the CLI (dabbler verify reopen). The reason is mandatory and permanent, and 'by' is who was working as the session record from 'dabbler session start' says, written by the verb and never typed: a cap moved past for no stated reason is the bare override this row exists to replace.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,7 +31,8 @@
       "type": "string",
       "enum": [
         "remediated_at_cap",
-        "cap-clean"
+        "cap-clean",
+        "cap-reviewed"
       ],
       "description": "Which cap terminal stood when the grant was made, as the record read it. 'adjudication' and 'cap-disputed' are absent by design and refused by the verb."
     },

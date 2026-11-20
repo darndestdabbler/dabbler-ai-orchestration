@@ -193,8 +193,8 @@ describe("verification_clean: the rounds, then the tree", () => {
     };
     const row = judgeTreeSinceRound(latest, [], SESSIONS, SESSIONS);
     assert.equal(row[0], true);
-    assert.match(row[1], /remediated at the cap: 2 blocking finding\(s\) from round 3/);
-    assert.match(row[1], /THIS WORK LANDS UNREVIEWED/);
+    assert.match(row[1], /ended at the cap, unreviewed: the fix to 2 blocking finding\(s\) from round 3/);
+    assert.match(row[1], /no reviewer read it\. This is not a pass/);
   });
 });
 

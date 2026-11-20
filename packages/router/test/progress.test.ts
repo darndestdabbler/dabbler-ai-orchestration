@@ -669,6 +669,9 @@ describe("the verification view", () => {
     });
     const view = buildVerificationView(repo, 1, 2) as Record<string, unknown>;
     assert.equal(view["terminal"], "REMEDIATED_AT_CAP");
+    // Never called passed: what `dabbler status` and the Work Explorer show.
+    assert.equal(view["headline"], "ended at the cap, unreviewed");
+    assert.equal(view["clean"], false);
     assert.deepEqual(view["fixPaths"], ["src/widget.py"]);
     const [finding] = view["findings"] as Record<string, unknown>[];
     assert.equal(finding["disposition"], "fixed, unreviewed");

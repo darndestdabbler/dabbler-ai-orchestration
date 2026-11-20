@@ -4,7 +4,7 @@
 // The framework decides everything about a verification round except how
 // many a repository is willing to pay for, and that last one is a person's.
 // Before this verb the cap was answerable only BEFORE it was reached: once
-// `terminateAtCap` wrote its row, `noRoundReason` returned `terminal` ahead
+// a cap terminal row was written, `noRoundReason` returned `terminal` ahead
 // of every other test, and `session plan amend --max-rounds` was accepted,
 // recorded in `amendments.jsonl`, and did nothing. Session 137, 2026-09-09,
 // spent its last three rounds finding that out: `verify` said close the
@@ -46,6 +46,7 @@ import { NOBODY_ON_THE_RECORD, readSessionState, whoIsWorking } from "../progres
 import { NoCandidateError, RouterError, type RouteResult } from "../route.ts";
 import { FundsError } from "../transports/api.ts";
 import {
+  VERDICT_ISSUES_FOUND,
   VERDICT_REMEDIATED_AT_CAP,
   VERDICT_VERIFIED,
   classifyBlocking,
@@ -54,7 +55,8 @@ import {
 } from "../verdict.ts";
 import { buildVerificationPrompt } from "../verifyjob.ts";
 import { VERSION } from "../version.ts";
-import { recordAmendment, recordClosedSessionVerified } from "../writers.ts";
+import { recordAmendment, recordClosedSessionVerified, reviewableAfterClose } from "../writers.ts";
+import { readRun } from "../driver.ts";
 import {
   EXIT_BLOCKING,
   EXIT_CALL_FAILED,
@@ -67,6 +69,7 @@ import {
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
+  NO_ROUND_CAP_REVIEWED,
   NO_ROUND_TERMINAL,
   closedSessionReview,
   costNumber,
@@ -134,6 +137,16 @@ export function classifyStuck(
       terminal: "cap-clean",
     };
   }
+  if (reason === NO_ROUND_CAP_REVIEWED) {
+    // The round past the cap still holds findings: a spent budget, which a
+    // person may buy past, and the findings go back to the author.
+    const latest = priorRounds[priorRounds.length - 1] as Row;
+    return {
+      kind: "reopenable",
+      afterRound: Number(latest["round"]),
+      terminal: NO_ROUND_CAP_REVIEWED,
+    };
+  }
   if (reason === NO_ROUND_CAP_DISPUTED) {
     return {
       kind: "refused",
@@ -199,7 +212,8 @@ export function runReopen(sessionsDir: string, options: ReopenOptions): number {
   const by = whoIsWorking(sessionsDir, current);
 
   const priorRounds = readRounds(repoRoot, current);
-  const cap = verificationRoundCap(loadConfig());
+  // The cap this run verifies under, which the driver passes to every round.
+  const cap = readRun(repoRoot, current)?.verification?.max_rounds || verificationRoundCap(loadConfig());
   const stuck = classifyStuck(repoRoot, current, priorRounds, cap);
   if (stuck.kind === "refused") {
     writeErr(`verify reopen: refused -- ${stuck.message}\n`);
@@ -296,16 +310,20 @@ export async function reviewClosedSession(sessionsDir: string, options: ClosedRe
   const sessions = Array.isArray(state?.["sessions"]) ? (state["sessions"] as Row[]) : [];
   const record = sessions.find((row) => row["number"] === n);
   const verdict = record?.["verificationVerdict"];
-  if (record === undefined || record["status"] !== "complete" || verdict !== VERDICT_REMEDIATED_AT_CAP) {
+  const rounds = record === undefined ? [] : readRounds(repoRoot, n);
+  const last = rounds[rounds.length - 1];
+  if (record === undefined || record["status"] !== "complete" || !reviewableAfterClose(verdict, last)) {
     const found =
       record === undefined
         ? "there is no such session"
         : record["status"] !== "complete"
           ? `its status is ${String(record["status"])}`
-          : `its verdict is ${verdict === undefined || verdict === null ? "none" : String(verdict)}`;
+          : last?.["type"] === ROW_ADJUDICATION
+            ? "it was ended by an adjudication, a judgment no review reaches"
+            : `its verdict is ${verdict === undefined || verdict === null ? "none" : String(verdict)}`;
     writeErr(
       `verify reopen: refused -- session ${n} cannot be reviewed again: ${found}, and only a session ` +
-        `that closed ${VERDICT_REMEDIATED_AT_CAP} can.\n`,
+        `that closed ${VERDICT_REMEDIATED_AT_CAP}, or ${VERDICT_ISSUES_FOUND} short of an adjudication, can.\n`,
     );
     return EXIT_USAGE;
   }
@@ -317,8 +335,6 @@ export async function reviewClosedSession(sessionsDir: string, options: ClosedRe
     );
     return EXIT_USAGE;
   }
-  const rounds = readRounds(repoRoot, n);
-  const last = rounds[rounds.length - 1];
   const author =
     [...rounds].reverse().map((row) => row["orchestrator_provider"]).find((value) => typeof value === "string") ??
     (record["orchestrator"] as Row | undefined)?.["provider"];
@@ -388,7 +404,7 @@ export async function reviewClosedSession(sessionsDir: string, options: ClosedRe
     schema_version: 1,
     session_number: n,
     after_round: afterRound,
-    terminal: "remediated_at_cap",
+    terminal: verdict === VERDICT_REMEDIATED_AT_CAP ? "remediated_at_cap" : "cap-reviewed",
     cap: round,
     reason,
     by: NOBODY_ON_THE_RECORD,
@@ -427,7 +443,7 @@ export async function reviewClosedSession(sessionsDir: string, options: ClosedRe
         `${classification.blockingIssues.length} blocking finding(s) (reviewer ` +
         `${result.model_name}/${result.provider}). Raw output: ${rawPath}\n` +
         classification.blockingIssues.map((issue) => `  - ${String(issue.description ?? "").split("\n")[0]}\n`).join("") +
-        `Session ${n}'s verdict stays ${VERDICT_REMEDIATED_AT_CAP}. Plan a session that fixes these, ` +
+        `Session ${n}'s verdict stays ${String(verdict)}. Plan a session that fixes these, ` +
         "then review the session again.\n",
     );
     return EXIT_BLOCKING;

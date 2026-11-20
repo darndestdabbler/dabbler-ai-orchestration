@@ -2030,6 +2030,35 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       cancelChoice(),
     ],
   },
+  "cap-reviewed": {
+    what:
+      "The round past the cap reviewed the fix made at the cap and still found it " +
+      "blocking. That round sends nothing back, so what follows is a person's.",
+    actor: "operator",
+    moves: (parts) => [
+      {
+        label: "Have the Auxiliary Reviewer judge the findings",
+        cost:
+          "One call to a provider that has neither written nor reviewed this session, " +
+          "once a dispute is recorded against each finding with `dabbler verify dispute`. " +
+          "Its judgment ends the loop either way: every finding overruled is VERIFIED, " +
+          "any upheld stands.",
+        command: "dabbler verify adjudicate",
+      },
+      {
+        label: "Buy further rounds",
+        cost:
+          `${REOPEN_COST} The findings go back to the author, and reaching the new cap ` +
+          "stops the session again.",
+        command: REOPEN_COMMAND,
+      },
+      waiveChoice(
+        "The session closes as it is, its verdict ISSUES_FOUND. No release can include it " +
+          "until it has been reviewed again, which once it is closed is " +
+          `\`dabbler verify reopen --session-number ${parts.session} --reason "<why>"\`.`,
+      ),
+    ],
+  },
   "cap-terminal-tree-moved": {
     what:
       "A terminal verification row stands, and this is not the tree that was " +

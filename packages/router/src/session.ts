@@ -225,6 +225,7 @@ import {
   recordReleaseHold,
   recordRollback,
   releaseHold,
+  reviewableAfterClose,
   WorkBegunError,
   workBegunRefusal,
 } from "./writers.ts";
@@ -1410,6 +1411,8 @@ export interface UnverifiedSession {
   readonly verdict: string | null;
   /** What a review after its close found blocking, where the last one did. */
   readonly blocking: readonly string[];
+  /** `verify reopen --session-number` may review it: `writers.reviewableAfterClose`. */
+  readonly reviewable: boolean;
 }
 
 /** What a release session's start is judged on, read from the repository. */
@@ -1449,8 +1452,11 @@ export function judgeReleasePreflight(number: number, version: string, facts: Re
     const named = facts.unverified.map((session) => sessionDisplayNumber(session.number)).join(", ");
     const ways = facts.unverified.map((session) => {
       const which = `session ${sessionDisplayNumber(session.number)} carries ${session.verdict ?? "no verdict"}`;
-      if (session.verdict !== VERDICT_REMEDIATED_AT_CAP) {
-        return `\n- ${which}, and only a session closed ${VERDICT_REMEDIATED_AT_CAP} is reviewed after its close.`;
+      if (!session.reviewable) {
+        return (
+          `\n- ${which}, and only a session closed ${VERDICT_REMEDIATED_AT_CAP}, or ISSUES_FOUND short of ` +
+          "an adjudication, is reviewed after its close."
+        );
       }
       const review = `  dabbler verify reopen --session-number ${session.number} --reason "<why>"`;
       if (session.blocking.length === 0) return `\n- ${which}: its fix was never reviewed. Review it:\n${review}`;
@@ -1534,6 +1540,7 @@ export function readReleaseFacts(sessionsDir: string, number: number): ReleaseFa
         number: n,
         verdict: verdict === undefined || verdict === null ? null : String(verdict),
         blocking: blocking.map((finding) => `- ${String(finding["description"] ?? "").split("\n")[0]}`),
+        reviewable: reviewableAfterClose(verdict, last),
       };
     });
   let versionFile: ReleaseFacts["versionFile"] = null;
@@ -3130,6 +3137,25 @@ export interface CloseCliOptions {
  * committed and pushed. A close that pushed before flipping would leave the
  * remote holding a session the record still calls in flight.
  */
+/**
+ * What the close says once of a session it closes unverified at the cap --
+ * ended there unreviewed, or closed as it was after the round past it still
+ * blocked: a release will refuse it, and the review that lifts that. Null for
+ * every other close. `last` is the last row of its rounds ledger.
+ */
+export function releaseRefusesLine(
+  sessionNumber: number,
+  verdict: unknown,
+  last: Record<string, unknown> | undefined,
+): string | null {
+  if (verdict === null || verdict === undefined || !reviewableAfterClose(verdict, last)) return null;
+  return (
+    `close: a release will refuse session ${sessionDisplayNumber(sessionNumber)} until it has been ` +
+    "reviewed again:\n" +
+    `  dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n`
+  );
+}
+
 export function close(sessionsDir: string, options: CloseCliOptions = {}): number {
   const dryRun = options.dryRun === true;
   const forced = options.forced === true;
@@ -3247,6 +3273,8 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     for (const line of steppedOverLines(repoRoot, sessionsDir, current as number)) {
       writeOut(`${line}\n`);
     }
+    const refusedLater = repoRoot ? releaseRefusesLine(current, verdict, latestRound(repoRoot, current) ?? undefined) : null;
+    if (refusedLater !== null) writeOut(refusedLater);
 
     if (repoRoot) {
       const bookkeeping = SET_BOOKKEEPING_COMMIT_BASENAMES.map((name) =>

@@ -42,6 +42,7 @@ import {
   planStepKey,
   recordAmendment,
   recordClosedSessionVerified,
+  reviewableAfterClose,
   recordReleaseHold,
   releaseHold,
   recordProjectPlan,
@@ -509,7 +510,7 @@ describe("the window before a session declares", () => {
 });
 
 describe("verifying a session after its close", () => {
-  it("rewrites only a REMEDIATED_AT_CAP verdict, and only to VERIFIED", () => {
+  it("rewrites only a verdict that ended at the cap unverified, and only to VERIFIED", () => {
     const { sessionsDir } = makeSessionsDir();
     const path = join(sessionsDir, "sessions.json");
     writeFileSync(
@@ -519,16 +520,27 @@ describe("verifying a session after its close", () => {
         sessions: [
           { number: 1, title: "First", status: "complete", verificationVerdict: "REMEDIATED_AT_CAP" },
           { number: 2, title: "Second", status: "complete", verificationVerdict: "ISSUES_FOUND" },
+          { number: 3, title: "Third", status: "complete", verificationVerdict: "VERIFIED" },
         ],
       }),
       "utf8",
     );
     assert.throws(
-      () => recordClosedSessionVerified(sessionsDir, 2, { rounds: 3 }),
-      /session 2 is not a session closed REMEDIATED_AT_CAP/,
+      () => recordClosedSessionVerified(sessionsDir, 3, { rounds: 3 }),
+      /session 3 is not a session closed REMEDIATED_AT_CAP or ISSUES_FOUND/,
     );
     recordClosedSessionVerified(sessionsDir, 1, { rounds: 3 });
+    recordClosedSessionVerified(sessionsDir, 2, { rounds: 4 });
     const sessions = JSON.parse(readFileSync(path, "utf8")).sessions as Array<Record<string, unknown>>;
-    assert.deepEqual(sessions.map((row) => row["verificationVerdict"]), ["VERIFIED", "ISSUES_FOUND"]);
+    assert.deepEqual(sessions.map((row) => row["verificationVerdict"]), ["VERIFIED", "VERIFIED", "VERIFIED"]);
+  });
+
+  it("may review again a session closed unverified, short of an adjudication", () => {
+    const round = { round: 4, blocking: true };
+    assert.equal(reviewableAfterClose("REMEDIATED_AT_CAP", { round: 4, type: "remediated_at_cap" }), true);
+    assert.equal(reviewableAfterClose("ISSUES_FOUND", round), true);
+    assert.equal(reviewableAfterClose("ISSUES_FOUND", { ...round, type: "adjudication" }), false);
+    assert.equal(reviewableAfterClose("ISSUES_FOUND", undefined), false);
+    assert.equal(reviewableAfterClose("VERIFIED", round), false);
   });
 });

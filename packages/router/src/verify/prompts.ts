@@ -15,11 +15,12 @@ import { join } from "node:path";
 import { briefing, type AgencyGrant } from "../agency.ts";
 import { readWorkPlan } from "../driver.ts";
 import { startPlanText } from "../approvedPlan.ts";
-import { SESSION_PLAN_FILENAME, planSection, repoRootFromSessionsDir } from "../evidence.ts";
+import { SESSION_PLAN_FILENAME, planSection, repoRootFromSessionsDir, runGit } from "../evidence.ts";
+import { repoRelativePath } from "../journal.ts";
 import type { ControlFact } from "../facts.ts";
 import type { Row } from "../ledger.ts";
 import { dumps } from "../pythonJson.ts";
-import { decisionEntries } from "../writers.ts";
+import { amendmentEntries, amendmentLine, decisionEntries } from "../writers.ts";
 
 /**
  * The session's section as committed at its start commit, which is what the
@@ -367,6 +368,84 @@ export function decisionsBlock(sessionsDir: string, sessionNumber: number): stri
 }
 
 /**
+ * For the round past the cap: where the findings of the round before it were
+ * answered by changing the session plan and no other path they cited, the
+ * plan change shown as one -- the section as it read when the findings were
+ * made, as it reads now, and what was recorded for the session since. Empty
+ * for any other answer.
+ *
+ * Without it, the reviewer of a plan-only answer saw the new plan as the plan,
+ * and a finding ended by relabelling what it was measured against read as a
+ * finding fixed.
+ */
+export function planChangeBlock(
+  sessionsDir: string,
+  sessionNumber: number,
+  repoRoot: string,
+  previous: Row,
+  changed: readonly string[],
+): string {
+  const planPath = repoRelativePath(repoRoot, join(sessionsDir, SESSION_PLAN_FILENAME));
+  const paths = changed.map((path) => path.replace(/\\/g, "/"));
+  if (!paths.includes(planPath)) return "";
+  const findings = (Array.isArray(previous["findings"]) ? (previous["findings"] as Row[]) : []).filter(
+    (finding) => finding["blocking"] !== false,
+  );
+  // Finding by finding: one answered in its own cited code is a fix, and
+  // does not hide another that only the plan change answers.
+  const planOnly = findings.filter((finding) => {
+    const cited = (Array.isArray(finding["evidencePaths"]) ? (finding["evidencePaths"] as string[]) : [])
+      .map((path) => String(path).replace(/\\/g, "/").replace(/\/+$/, ""))
+      .filter((path) => path !== "" && path !== planPath);
+    return !paths.some(
+      (path) => path !== planPath && cited.some((site) => path === site || path.startsWith(`${site}/`)),
+    );
+  });
+  if (planOnly.length === 0) return "";
+
+  const shown = runGit(repoRoot, ["show", `${String(previous["completion_tree"])}:${planPath}`]);
+  const before = shown.code === 0 ? planSection(shown.stdout, sessionNumber) : null;
+  let now: string | null;
+  try {
+    now = planSection(readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8"), sessionNumber);
+  } catch {
+    now = null;
+  }
+  const since = Date.parse(String(previous["recorded_at"] ?? ""));
+  const after = (stamp: unknown): boolean => Number.isNaN(since) || Date.parse(String(stamp ?? "")) > since;
+  const records = [
+    ...decisionEntries(sessionsDir, sessionNumber)
+      .filter((entry) => after(entry["recordedAt"]))
+      .map((entry) => `- ${String(entry["decisionId"])} -- ${String(entry["headline"])}: ${sliceCodePoints(String(entry["body"] ?? "").trim(), 800)}`),
+    ...amendmentEntries(sessionsDir, sessionNumber)
+      .filter((entry) => after(entry["dateTime"]))
+      .map((entry) => `- ${amendmentLine(entry)}`),
+  ];
+  return [
+    "#### The findings were answered by changing the plan",
+    "",
+    `The fix since round ${String(previous["round"])} changes ${planPath}, and for the finding(s) below no ` +
+      "other path each one cited: the work was not changed to meet them, the plan the work is measured " +
+      "against was. Judge the work against the plan as amended, and for each of these findings say whether " +
+      "the amendment answers it -- a plan narrowed so a finding no longer applies is a decision about " +
+      "scope, not a fix, and is answered only where the record below shows it was decided.",
+    "",
+    ...planOnly.map((finding) => `- ${sliceCodePoints(String(finding["description"] ?? "").split("\n")[0] ?? "", 300)}`),
+    "",
+    `The section when round ${String(previous["round"])} made its findings:`,
+    "",
+    before ?? "(the plan at that round could not be read)",
+    "",
+    "The section now:",
+    "",
+    now ?? "(the session plan has no section for this session now)",
+    "",
+    "Recorded for this session since that round:",
+    ...(records.length > 0 ? records : ["(nothing: no decision or amendment records the change)"]),
+  ].join("\n");
+}
+
+/**
  * The changed source files no test is named after. Shown, never judged: the
  * reviewer weighs whether what changed is tested, and nothing here refuses.
  */
@@ -435,6 +514,7 @@ export function buildTaskBlock(
   untested: readonly string[] = [],
   failedRunOfRecord: FailedRunOfRecord | null = null,
   contract: ControlFact | null = null,
+  planChange = "",
 ): string {
   const parts: string[] = [];
   const prior = priorFindingsBlock(priorRounds, disputes, repoRoot);
@@ -449,6 +529,7 @@ export function buildTaskBlock(
   if (plan) parts.push(plan);
   const decisions = decisionsBlock(sessionsDir, sessionNumber);
   if (decisions) parts.push(decisions);
+  if (planChange) parts.push(planChange);
   const gap = untestedBlock(untested);
   if (gap) parts.push(gap);
   const failed = runOfRecordBlock(failedRunOfRecord);

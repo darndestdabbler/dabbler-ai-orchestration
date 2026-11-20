@@ -453,6 +453,7 @@
         "dispute-refused",
         "cap-unresolved",
         "cap-disputed",
+        "cap-reviewed",
         "cap-terminal-tree-moved"
       ]
     },

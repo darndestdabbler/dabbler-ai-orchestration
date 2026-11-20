@@ -7,7 +7,7 @@
  */
 export type Rounds = {
   round: number;
-  phase?: "full" | "fix-delta";
+  phase?: "full" | "fix-delta" | "cap-review";
   verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP";
   blocking: boolean;
   /**

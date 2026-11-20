@@ -61,10 +61,10 @@ export const LIFECYCLE_WRITTEN_FILES: readonly string[] = [
  * and a session carries at most one.
  *
  * `adjudication` is a third provider's judgment of the recorded disputes;
- * `remediated_at_cap` is the cap terminal where every blocking finding was
- * fixed and the cap left the fix unreviewed. `waive` is retired -- no
- * writer emits it -- but historical ledgers carry it, so readers still
- * recognize it as terminal.
+ * `remediated_at_cap` is the cap terminal where a fix landed at the cap and
+ * no reviewer read it. No writer emits it any more -- a fix made at the cap
+ * is reviewed by one round past it -- but ledgers already carry it, so
+ * readers still recognize it as terminal. `waive` is retired the same way.
  *
  * "Terminal" is the ledger's shape, not the last word: a `remediated_at_cap`
  * row is evidence of a spent BUDGET, and an operator may buy further rounds

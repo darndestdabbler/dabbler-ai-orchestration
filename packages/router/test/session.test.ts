@@ -77,6 +77,7 @@ import {
   judgeRollback,
   rollback,
   restore,
+  releaseRefusesLine,
   reviewingVehicleRefusal,
   setSessionUseReading,
   STARTING_POINT,
@@ -1924,17 +1925,26 @@ describe("what a release session's start refuses", () => {
       judgeReleasePreflight(7, "2.0.0", {
         ...CLEAR,
         unverified: [
-          { number: 4, verdict: "REMEDIATED_AT_CAP", blocking: [] },
-          { number: 5, verdict: "REMEDIATED_AT_CAP", blocking: ["- the tab is never closed"] },
+          { number: 4, verdict: "REMEDIATED_AT_CAP", blocking: [], reviewable: true },
+          { number: 5, verdict: "REMEDIATED_AT_CAP", blocking: ["- the tab is never closed"], reviewable: true },
+          // Closed as it was after the round past the cap still blocked.
+          { number: 6, verdict: "ISSUES_FOUND", blocking: ["- the pane never docks"], reviewable: true },
+          // Ended by an adjudication, which no review reaches.
+          { number: 3, verdict: "ISSUES_FOUND", blocking: [], reviewable: false },
         ],
       }),
     );
-    assert.match(capped, /session\(s\) 004, 005 closed after the last published release without a VERIFIED verdict/);
+    assert.match(capped, /session\(s\) 004, 005, 006, 003 closed after the last published release without a VERIFIED verdict/);
     assert.match(capped, /session 004 carries REMEDIATED_AT_CAP: its fix was never reviewed[\s\S]*verify reopen --session-number 4 --reason "<why>"/);
     assert.match(
       capped,
       /session 005 carries REMEDIATED_AT_CAP, and its last review found it blocking:\s+- the tab is never closed\s+Plan a session that fixes them, then review the session again:\s+dabbler verify reopen --session-number 5 /,
     );
+    assert.match(
+      capped,
+      /session 006 carries ISSUES_FOUND, and its last review found it blocking:\s+- the pane never docks[\s\S]*verify reopen --session-number 6 /,
+    );
+    assert.match(capped, /session 003 carries ISSUES_FOUND, and only a session closed REMEDIATED_AT_CAP, or ISSUES_FOUND short of an adjudication, is reviewed/);
     assert.doesNotMatch(capped, /fixes and verifies it/);
     assert.match(
       String(judgeReleasePreflight(7, "2.0.1", CLEAR)),
@@ -2006,6 +2016,18 @@ describe("what a release session's start refuses", () => {
 });
 
 // --- What the close says was stepped over ----------------------------------------
+
+describe("what the close says of a session closed unverified at the cap", () => {
+  it("says once that a release will refuse it and names the review, and nothing for a verified one", () => {
+    const unreviewed = releaseRefusesLine(373, "REMEDIATED_AT_CAP", { round: 4, type: "remediated_at_cap" });
+    assert.match(String(unreviewed), /a release will refuse session 373 until it has been reviewed again/);
+    assert.match(String(unreviewed), /dabbler verify reopen --session-number 373 --reason "<why>"/);
+    assert.notEqual(releaseRefusesLine(373, "ISSUES_FOUND", { round: 4, phase: "cap-review" }), null);
+    assert.equal(releaseRefusesLine(373, "ISSUES_FOUND", { round: 4, type: "adjudication" }), null);
+    assert.equal(releaseRefusesLine(373, "VERIFIED", { round: 2 }), null);
+    assert.equal(releaseRefusesLine(373, null, undefined), null);
+  });
+});
 
 describe("what the close says was stepped over", () => {
   it("is one line per repair and per amendment with its reason, and nothing for a session with neither", () => {

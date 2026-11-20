@@ -80,6 +80,8 @@ import {
 import { SESSIONS_DIRNAME, STATE_FILENAME } from "../evidence.ts";
 import { readUncollectedJob } from "../jobs.ts";
 import { RUNS_DIRNAME } from "../journal.ts";
+import { ROW_REMEDIATED_AT_CAP } from "../ledger.ts";
+import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP } from "../verdict.ts";
 import { renderWaiting, stalledAfterSeconds } from "../progress.ts";
 import {
   TESTS_FAILED,
@@ -674,7 +676,11 @@ function recordedAt(value: unknown): Date | null {
 function roundFields(row: Record<string, unknown>): Record<string, string> {
   return {
     round: String(row["round"] ?? "?"),
-    verdict: String(row["verdict"] ?? "?"),
+    // A fix that landed at the cap unread is said as that, never as its token.
+    verdict:
+      row["type"] === ROW_REMEDIATED_AT_CAP
+        ? TERMINAL_HEADLINES[VERDICT_REMEDIATED_AT_CAP]
+        : String(row["verdict"] ?? "?"),
     reviewer: String(row["reviewer_model"] ?? row["verifier_model"] ?? ""),
   };
 }

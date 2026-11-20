@@ -129,12 +129,13 @@ function usage(): string {
     "",
     "one cross-provider verification round; the loop continues on re-invocation",
     "",
-    "reopen buys further rounds past a cap terminal that has already ended the",
-    "loop -- the operator's answer when the cap stopped a review the tree still",
-    "needs. It buys rounds, never a verdict, and never reaches an adjudication.",
-    "With --session-number, a person buys one review of a CLOSED session whose",
-    "verdict is REMEDIATED_AT_CAP, of what it changed as the trunk holds it now;",
-    "a clean round makes its verdict VERIFIED.",
+    "reopen buys further rounds past a cap that has already ended the loop --",
+    "the operator's answer when the cap stopped a review the tree still needs.",
+    "It buys rounds, never a verdict, and never reaches an adjudication.",
+    "With --session-number, a person buys one review of a CLOSED session that",
+    "ended at the cap unverified -- REMEDIATED_AT_CAP, or ISSUES_FOUND short of an",
+    "adjudication -- of what it changed as the trunk holds it now; a clean round",
+    "makes its verdict VERIFIED.",
     "",
   ].join("\n");
 }
@@ -386,11 +387,10 @@ export async function verifyVerb(argv: string[]): Promise<number> {
     writeErr(
       "verify waive: refused -- there is no waiver. A waiver " +
         "accepted work over a finding that still stood, and no verdict " +
-        "a person types exists here any more. A capped session ends in " +
-        "one of two states the loop decides for itself: REMEDIATED AT " +
-        "THE CAP when every blocking finding was fixed and the cap " +
-        "left the fix unreviewed, or UNRESOLVED when findings still " +
-        "stand. Re-run the loop and it will record whichever it is:\n" +
+        "a person types exists here any more. At the cap the loop decides " +
+        "for itself: a fix made to the last round's findings is reviewed " +
+        "by one round past the cap, and a tree that did not move is " +
+        "UNRESOLVED. Re-run the loop and it will do whichever it is:\n" +
         "  dabbler verify --sessions-dir <dir>\n",
     );
     return EXIT_USAGE;

@@ -1287,39 +1287,66 @@ someone who is not at the keyboard, stop calling `next`. Nothing expires.
 The session resumes from the phase it is in, and nothing already accepted
 is asked for again.
 
-### The one stop with no forward exit, and the verb that is one
+### At the cap: the last fix is reviewed, once
 
-There is a stop the four steps above cannot answer, because it is not a
-wrong diagnosis — it is two correct refusals pointing at each other.
+The round cap counts the rounds that may send work back to the author.
+When it is reached with blocking findings the author has answered, the
+framework does not land that answer unread. It opens **one more round**,
+past the cap, over the change since the last one. No report or flag asks
+for it, and it sends nothing back:
 
-A session reaches the verification round cap. The loop records a terminal:
-`remediated_at_cap` when the last round's blocking findings were each fixed
-at the site they cited, or a cap-clean end when nothing was outstanding. The
-tree then moves again — a repair to the repair, which is exactly what an
-unreviewed fix tends to need. Now:
+- **It finds nothing blocking.** The session is `VERIFIED` and goes on to
+  the run of record and the close, like any clean round.
+- **The tree has not moved since the last round.** Nothing answers the
+  findings, and the session is UNRESOLVED: nothing lands but the record.
+- **It still finds something blocking.** The session stops for a person
+  (stop code `cap-reviewed`). No terminal row is written. The stop names
+  what the reviewer still holds and gives three ways on:
+  1. **The Auxiliary Reviewer judges the findings.** Record a dispute
+     against each finding (`dabbler verify dispute`), then run `dabbler
+     verify adjudicate`. That is one call to a provider that has neither
+     written nor reviewed the session, and its judgment ends the loop.
+  2. **Buy further rounds** with `dabbler verify reopen --rounds N
+     --reason "<why>"`. The findings go back to the author first, and
+     reaching the new cap stops the session again.
+  3. **Close the session as it is** with `dabbler session waive --reason
+     "<why>"`. The verdict stays `ISSUES_FOUND`, and **no release can
+     include the session until it has been reviewed again**. Once it is
+     closed, `dabbler verify reopen --session-number N` does that.
 
-- the close's `verification_clean` gate refuses, correctly: this is not the
-  tree that was reviewed, so **re-run `dabbler verify`**;
-- `dabbler verify` refuses, correctly: a terminal row stands, so **close the
-  session**;
-- `session close --force` cannot help either, because `verification_clean`
-  is an *evidence* gate and force bypasses only bookkeeping.
+If the author answered a finding by changing `session-plan.md` and no
+other path the findings cited, the round past the cap is told so. It is
+shown the session's section as it read when the finding was made, as it
+reads now, and the decisions and amendments recorded since then. The
+reviewer judges the work against the plan as amended, and says whether the
+amendment answers each finding. Narrowing a plan so that a finding no
+longer applies is a decision about scope, not a fix.
 
-Session 137, 2026-09-09, sat in that loop. Raising the cap does not lift it:
-the terminal is read **before** the cap, so `session plan amend
---max-rounds` was accepted, written to `amendments.jsonl` — and inert. It
-now refuses instead, and names the verb below.
+#### Ended at the cap, unreviewed
 
-A cap terminal is a spent **budget**, not a judgment, so the operator may
-buy the review it refused:
+A ledger may still carry a `remediated_at_cap` row, written before the
+round past the cap existed: a fix that landed at the cap and that no
+reviewer read. It is never reported as passed. The run's events, the
+Dabbler Terminal, `dabbler status` and the transcript all say "ended at
+the cap, unreviewed". A close that takes it says once, as it closes, that
+a release will refuse the session, and gives the command that reviews it.
+
+#### The one stop with no forward exit, and the verb that is one
+
+A cap that ended over a clean round can still meet a tree that moved
+afterwards. Now the close's `verification_clean` gate says re-run `dabbler
+verify`, and `dabbler verify` says the cap is spent. Raising the cap does
+not help: `session plan amend --max-rounds` refuses once a terminal row
+stands. Session 137, 2026-09-09, sat in that loop. The cap is a spent
+**budget**, not a judgment, so the operator may buy the review it refused:
 
 ```
 dabbler verify reopen --rounds 1 --reason "<why>"
 ```
 
-That records a grant in `verification-reopens.jsonl` under `.dabbler/runs/s<N>/` and
-reopens the loop. Read what it is carefully, because it is easy to mistake
-for a waiver of the verdict, which this framework does not have:
+That records a grant in `verification-reopens.jsonl` under
+`.dabbler/runs/s<N>/` and reopens the loop. Read what it is carefully,
+because it is easy to mistake for a waiver of the verdict:
 
 - **It buys rounds, never a verdict.** Nothing is verified until a round
   says so, and `verification_clean` refuses while a grant stands that no
@@ -1341,10 +1368,12 @@ for a waiver of the verdict, which this framework does not have:
 
 #### After the close: a release refused over a session closed at the cap
 
-A session may also close at the cap: its verdict is `REMEDIATED_AT_CAP`,
-its work landed, and nobody reviewed the fix. A release publishes only
-verified work, so the start of the next release refuses while such a
-session stands, and names each one with the verdict it carries.
+A session may close at the cap unverified, in one of two ways. Its verdict
+is `REMEDIATED_AT_CAP` (ended at the cap, unreviewed), or `ISSUES_FOUND`
+because a person closed it as it was after the round past the cap still
+blocked. A release publishes only verified work, so the start of the next
+release refuses while such a session stands, and names each one with the
+verdict it carries.
 
 The way on is a review of what that session changed, bought by a person:
 
@@ -1353,13 +1382,14 @@ dabbler verify reopen --session-number N --reason "<why>"
 ```
 
 It runs only while no session is in flight, and an engine is refused it.
-It buys one round by the Primary Reviewer, who is not the provider that
-wrote the session. The reviewer is shown the session's section of the
-session plan as it reads now, the findings the cap left unreviewed, and
-what the session changed **as the trunk holds it now**: the difference from
-the session's start commit to `HEAD`, over the paths its own commit
-touched. A later session's change to one of those paths is in it, because
-that is the text the release would ship.
+It is refused for a session an adjudication ended, because that is a
+judgment rather than a budget. It buys one round by the Primary Reviewer,
+who is not the provider that wrote the session. The reviewer is shown the
+session's section of the session plan as it reads now, the findings its
+last round left standing, and what the session changed **as the trunk
+holds it now**: the difference from the session's start commit to `HEAD`,
+over the paths its own commit touched. A later session's change to one of
+those paths is in it, because that is the text the release would ship.
 
 The grant and the round go on the session's own record, after the rows
 already there. A round with no blocking finding makes the verdict

@@ -1086,7 +1086,7 @@ describe("a stop, as a person reads it", () => {
     assert.match(unreachable.choices.map((choice) => choice.command).join(" "), /dabbler configure/);
   });
 
-  it("offers a round past the cap that still blocks three ways on, the last naming the review a release waits for", () => {
+  it("offers a round past the cap that still blocks four ways on, a person's review among them, the last naming the review a release waits for", () => {
     const words = renderStop(
       { kind: "verification", code: "cap-reviewed", reason: "round 4 still holds 1 blocking finding(s)" },
       { session_number: 7, phase: "verify", engine: "cli" },
@@ -1094,11 +1094,32 @@ describe("a stop, as a person reads it", () => {
     assert.equal(words.actor, "operator");
     assert.deepEqual(
       // The Mechanic, offered at every stop, follows them.
-      words.choices.slice(0, 3).map((choice) => choice.command),
-      ["dabbler verify adjudicate", 'dabbler verify reopen --rounds 1 --reason "<why>"', 'dabbler session waive --reason "<why>"'],
+      words.choices.slice(0, 4).map((choice) => choice.command),
+      [
+        "dabbler verify adjudicate",
+        'dabbler verify reopen --rounds 1 --reason "<why>"',
+        'dabbler verify person-review --reason "<why>"',
+        'dabbler session waive --reason "<why>"',
+      ],
     );
     assert.match(words.choices[0]!.cost, /dabbler verify dispute/);
-    assert.match(words.choices[2]!.cost, /No release can include it until it has been reviewed again[\s\S]*verify reopen --session-number 7/);
+    assert.match(words.choices[2]!.cost, /REVIEWED_BY_PERSON with your name on the record, no model is called/);
+    assert.match(words.choices[3]!.cost, /No release can include it until it has been reviewed again[\s\S]*verify reopen --session-number 7/);
+  });
+
+  it("offers a person's review at every verification stop a person may answer, saying it never replaces VERIFIED", () => {
+    const run = { session_number: 7, phase: "verify", engine: "cli" };
+    for (const code of [
+      "no-verdict", "provider-unreachable", "reviewer-unreachable", "cap-unresolved", "cap-disputed", "cap-terminal-tree-moved",
+    ]) {
+      const review = renderStop({ kind: "verification", code, reason: "r" }, run).choices.find((choice) =>
+        choice.command.includes("person-review"),
+      );
+      assert.equal(review?.command, 'dabbler verify person-review --reason "<why>"', code);
+      assert.match(review?.cost ?? "", /never replaces a VERIFIED verdict/, code);
+    }
+    const engines = renderStop({ kind: "verification", code: "dispute-refused", reason: "r" }, run).choices;
+    assert.ok(!engines.some((choice) => choice.command.includes("person-review")));
   });
 
   it("names the free refresh, never a model to choose, when a seat round has no catalog", () => {

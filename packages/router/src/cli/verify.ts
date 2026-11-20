@@ -1,10 +1,10 @@
 // `dabbler verify …` -- the cross-provider verification loop's command line.
 //
-// Seven commands share one entry point: the bare round, `dispute`,
-// `adjudicate`, `prepare`, `reanchor`, `reopen` and `step`.
-// A seventh, `waive`, exists only to be refused by name -- there is no
-// verdict a person can type, and argparse's "invalid choice" would read like
-// an oversight rather than a decision.
+// Eight commands share one entry point: the bare round, `dispute`,
+// `adjudicate`, `prepare`, `reanchor`, `reopen`, `person-review` and `step`.
+// A ninth, `waive`, exists only to be refused by name -- a person's review
+// replaces it, and "invalid choice" would read like an oversight rather than
+// a decision.
 
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { VALID_TRANSPORTS } from "../config.ts";
@@ -16,6 +16,7 @@ import { recordDispute, runAdjudication } from "../verify/disputes.ts";
 import { runPrepare } from "../verify/prepare.ts";
 import { runReanchor } from "../verify/reanchor.ts";
 import { reviewClosedSession, runReopen } from "../verify/reopen.ts";
+import { runPersonReview } from "../verify/personReview.ts";
 import { personIsPresent } from "../session.ts";
 import { APPROVER_FLAG, APPROVER_GONE } from "./session.ts";
 import { runRound } from "../verify/rounds.ts";
@@ -125,6 +126,7 @@ function usage(): string {
     "       dabbler verify reanchor --commit COMMIT --reason TEXT",
     "       dabbler verify reopen --rounds N --reason TEXT",
     "       dabbler verify reopen --session-number N --reason TEXT",
+    "       dabbler verify person-review [--session-number N] [--reason TEXT]",
     "       dabbler verify step <open|close|status|amend|guard-commit>",
     "",
     "one cross-provider verification round; the loop continues on re-invocation",
@@ -136,6 +138,12 @@ function usage(): string {
     "ended at the cap unverified -- REMEDIATED_AT_CAP, or ISSUES_FOUND short of an",
     "adjudication -- of what it changed as the trunk holds it now; a clean round",
     "makes its verdict VERIFIED.",
+    "",
+    "person-review is a person's own review of the work, never an engine's: at a",
+    "verification stop of the session in flight, or with --session-number on a",
+    "closed session that ended at the cap unverified. Without --reason it shows",
+    "what a reviewer would be shown and changes nothing; with it, the verdict is",
+    "REVIEWED_BY_PERSON, signed with git's user.name, which a release accepts.",
     "",
   ].join("\n");
 }
@@ -319,6 +327,26 @@ async function reopenMain(argv: readonly string[]): Promise<number> {
   return runReopen(resolved.dir, { rounds: rounds ?? 1, reason });
 }
 
+async function personReviewMain(argv: readonly string[]): Promise<number> {
+  const parsed = parseArgs(argv, [SESSIONS_DIR, "--session-number", "--reason"]);
+  if (typeof parsed === "string") {
+    writeErr(`dabbler verify person-review: ${parsed}\n`);
+    return EXIT_USAGE;
+  }
+  const sessionNumber = integerFlag(parsed, "--session-number");
+  if (sessionNumber === "invalid") {
+    writeErr("dabbler verify person-review: --session-number takes a session's number\n");
+    return EXIT_USAGE;
+  }
+  const resolved = resolvedSessions("verify person-review", parsed);
+  if ("code" in resolved) return resolved.code;
+  return runPersonReview(resolved.dir, {
+    sessionNumber,
+    reason: parsed.values.get("--reason") ?? null,
+    engine: !personIsPresent(),
+  });
+}
+
 const STEP_VERBS = ["open", "close", "status", "amend", "guard-commit"];
 
 async function stepMain(argv: readonly string[]): Promise<number> {
@@ -386,8 +414,9 @@ export async function verifyVerb(argv: string[]): Promise<number> {
   if (first === "waive") {
     writeErr(
       "verify waive: refused -- there is no waiver. A waiver " +
-        "accepted work over a finding that still stood, and no verdict " +
-        "a person types exists here any more. At the cap the loop decides " +
+        "accepted work over a finding that still stood; a person who has " +
+        "read the work signs a review of it instead, at a verification " +
+        "stop: `dabbler verify person-review`. At the cap the loop decides " +
         "for itself: a fix made to the last round's findings is reviewed " +
         "by one round past the cap, and a tree that did not move is " +
         "UNRESOLVED. Re-run the loop and it will do whichever it is:\n" +
@@ -398,6 +427,7 @@ export async function verifyVerb(argv: string[]): Promise<number> {
   if (first === "prepare") return prepareMain(rest);
   if (first === "reanchor") return reanchorMain(rest);
   if (first === "reopen") return reopenMain(rest);
+  if (first === "person-review") return personReviewMain(rest);
   if (first === "step") return stepMain(rest);
 
   const parsed = parseArgs(argv, [SESSIONS_DIR, "--max-rounds", "--transport"]);

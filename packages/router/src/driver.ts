@@ -1616,6 +1616,22 @@ const WAIVE_CLOSE = waiveChoice(
 );
 
 /**
+ * Reviewing the work yourself: a way on from a verification stop that costs
+ * no model call and leaves the session one a release can carry. A person's,
+ * because the verdict it records is theirs and names them.
+ */
+const PERSON_REVIEW: StopChoice = {
+  label: "Review the work yourself -- yours to run, never the engine's",
+  cost:
+    "Your time: run it without --reason first, and it shows you what a reviewer would see -- the plan, " +
+    "what changed, every finding and how it was answered -- and changes nothing. With your reason, the " +
+    "verdict is REVIEWED_BY_PERSON with your name on the record, no model is called, and a release accepts it. " +
+    "It never replaces a VERIFIED verdict: where the Primary Reviewer verified the session, it refuses and " +
+    "a round reviews what changed since.",
+  command: 'dabbler verify person-review --reason "<why>"',
+};
+
+/**
  * What the record will say once a stop of this kind is waived: the waiver's
  * own cost words, for the card a person reads before authorising. Null for a
  * kind with nothing to go past.
@@ -1882,6 +1898,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock.",
       ),
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -1897,6 +1914,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "One more verification round: a provider call for the verifier, and " +
           "the round's own clock. Nothing already verified is re-verified.",
       ),
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -1924,6 +1942,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "environment, never in a file.",
         command: "dabbler configure --reviewer-model <id>",
       },
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -1958,6 +1977,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: "Verification stays cross-provider on every vehicle; what changes is how the round is reached.",
         command: "dabbler configure --reviewer-transport <vehicle>",
       },
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -2002,6 +2022,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         cost: REOPEN_COST,
         command: REOPEN_COMMAND,
       },
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -2025,6 +2046,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
       // No second move: a dispute is never withdrawn -- the ledger keeps it --
       // and `verify reopen` refuses a cap reached over disputes, so offering
       // either would print a command that refuses.
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),
@@ -2052,6 +2074,7 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
           "stops the session again.",
         command: REOPEN_COMMAND,
       },
+      PERSON_REVIEW,
       waiveChoice(
         "The session closes as it is, its verdict ISSUES_FOUND. No release can include it " +
           "until it has been reviewed again, which once it is closed is " +
@@ -2076,6 +2099,10 @@ const SITUATIONS: Readonly<Record<string, StopSituation>> = {
         "The repair is given up. Nothing is spent, and the session closes on " +
           "the tree the round actually saw.",
       ),
+      // Offered: the terminal here is most often a cap ending that no one
+      // reviewed. Where it is a VERIFIED round the verb refuses, and its
+      // cost says so.
+      PERSON_REVIEW,
       WAIVE_VERIFICATION,
       rollbackChoice(),
       cancelChoice(),

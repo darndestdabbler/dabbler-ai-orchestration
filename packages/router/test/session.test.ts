@@ -1934,8 +1934,12 @@ describe("what a release session's start refuses", () => {
         ],
       }),
     );
-    assert.match(capped, /session\(s\) 004, 005, 006, 003 closed after the last published release without a VERIFIED verdict/);
+    assert.match(
+      capped,
+      /session\(s\) 004, 005, 006, 003 closed after the last published release without a VERIFIED verdict or a person's review/,
+    );
     assert.match(capped, /session 004 carries REMEDIATED_AT_CAP: its fix was never reviewed[\s\S]*verify reopen --session-number 4 --reason "<why>"/);
+    assert.match(capped, /Or review it yourself[\s\S]*dabbler verify person-review --session-number 4 --reason "<why>"/);
     assert.match(
       capped,
       /session 005 carries REMEDIATED_AT_CAP, and its last review found it blocking:\s+- the tab is never closed\s+Plan a session that fixes them, then review the session again:\s+dabbler verify reopen --session-number 5 /,
@@ -1971,6 +1975,28 @@ describe("what a release session's start refuses", () => {
         /verify reopen --session-number 1 /,
       );
       recordClosedSessionVerified(state.sessionsDir, 1, { rounds: 3 });
+      const facts = readReleaseFacts(state.sessionsDir, 2);
+      assert.deepEqual(facts.unverified, []);
+      assert.equal(judgeReleasePreflight(2, "2.0.0", { ...facts, packagingDeclared: true }), null);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("does not refuse over a session a person reviewed", () => {
+    const state = stateDir();
+    try {
+      writeFileSync(
+        join(state.sessionsDir, "sessions.json"),
+        JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            { number: 1, title: "First things", status: "complete", verificationVerdict: "REVIEWED_BY_PERSON" },
+            { number: 2, title: "Second things", status: "not-started" },
+          ],
+        }),
+        "utf8",
+      );
       const facts = readReleaseFacts(state.sessionsDir, 2);
       assert.deepEqual(facts.unverified, []);
       assert.equal(judgeReleasePreflight(2, "2.0.0", { ...facts, packagingDeclared: true }), null);
@@ -2022,6 +2048,7 @@ describe("what the close says of a session closed unverified at the cap", () => 
     const unreviewed = releaseRefusesLine(373, "REMEDIATED_AT_CAP", { round: 4, type: "remediated_at_cap" });
     assert.match(String(unreviewed), /a release will refuse session 373 until it has been reviewed again/);
     assert.match(String(unreviewed), /dabbler verify reopen --session-number 373 --reason "<why>"/);
+    assert.match(String(unreviewed), /dabbler verify person-review --session-number 373 --reason "<why>"/);
     assert.notEqual(releaseRefusesLine(373, "ISSUES_FOUND", { round: 4, phase: "cap-review" }), null);
     assert.equal(releaseRefusesLine(373, "ISSUES_FOUND", { round: 4, type: "adjudication" }), null);
     assert.equal(releaseRefusesLine(373, "VERIFIED", { round: 2 }), null);

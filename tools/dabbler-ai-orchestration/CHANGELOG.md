@@ -46,6 +46,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   changed, as it stands now. A clean round marks the session verified and
   the release can start; a round that finds something says what, so a
   session can be planned to fix it.
+- **A person may review the work, and the record says a person did.** At
+  a verification stop, or after a session closed at the cap unverified,
+  `dabbler verify person-review` shows you the plan, what changed and every
+  finding with how it was answered. With your reason, it records the
+  verdict `REVIEWED_BY_PERSON` with your name. No model is called, a
+  release accepts it, and every view says the session was reviewed by a
+  person, and who.
 
 ### Changed
 
@@ -56,9 +63,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   behind Output. After that it stays wherever you put it.
 - **A fix made at the round cap is reviewed before the session closes.**
   One more round reads it, unasked. If it still finds something blocking,
-  the session stops for you with three ways on: the Auxiliary Reviewer
-  judges, you buy more rounds, or the session closes as it is and stays out
-  of every release until it is reviewed again. A fix that landed unread on
+  the session stops for you with four ways on: the Auxiliary Reviewer
+  judges, you buy more rounds, you review it yourself, or the session
+  closes as it is and stays out of every release until it is reviewed
+  again. A fix that landed unread on
   an older record now reads "ended at the cap, unreviewed", never passed.
 
 ## [3.39.0] — 2026-11-18

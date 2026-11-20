@@ -179,7 +179,7 @@ export type ProgressProjectionFinding = {
  */
 export type ProgressProjectionVerification = {
   /**
-   * VERIFIED, ISSUES_FOUND (unresolved at the cap) or REMEDIATED_AT_CAP; null while the loop is still open.
+   * VERIFIED, ISSUES_FOUND (unresolved at the cap), REMEDIATED_AT_CAP or REVIEWED_BY_PERSON (a person reviewed the work; reviewedBy names them); null while the loop is still open.
    */
   terminal: string | null;
   /**
@@ -197,6 +197,10 @@ export type ProgressProjectionVerification = {
   agency: ProgressProjectionAgency;
   findings: ProgressProjectionFinding[];
   fixPaths: string[];
+  /**
+   * Present only when terminal is REVIEWED_BY_PERSON: the person who reviewed the work, from the person_review row.
+   */
+  reviewedBy?: string;
   /**
    * The latest round's non-blocking findings outside its NITS section, counted for a surface to show beside the verdict.
    */
@@ -224,6 +228,10 @@ export type ProgressProjectionSession = {
    * The session closed having changed nothing, so it carries no verdict because there was nothing to verify. Present only on such a session.
    */
   noChange?: boolean;
+  /**
+   * Who reviewed the session, where its verdict is REVIEWED_BY_PERSON: read from sessions.json, which travels with the repository, so a checkout without this machine's rounds ledger still names the person.
+   */
+  reviewedBy?: string;
   /**
    * The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects.
    */

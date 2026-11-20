@@ -196,6 +196,13 @@ describe("verification_clean: the rounds, then the tree", () => {
     assert.match(row[1], /ended at the cap, unreviewed: the fix to 2 blocking finding\(s\) from round 3/);
     assert.match(row[1], /no reviewer read it\. This is not a pass/);
   });
+
+  it("passes a person's review over the tree it reviewed, naming the person, and refuses once the tree moves", () => {
+    const latest = { round: 11, type: "person_review", verdict: "REVIEWED_BY_PERSON", blocking: false, reviewed_by: "Pat" };
+    assert.equal(judgeLatestRound([latest], 7, SESSIONS), null);
+    assert.deepEqual(judgeTreeSinceRound(latest, [], SESSIONS, SESSIONS), [true, "reviewed by a person: Pat, at round 11"]);
+    assert.equal(judgeTreeSinceRound(latest, ["src/a.ts"], SESSIONS, SESSIONS)[0], false);
+  });
 });
 
 function loaded(errors: string[], expensive: boolean[]): SuiteLoadResult {

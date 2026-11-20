@@ -7428,17 +7428,39 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "startCommit": "f04ca646893de4559b51e73bd608ee44f89793f3",
-      "frameworkVersion": "3.38.0",
       "verification": {
         "rounds": 1,
+        "verifierModel": "gpt-6.1-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "3.38.0",
+      "startCommit": "f04ca646893de4559b51e73bd608ee44f89793f3"
+    },
+    {
+      "number": 375,
+      "title": "A person may review the work, and the record says a person did",
+      "status": "in-progress",
+      "startedAt": "2026-11-20T09:06:38.656000-05:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "startCommit": "713affa8f1dc6e07a8c33e97c59520795b5fb1fa",
+      "frameworkVersion": "3.40.0",
+      "verification": {
+        "rounds": 4,
         "verifierModel": "gpt-6.1-terra",
         "verifierProvider": "openai",
         "transport": "api"
       }
     },
     {
-      "number": 375,
+      "number": 376,
       "title": "Release 3.40.0 (release: 3.40.0)",
       "status": "not-started",
       "startedAt": null,
@@ -7447,17 +7469,8 @@
       "verificationVerdict": null
     },
     {
-      "number": 376,
-      "title": "A person may review the work, and the record says a person did",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
-    },
-    {
       "number": 377,
-      "title": "Release 3.41.0 (release: 3.41.0)",
+      "title": "A session that closes while Visual Studio is not running ends its engine",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

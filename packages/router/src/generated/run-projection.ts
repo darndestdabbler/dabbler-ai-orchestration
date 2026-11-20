@@ -39,7 +39,7 @@ export type RunProjectionRun = {
   }>;
   verification: {
     rounds: number;
-    last_verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | null;
+    last_verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | "REVIEWED_BY_PERSON" | null;
     reviewer_provider: string | null;
     transport: string | null;
     accepted_tree_digest?: string | null;
@@ -55,7 +55,7 @@ export type RunProjectionRun = {
   };
   commit: string | null;
   outcome: "completed" | "failed" | "cancelled" | null;
-  verdict?: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | null;
+  verdict?: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | "REVIEWED_BY_PERSON" | null;
   checkpoints?: {
     sequence: number;
     note: string;

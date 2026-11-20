@@ -474,7 +474,7 @@ export function capReviewedWays(sessionsDir: string, sessionNumber: number, row:
   return (
     `verify: round ${round} reviewed the fix made at the cap and still holds ` +
     `${blockingFindings(row).length} blocking finding(s):\n${held}` +
-    "This round sends nothing back: the session stops for a person, and there are three ways on.\n" +
+    "This round sends nothing back: the session stops for a person, and there are four ways on.\n" +
     "  1. The Auxiliary Reviewer judges the findings. One call to a provider that has neither " +
     "written nor reviewed this session; its judgment ends the loop either way. Record the grounds " +
     "against each finding, then route them:\n" +
@@ -484,11 +484,16 @@ export function capReviewedWays(sessionsDir: string, sessionNumber: number, row:
     "  2. Buy further rounds. Each is one more review by the Primary Reviewer, the fix goes back " +
     "to the author, and reaching the new cap stops the session again:\n" +
     `       dabbler verify reopen --rounds 1 --reason "<why>" --sessions-dir ${sessionsDir}\n` +
-    "  3. Close the session as it is. The findings stay written as they stand, beside your reason. " +
+    "  3. Review the work yourself. No model is called: without --reason it shows you the plan, what " +
+    "changed and every finding with how it was answered, and changes nothing; with your reason the " +
+    "verdict is REVIEWED_BY_PERSON, with your name on the record, and a release accepts it:\n" +
+    `       dabbler verify person-review --sessions-dir ${sessionsDir} --reason "<why>"\n` +
+    "  4. Close the session as it is. The findings stay written as they stand, beside your reason. " +
     "No release can include this session until it has been reviewed again, and once it is closed " +
     "this is the command that does that:\n" +
     `       dabbler session waive --reason "<why>"\n` +
-    `       dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n`
+    `       dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n` +
+    `       dabbler verify person-review --session-number ${sessionNumber} --reason "<why>"\n`
   );
 }
 

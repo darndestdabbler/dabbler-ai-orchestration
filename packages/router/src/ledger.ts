@@ -65,6 +65,8 @@ export const LIFECYCLE_WRITTEN_FILES: readonly string[] = [
  * no reviewer read it. No writer emits it any more -- a fix made at the cap
  * is reviewed by one round past it -- but ledgers already carry it, so
  * readers still recognize it as terminal. `waive` is retired the same way.
+ * `person_review` is a person's own review, written by `verify person-review`:
+ * it ends the loop because the work has been read, by someone the row names.
  *
  * "Terminal" is the ledger's shape, not the last word: a `remediated_at_cap`
  * row is evidence of a spent BUDGET, and an operator may buy further rounds
@@ -77,10 +79,12 @@ export const LIFECYCLE_WRITTEN_FILES: readonly string[] = [
 export const ROW_ADJUDICATION = "adjudication";
 export const ROW_REMEDIATED_AT_CAP = "remediated_at_cap";
 export const ROW_WAIVE = "waive";
+export const ROW_PERSON_REVIEW = "person_review";
 export const TERMINAL_ROW_TYPES: ReadonlySet<string> = new Set([
   ROW_ADJUDICATION,
   ROW_REMEDIATED_AT_CAP,
   ROW_WAIVE,
+  ROW_PERSON_REVIEW,
 ]);
 
 /**

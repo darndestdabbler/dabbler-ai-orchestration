@@ -151,7 +151,7 @@ export type RunEventRunFinished = {
   outcome: "completed" | "failed" | "cancelled";
   commit: string | null;
   tree_digest: string | null;
-  verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | null;
+  verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | "REVIEWED_BY_PERSON" | null;
   unreviewed_findings?: number | null;
   checks_green: boolean;
   pushed?: boolean;

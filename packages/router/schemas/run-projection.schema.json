@@ -138,7 +138,7 @@
           "properties": {
             "rounds": { "type": "integer", "minimum": 0 },
             "last_verdict": {
-              "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", null]
+              "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", "REVIEWED_BY_PERSON", null]
             },
             "reviewer_provider": { "type": ["string", "null"] },
             "transport": { "type": ["string", "null"] },
@@ -161,7 +161,7 @@
         },
         "commit": { "type": ["string", "null"] },
         "outcome": { "enum": ["completed", "failed", "cancelled", null] },
-        "verdict": { "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", null] },
+        "verdict": { "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", "REVIEWED_BY_PERSON", null] },
         "checkpoints": {
           "type": "array",
           "items": {

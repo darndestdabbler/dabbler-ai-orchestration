@@ -35,13 +35,13 @@ import { driverDir, readDriverEvents, readRun, readWorkPlan } from "./driver.ts"
 import { SESSION_PLAN_FILENAME, planSection } from "./evidence.ts";
 import { jobLogPath, jobStatusPath, jobsDir } from "./jobs.ts";
 import { TRANSCRIPTS_DIRNAME, runGit } from "./journal.ts";
-import { ROW_REMEDIATED_AT_CAP, readExceptions, readRounds } from "./ledger.ts";
+import { ROW_PERSON_REVIEW, ROW_REMEDIATED_AT_CAP, readExceptions, readRounds } from "./ledger.ts";
 import { redact } from "./packaging.ts";
 import { STATUS_CANCELLED, sessionDisplayNumber } from "./progress.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { readRecords, type TestRunRecord } from "./testEvidence.ts";
 import { totalsOf, type TestTotals } from "./testOutput.ts";
-import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP } from "./verdict.ts";
+import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP, VERDICT_REVIEWED_BY_PERSON } from "./verdict.ts";
 import { VERSION } from "./version.ts";
 import type { DriverEvent, DriverRun, DriverWorkPlan } from "./generated/index.ts";
 
@@ -102,7 +102,7 @@ export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, stri
  */
 export function verdictTone(verdict: string): Tone {
   const token = verdict.trim().toUpperCase();
-  if (token === "VERIFIED") return "good";
+  if (token === "VERIFIED" || token === "REVIEWED BY A PERSON") return "good";
   if (token === "ISSUES_FOUND" || token === "REJECTED" || token === "FAILED") return "bad";
   return "warn";
 }
@@ -718,7 +718,7 @@ function fieldsOf(event: DriverEvent): Record<string, unknown> {
  * written before they carried answers say nothing, and the page says so
  * rather than reading that silence as "not answered".
  */
-function findingResponse(
+export function findingResponse(
   roundNumber: number,
   index: number,
   events: readonly DriverEvent[],
@@ -800,11 +800,15 @@ function renderRounds(
   return table(
     ROUND_COLUMNS,
     rounds.map((round) => {
-      // A fix no reviewer read is said as that, never as its token.
+      // A fix no reviewer read is said as that, never as its token, and a
+      // person's review as theirs, with their name where the model would be.
+      const person = round["type"] === ROW_PERSON_REVIEW;
       const verdict =
         round["type"] === ROW_REMEDIATED_AT_CAP
           ? TERMINAL_HEADLINES[VERDICT_REMEDIATED_AT_CAP]
-          : text(round["verdict"]);
+          : person
+            ? TERMINAL_HEADLINES[VERDICT_REVIEWED_BY_PERSON]
+            : text(round["verdict"]);
       const count = found(round);
       // The toggle hides the row after it by the stylesheet alone; a round
       // still owed a fix opens, a settled one does not.
@@ -815,8 +819,8 @@ function renderRounds(
         toned(verdictTone(verdict), verdict),
         // Rows written before the role was renamed carry the old spelling,
         // and archived rows are never rewritten.
-        escapeHtml(text(round["reviewer_model"] ?? round["verifier_model"])),
-        escapeHtml(text(round["reviewer_provider"] ?? round["verifier_provider"])),
+        escapeHtml(text(person ? round["reviewed_by"] : (round["reviewer_model"] ?? round["verifier_model"]))),
+        escapeHtml(person ? "a person" : text(round["reviewer_provider"] ?? round["verifier_provider"])),
         escapeHtml(text(round["transport"])),
         count === 0
           ? "0"

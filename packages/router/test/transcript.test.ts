@@ -311,6 +311,22 @@ describe("one session's transcript", () => {
     assert.ok(!said.includes("verification-passed"), "the old event was shown as a pass");
   });
 
+  it("says a person's review as a person's, with their name where the reviewer model would be", () => {
+    const root = repoWithASession();
+    write(
+      roundsPath(root, 5),
+      `${JSON.stringify({
+        round: 1, type: "person_review", verdict: "REVIEWED_BY_PERSON", blocking: false, findings: [],
+        reviewed_by: "Pat Reviewer", reason: "it is right", completion_tree: "abcdef1234567",
+        recorded_at: "2026-11-20T09:30:00-05:00",
+      })}\n`,
+    );
+    const html = render(root);
+    assert.match(html, /reviewed by a person/);
+    assert.match(html, /Pat Reviewer/);
+    assert.ok(!html.includes(">REVIEWED_BY_PERSON<"), "the round's verdict cell carried the token");
+  });
+
   it("answers each finding in its round's row, opening only a round still owed a fix", () => {
     // A count says there were issues; only the subtable says what became of them.
     const root = repoWithASession();

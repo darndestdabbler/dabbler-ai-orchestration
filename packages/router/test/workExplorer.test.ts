@@ -836,6 +836,15 @@ suite("workExplorer: session descriptor", () => {
     assert.ok(d.tooltip!.includes("Verification: VERIFIED (1 minor, 2 nits)"), d.tooltip);
   });
 
+  test("tooltip says a person's review is a person's, and names them, and the row is not unclean", () => {
+    // No rounds ledger here, as on a second checkout: the name comes from the state file.
+    const session = makeSession({ status: "complete", verificationVerdict: "REVIEWED_BY_PERSON", reviewedBy: "Pat" });
+    const d = sessionDescriptor({ kind: "session", repository, session });
+    assert.ok(d.tooltip!.includes("Verification: reviewed by a person (Pat)"), d.tooltip);
+    assert.ok(!verdictIsUnclean("REVIEWED_BY_PERSON"));
+    assert.strictEqual(severityOf(session), null);
+  });
+
   test("a session that closed having changed nothing says no change, and is neither severe nor unverified", () => {
     const session = makeSession({
       status: "complete",

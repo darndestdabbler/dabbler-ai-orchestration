@@ -1301,7 +1301,7 @@ for it, and it sends nothing back:
   findings, and the session is UNRESOLVED: nothing lands but the record.
 - **It still finds something blocking.** The session stops for a person
   (stop code `cap-reviewed`). No terminal row is written. The stop names
-  what the reviewer still holds and gives three ways on:
+  what the reviewer still holds and gives four ways on:
   1. **The Auxiliary Reviewer judges the findings.** Record a dispute
      against each finding (`dabbler verify dispute`), then run `dabbler
      verify adjudicate`. That is one call to a provider that has neither
@@ -1309,7 +1309,9 @@ for it, and it sends nothing back:
   2. **Buy further rounds** with `dabbler verify reopen --rounds N
      --reason "<why>"`. The findings go back to the author first, and
      reaching the new cap stops the session again.
-  3. **Close the session as it is** with `dabbler session waive --reason
+  3. **Review the work yourself** with `dabbler verify person-review`. No
+     model is called; see [A person's review](#a-persons-review) below.
+  4. **Close the session as it is** with `dabbler session waive --reason
      "<why>"`. The verdict stays `ISSUES_FOUND`, and **no release can
      include the session until it has been reviewed again**. Once it is
      closed, `dabbler verify reopen --session-number N` does that.
@@ -1321,6 +1323,64 @@ reads now, and the decisions and amendments recorded since then. The
 reviewer judges the work against the plan as amended, and says whether the
 amendment answers each finding. Narrowing a plan so that a finding no
 longer applies is a decision about scope, not a fix.
+
+#### A person's review
+
+Every other way on from a verification stop costs a model call or leaves
+the session out of every release. You are a reviewer too, and you are not
+paid by the token. At any verification stop you can answer, the stop
+offers:
+
+```
+dabbler verify person-review --reason "<why>"
+```
+
+**Run it without `--reason` first.** It prints what a reviewer would be
+shown and changes nothing:
+
+1. the session's section of the session plan;
+2. what the session changed, as a `git diff --stat` from its start
+   commit, with the `git diff` command that shows all of it. New files git
+   does not track yet, which `git diff` does not show, are listed with
+   their size, and each comes with a `git -C <root> diff --no-index --
+   /dev/null <path>` that shows it whole. Every command names the
+   repository root, so it runs from any folder; a name with a space is
+   quoted, and a name holding a character a shell would read is never put
+   in a command — open that file in your editor;
+3. every round's findings, whole: each description in full, with its
+   failure scenario and the paths it cites, and what the author did about
+   each one: fixed, with the step's notes, or disputed, with the reason and
+   any judgment.
+
+**Run it with `--reason`** once you have read the work and accept it. It
+records:
+
+- a `person_review` row in the session's rounds ledger, with your name as
+  git's `user.name` gives it, your reason, and the tree you reviewed;
+- the verdict `REVIEWED_BY_PERSON`. It is its own verdict, never
+  `VERIFIED` under another name. `dabbler status`, the Work Explorer, the
+  transcript and the Dabbler Terminal all say "reviewed by a person" and
+  name you. `sessions.json` keeps your name, your reason and the tree too,
+  because the rounds ledger never leaves this machine, so another checkout
+  still shows who reviewed the session.
+
+It never replaces the Primary Reviewer's `VERIFIED`. Every stop that offers
+it says so, and where a session is already verified and its tree moved
+since, the verb refuses: a round reviews the change, through the stop's
+other ways on. A tree is reviewed by a person once.
+
+The close's `verification_clean` gate and a release start accept
+`REVIEWED_BY_PERSON` as they accept `VERIFIED`. The review is held to the
+tree you read: if the tree changes after it, the gate refuses again, and
+the change needs a review of its own. Then carry on with `dabbler session
+next`.
+
+**An engine can never run it.** The verb is refused to an engine, as
+`session waive` is, and no instruction asks an engine to run it. The
+closed verdict list exists because an engine once wrote its own verdict.
+A person reviewing the work is not that, and the record says who it was.
+Git must know your name (`git config user.name "<your name>"`), or the
+verb refuses: a review nobody signed is not a review.
 
 #### Ended at the cap, unreviewed
 
@@ -1397,6 +1457,20 @@ already there. A round with no blocking finding makes the verdict
 does; start the release again. A round that finds something blocking
 changes no verdict, and the release start then names those findings: plan
 a session that fixes them, and when it closes, review the session again.
+
+Or review it yourself, with no model call:
+
+```
+dabbler verify person-review --session-number N
+dabbler verify person-review --session-number N --reason "<why>"
+```
+
+The first shows you the card described in [A person's
+review](#a-persons-review), over what the session changed as the trunk
+holds it now. The second records `REVIEWED_BY_PERSON` with your name, and
+commits and pushes `sessions.json` as a close does. It runs only while no
+session is in flight, for the same sessions `verify reopen --session-number`
+reaches. Then start the release again.
 
 ## The end
 

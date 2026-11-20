@@ -61,6 +61,7 @@ import {
   LIFECYCLE_WRITTEN_FILES,
   LedgerError,
   OUTCOME_PUBLISHED,
+  ROW_PERSON_REVIEW,
   ROW_REMEDIATED_AT_CAP,
   readPackaging,
   readExceptions,
@@ -459,6 +460,9 @@ export function judgeTreeSinceRound(
         `round ${pythonStr(remediated["reviewed_round"])} landed and no reviewer read it. ` +
         "This is not a pass",
     ];
+  }
+  if (latest["type"] === ROW_PERSON_REVIEW) {
+    return [true, `reviewed by a person: ${pythonStr(latest["reviewed_by"])}, at round ${pythonStr(latest["round"])}`];
   }
   return [true, ""];
 }

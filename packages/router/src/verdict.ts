@@ -18,11 +18,16 @@
 export const VERDICT_VERIFIED = "VERIFIED";
 export const VERDICT_ISSUES_FOUND = "ISSUES_FOUND";
 export const VERDICT_REMEDIATED_AT_CAP = "REMEDIATED_AT_CAP";
+export const VERDICT_REVIEWED_BY_PERSON = "REVIEWED_BY_PERSON";
 
 /**
  * The closed allowlist for any verdict a writer persists (session-state's
- * verificationVerdict, the rounds ledger). Every token here is produced by the
- * loop; there is no verdict a person can type.
+ * verificationVerdict, the rounds ledger). Every token but one is produced by
+ * the loop. REVIEWED_BY_PERSON is a person's own verdict, written only by
+ * `verify person-review`, which refuses an engine: a person who read the work
+ * signed it, and the row names them. It is never VERIFIED under another name,
+ * and no engine can ever write it -- the v1 incident this list exists against
+ * was an engine typing its own verdict, never a person reviewing work.
  *
  * REMEDIATED_AT_CAP is not a waiver and must never be read as one. A waiver
  * accepted work over a finding that still stood; this is the opposite --
@@ -35,7 +40,17 @@ export const SESSION_VERDICTS: ReadonlySet<string> = new Set([
   VERDICT_VERIFIED,
   VERDICT_ISSUES_FOUND,
   VERDICT_REMEDIATED_AT_CAP,
+  VERDICT_REVIEWED_BY_PERSON,
 ]);
+
+/**
+ * Whether a session with this verdict may land in a release: the Primary
+ * Reviewer's VERIFIED, or a person's review. Every gate that asks "did this
+ * verify" asks it here.
+ */
+export function verdictIsAccepted(verdict: unknown): boolean {
+  return verdict === VERDICT_VERIFIED || verdict === VERDICT_REVIEWED_BY_PERSON;
+}
 
 /**
  * How each terminal state of a review loop reads to a person. Keyed by the
@@ -48,6 +63,7 @@ export const TERMINAL_HEADLINES: Readonly<Record<string, string>> = {
   [VERDICT_VERIFIED]: "verified",
   [VERDICT_ISSUES_FOUND]: "unresolved at the cap",
   [VERDICT_REMEDIATED_AT_CAP]: "ended at the cap, unreviewed",
+  [VERDICT_REVIEWED_BY_PERSON]: "reviewed by a person",
 };
 
 export const SEVERITIES = ["critical", "major", "minor"] as const;

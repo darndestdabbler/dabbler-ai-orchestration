@@ -52,8 +52,10 @@ import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import {
   VERDICT_ISSUES_FOUND,
   VERDICT_REMEDIATED_AT_CAP,
+  VERDICT_REVIEWED_BY_PERSON,
   VERDICT_VERIFIED,
   validateSessionVerdict,
+  verdictIsAccepted,
 } from "./verdict.ts";
 import { VERSION } from "./version.ts";
 
@@ -568,14 +570,22 @@ export function reviewableAfterClose(verdict: unknown, last: Record<string, unkn
 /**
  * The one write to a CLOSED session's verdict: REMEDIATED_AT_CAP or
  * ISSUES_FOUND becomes VERIFIED, once a review bought after the close found
- * nothing blocking. The verdict is not the caller's to name, and every other
- * session -- open, or closed with any other verdict -- is refused.
+ * nothing blocking, or REVIEWED_BY_PERSON, once a person reviewed it. No other
+ * verdict may be written, and every other session -- open, or closed with any
+ * other verdict -- is refused.
  */
 export function recordClosedSessionVerified(
   sessionsDir: string,
   sessionNumber: number,
   summary: Record<string, unknown>,
+  verdict: string = VERDICT_VERIFIED,
 ): void {
+  if (!verdictIsAccepted(verdict)) {
+    throw new SessionStateInvariantError(
+      2,
+      `a closed session's verdict becomes ${VERDICT_VERIFIED} or ${VERDICT_REVIEWED_BY_PERSON}, never '${verdict}'`,
+    );
+  }
   const raw = readRawSessionState(sessionsDir);
   const sessions = Array.isArray(raw?.["sessions"]) ? (raw["sessions"] as unknown[]) : [];
   const record = sessions.find(
@@ -593,7 +603,7 @@ export function recordClosedSessionVerified(
         `${VERDICT_ISSUES_FOUND} under ${sessionsDir}, and no other closed verdict is ever rewritten`,
     );
   }
-  record["verificationVerdict"] = VERDICT_VERIFIED;
+  record["verificationVerdict"] = verdict;
   record["verification"] = summary;
   validateAndWriteState(sessionsDir, raw);
 }
@@ -1213,8 +1223,8 @@ function verdictHold(sessionsDir: string, sessionNumber: number): string | null 
   );
   const verdict = record?.["verificationVerdict"];
   if (verdict === null || verdict === undefined) return null;
-  if (String(verdict) === VERDICT_VERIFIED) return null;
-  return `held by its verdict: the last verification round said ${String(verdict)}, and a session publishes only what verified`;
+  if (verdictIsAccepted(verdict)) return null;
+  return `held by its verdict: the last verification round said ${String(verdict)}, and a session publishes only what verified or a person reviewed`;
 }
 
 /**

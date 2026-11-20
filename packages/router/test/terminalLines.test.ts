@@ -18,6 +18,7 @@ import {
   forTerminal,
   layout,
   paint,
+  roundFields,
   watcherLookMs,
   type Span,
   type TerminalLinesOptions,
@@ -590,6 +591,12 @@ describe("the Dabbler terminal's lines", () => {
     assert.strictEqual(lineTone("paused", { class: "deadlock" }), "warn");
     assert.strictEqual(lineTone("progress-resumed", {}), "good");
     assert.strictEqual(lineTone("verify", { verdict: "SOMETHING_NEW" }), "warn");
+  });
+
+  it("says a person's review as a person's, with the person as the reviewer, in the good tone", () => {
+    const fields = roundFields({ round: 11, type: "person_review", verdict: "REVIEWED_BY_PERSON", reviewed_by: "Pat" });
+    assert.deepStrictEqual(fields, { round: "11", verdict: "reviewed by a person", reviewer: "Pat" });
+    assert.strictEqual(lineTone("verify", fields), "good");
   });
 
   it("tells of a run begun after it was built, once, and not of one already there", () => {

@@ -451,6 +451,46 @@ describe("a fix that landed at the cap unread", () => {
   });
 });
 
+describe("a person's review", () => {
+  it("takes the session on to the run of record, logged as the person's, never as settled", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, {
+      schema_version: 1, session_number: 1, engine: "cli", phase: "verify", seq: 2,
+      invocations: 0, max_invocations: 24, accepted_steps: ["one"], baseline_tree: null,
+      stop: null, lease_epoch: 1, verification: { max_rounds: 3, transport: null },
+      started_at: "2026-11-20T10:00:00-05:00", updated_at: "2026-11-20T10:00:00-05:00",
+    });
+    const tree = snapshotWorktreeTree(repo) ?? "a".repeat(40);
+    appendRound(repo, 1, {
+      round: 1, phase: "full", verdict: "ISSUES_FOUND", blocking: true,
+      findings: [{ description: "the widget still returns 3", severity: "major", blocking: true }],
+      reviewer_model: "o-gpt", reviewer_provider: "openai", orchestrator_provider: "anthropic",
+      completion_tree: tree, recorded_at: "2026-11-20T10:00:00.000000-05:00",
+    });
+    appendRound(repo, 1, {
+      round: 2, type: "person_review", verdict: "REVIEWED_BY_PERSON", blocking: false, findings: [],
+      reviewed_by: "Pat", reason: "3 is right here", completion_tree: tree, previous_tree: tree,
+      recorded_at: "2026-11-20T10:05:00.000000-05:00",
+    });
+    const started: string[] = [];
+    const restore = setJobStarter((root, session, options) => {
+      started.push(options.name);
+      return jobRecord(root, session, options, process.pid);
+    });
+    try {
+      await capture(() => sessionNext(sessionsDir, {}));
+    } finally {
+      restore();
+    }
+    const events = readDriverEvents(repo, 1);
+    const reviewed = events.find((event) => event["event"] === "verification-reviewed");
+    assert.equal((reviewed?.["fields"] as Record<string, unknown> | undefined)?.["by"], "Pat");
+    assert.ok(!events.some((event) => event["event"] === "verification-settled"));
+    assert.ok(!started.some((name) => /verif/.test(name)), started.join(" "));
+  });
+});
+
 describe("the Mechanic, called in without the person", () => {
   it("hands back a funds wait, an interrupt, an unreachable provider, a release past its publish, and a spent budget without calling one", () => {
     const stop = { kind: "verification", reason: "the round failed" };

@@ -65,7 +65,7 @@
         },
         "verificationVerdict": {
           "type": ["string", "null"],
-          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND / REMEDIATED_AT_CAP (plus the retired WAIVED, still read from historical records and refused by every writer). Typed string rather than enum because operators have shipped extension tokens that readers PREFIX-MATCH; the sanctioned writer (verdict.validate_session_verdict) fails closed against an exact allowlist, so a confabulated non-verdict can never persist here. Readers stay lenient; the writer is strict."
+          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND / REMEDIATED_AT_CAP / REVIEWED_BY_PERSON (a person's own review, written only by `verify person-review`, which refuses an engine; plus the retired WAIVED, still read from historical records and refused by every writer). Typed string rather than enum because operators have shipped extension tokens that readers PREFIX-MATCH; the sanctioned writer (verdict.validate_session_verdict) fails closed against an exact allowlist, so a confabulated non-verdict can never persist here. Readers stay lenient; the writer is strict."
         },
         "noChange": {
           "type": "boolean",

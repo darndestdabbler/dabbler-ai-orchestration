@@ -985,6 +985,7 @@
             "ISSUES_FOUND",
             "WAIVED",
             "REMEDIATED_AT_CAP",
+            "REVIEWED_BY_PERSON",
             null
           ]
         },

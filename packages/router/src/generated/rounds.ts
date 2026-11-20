@@ -8,7 +8,7 @@
 export type Rounds = {
   round: number;
   phase?: "full" | "fix-delta" | "cap-review";
-  verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP";
+  verdict: "VERIFIED" | "ISSUES_FOUND" | "WAIVED" | "REMEDIATED_AT_CAP" | "REVIEWED_BY_PERSON";
   blocking: boolean;
   /**
    * The model that reviewed this round. Rows written before the role was renamed carry 'verifier_model' instead; readers take both, because archived rows are not rewritten.
@@ -112,7 +112,15 @@ export type Rounds = {
       reason?: string;
     }>;
   };
-  type?: "adjudication" | "waive" | "remediated_at_cap";
+  type?: "adjudication" | "waive" | "remediated_at_cap" | "person_review";
+  /**
+   * On a 'person_review' row: the person who reviewed the work, as their git user.name read when they ran `dabbler verify person-review`. An engine is refused that verb, so this is never a model.
+   */
+  reviewed_by?: string;
+  /**
+   * On a 'person_review' row: why the person accepted the work, in their own words.
+   */
+  reason?: string;
   excluded_providers?: string[];
   outcomes?: Array<{
     finding_index: number;

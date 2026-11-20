@@ -69,6 +69,7 @@ export const RECOGNIZED_VERDICT_PREFIXES = [
   "VERIFIED",
   "ISSUES_FOUND",
   "REMEDIATED_AT_CAP",
+  "REVIEWED_BY_PERSON",
   // Retired: no writer emits WAIVED any more, and the Python writer
   // refuses it. Historical records carry it, and a reader that stopped
   // recognizing it would render the past as a confabulation.
@@ -1229,6 +1230,10 @@ function sessionTooltip(node: SessionNode): string {
   // verdict would be, rather than reading as a session nobody verified.
   if (session.noChange === true) {
     lines.push("", "Verification: no change");
+  } else if (verdict === "REVIEWED_BY_PERSON") {
+    // Said as a person's, with the person: never as VERIFIED under another name.
+    const by = session.reviewedBy ?? session.verification?.reviewedBy;
+    lines.push("", `Verification: reviewed by a person${by ? ` (${by})` : ""}`);
   } else if (typeof verdict === "string" && verdict.trim() !== "") {
     lines.push(
       "",
@@ -1351,6 +1356,11 @@ function terminalNote(view: SessionVerification): string {
         "Blocking findings still stand and nothing landed but the record. " +
         "Send it back, respecify it, or cancel it — there is no approval " +
         "to give."
+      );
+    case "REVIEWED_BY_PERSON":
+      return (
+        `A person reviewed the work and signed it${view.reviewedBy ? `: ${view.reviewedBy}` : ""}. ` +
+        "This is their verdict, not a reviewer model's; the findings above are as the rounds left them."
       );
     case null:
       return "The review loop is still open; these findings await a fix.";

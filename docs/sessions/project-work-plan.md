@@ -412,9 +412,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 372 | A session closed at the cap can be reviewed again | no | 2026-11-19 |
 | 373 | A fix made at the cap is reviewed before the session closes | no | 2026-11-20 |
 | 374 | A session that ends also ends its engine whose tab was closed | no | 2026-11-20 |
-| 375 | Release 3.40.0 (release: 3.40.0) | — | not declared |
-| 376 | A person may review the work, and the record says a person did | — | not declared |
-| 377 | Release 3.41.0 (release: 3.41.0) | — | not declared |
+| 375 | A person may review the work, and the record says a person did | no | 2026-11-20 |
+| 376 | Release 3.40.0 (release: 3.40.0) | — | not declared |
+| 377 | A session that closes while Visual Studio is not running ends its engine | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4159,3 +4159,13 @@ Make a fix landed at the verification cap get its review before the session clos
 **Releasable: no.**
 
 When a session ends, the Visual Studio extension ends every engine the host is running for that session of that repository, whether a tab holds it or not, and no engine of another session or another repository. The library decides which of the host's records a closing session ends -- a new EngineOpening.Ends beside EngineOpening.Closes, with its test in EngineOpeningTests -- and EngineHost gains End(record), which attaches to the record's pipe and sends End. DabblerPackage.EndSessionEngines keeps closing the tabs that hold the session's engine, and then, off the UI thread, ends each record Ends names that no closing tab held. Session 370's Step 3 in the session plan says, in one sentence approved by the operator on 2026-11-20, that 'a session never has two' is about the engines the host runs and that an engine opened in Windows Terminal is outside it. The 3.40.0 changelog entry says in a sentence that a closing session ends its engine even when its tab was closed.
+
+### Session 375 — A person may review the work, and the record says a person did
+
+**Releasable: no.**
+
+Make a person a legitimate reviewer, with a verdict of its own. A new closed-vocabulary verdict, REVIEWED_BY_PERSON (headline "reviewed by a person"), and a new terminal rounds-ledger row type, person_review, carrying who (git user.name, refused where it is unset), why, and the tree reviewed. A new person's verb, `dabbler verify person-review [--session-number N] [--reason TEXT]`, refused to an engine as `session waive` is: without --reason it prints what a reviewer would be shown (the session's section of the plan, what the session changed as a diffstat with the git command that shows the whole diff, and every round's findings with the author's disposition of each) and changes nothing; with --reason it records the row. It works at a verification stop of the session in flight (the driver then moves on to the run of record as it does past any settled terminal), and on a closed session that ended at the cap unverified (the same sessions `verify reopen --session-number` reaches), where it writes the closed session's verdict and commits and pushes the state file as that verb does. The close's verification gate, the release start and the publish hold accept REVIEWED_BY_PERSON as they accept VERIFIED; `dabbler status`, the Work Explorer, the transcript and the Dabbler Terminal show it as reviewed by a person and name the person. Every verification stop whose ways on cost a model call or leave the session out of every release offers the person's review as a way on, saying what it costs: the person's time and their name on the record. `docs/driving-a-session.md` and the changelog say so.
+
+**Amended after acceptance:**
+
+- 2026-11-20 — step 'person-review-verb': its files: the review card says how each finding was answered with the transcript's findingResponse, exported rather than restated (claude-code (anthropic, claude-opus-5-5))

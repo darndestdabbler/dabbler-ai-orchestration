@@ -230,7 +230,7 @@ import {
   workBegunRefusal,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
-import { VERDICT_REMEDIATED_AT_CAP, VERDICT_VERIFIED, sessionVerdict } from "./verdict.ts";
+import { VERDICT_REMEDIATED_AT_CAP, sessionVerdict, verdictIsAccepted } from "./verdict.ts";
 import { standingFindings } from "./verify/rounds.ts";
 
 /**
@@ -1459,16 +1459,19 @@ export function judgeReleasePreflight(number: number, version: string, facts: Re
         );
       }
       const review = `  dabbler verify reopen --session-number ${session.number} --reason "<why>"`;
-      if (session.blocking.length === 0) return `\n- ${which}: its fix was never reviewed. Review it:\n${review}`;
+      const person =
+        `\n  Or review it yourself -- no model is called, and the record names you:\n` +
+        `  dabbler verify person-review --session-number ${session.number} --reason "<why>"`;
+      if (session.blocking.length === 0) return `\n- ${which}: its fix was never reviewed. Review it:\n${review}${person}`;
       return (
         `\n- ${which}, and its last review found it blocking:\n` +
         session.blocking.map((finding) => `    ${finding}\n`).join("") +
-        `  Plan a session that fixes them, then review the session again:\n${review}`
+        `  Plan a session that fixes them, then review the session again:\n${review}${person}`
       );
     });
     return (
-      `session(s) ${named} closed after the last published release without a VERIFIED verdict, and a ` +
-      `release publishes only verified work.${ways.join("")}`
+      `session(s) ${named} closed after the last published release without a VERIFIED verdict or a ` +
+      `person's review, and a release publishes only work one of them accepted.${ways.join("")}`
     );
   }
   const file = facts.versionFile;
@@ -1527,7 +1530,7 @@ export function readReleaseFacts(sessionsDir: string, number: number): ReleaseFa
       const verdict = row["verificationVerdict"];
       // A session that changed nothing has no verdict and nothing to verify.
       if (verdict === undefined || verdict === null) return row["noChange"] !== true;
-      return String(verdict) !== VERDICT_VERIFIED;
+      return !verdictIsAccepted(verdict);
     })
     .map((row): UnverifiedSession => {
       const n = Number(row["number"]);
@@ -3151,8 +3154,9 @@ export function releaseRefusesLine(
   if (verdict === null || verdict === undefined || !reviewableAfterClose(verdict, last)) return null;
   return (
     `close: a release will refuse session ${sessionDisplayNumber(sessionNumber)} until it has been ` +
-    "reviewed again:\n" +
-    `  dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n`
+    "reviewed again -- by the Primary Reviewer, or by you:\n" +
+    `  dabbler verify reopen --session-number ${sessionNumber} --reason "<why>"\n` +
+    `  dabbler verify person-review --session-number ${sessionNumber} --reason "<why>"\n`
   );
 }
 

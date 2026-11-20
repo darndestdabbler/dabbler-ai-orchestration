@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 
 import {
   VERDICT_ISSUES_FOUND,
+  VERDICT_REVIEWED_BY_PERSON,
   VERDICT_VERIFIED,
   classifyBlocking,
   isBlockingIssue,
@@ -13,6 +14,7 @@ import {
   parseVerificationResponse,
   sessionVerdict,
   validateSessionVerdict,
+  verdictIsAccepted,
 } from "../src/verdict.ts";
 
 const ISSUE_BLOCK = `ISSUES FOUND
@@ -150,8 +152,17 @@ describe("severity and blocking", () => {
 });
 
 describe("the session verdict vocabulary", () => {
-  it("accepts exactly the three tokens the router writes", () => {
-    for (const token of ["VERIFIED", "ISSUES_FOUND", "REMEDIATED_AT_CAP"]) assert.equal(validateSessionVerdict(token), token);
+  it("accepts exactly the four tokens the router writes", () => {
+    for (const token of ["VERIFIED", "ISSUES_FOUND", "REMEDIATED_AT_CAP", "REVIEWED_BY_PERSON"]) {
+      assert.equal(validateSessionVerdict(token), token);
+    }
+  });
+
+  it("lets a release carry a session the Primary Reviewer verified or a person reviewed, and nothing else", () => {
+    for (const token of [VERDICT_VERIFIED, VERDICT_REVIEWED_BY_PERSON]) assert.ok(verdictIsAccepted(token));
+    for (const token of [VERDICT_ISSUES_FOUND, "REMEDIATED_AT_CAP", "WAIVED", null, undefined, "reviewed_by_person"]) {
+      assert.ok(!verdictIsAccepted(token));
+    }
   });
 
   it("refuses the v1 incident token, a prefix look-alike, the retired WAIVED, and anything unclean", () => {

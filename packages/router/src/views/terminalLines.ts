@@ -80,8 +80,8 @@ import {
 import { SESSIONS_DIRNAME, STATE_FILENAME } from "../evidence.ts";
 import { readUncollectedJob } from "../jobs.ts";
 import { RUNS_DIRNAME } from "../journal.ts";
-import { ROW_REMEDIATED_AT_CAP } from "../ledger.ts";
-import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP } from "../verdict.ts";
+import { ROW_PERSON_REVIEW, ROW_REMEDIATED_AT_CAP } from "../ledger.ts";
+import { TERMINAL_HEADLINES, VERDICT_REMEDIATED_AT_CAP, VERDICT_REVIEWED_BY_PERSON } from "../verdict.ts";
 import { renderWaiting, stalledAfterSeconds } from "../progress.ts";
 import {
   TESTS_FAILED,
@@ -673,15 +673,18 @@ function recordedAt(value: unknown): Date | null {
  * `verifier_model`, and a reader that took only the new key would print a
  * round with no reviewer against it.
  */
-function roundFields(row: Record<string, unknown>): Record<string, string> {
+export function roundFields(row: Record<string, unknown>): Record<string, string> {
   return {
     round: String(row["round"] ?? "?"),
-    // A fix that landed at the cap unread is said as that, never as its token.
+    // A fix that landed at the cap unread is said as that, never as its token,
+    // and a person's review as theirs, with their name as the reviewer.
     verdict:
       row["type"] === ROW_REMEDIATED_AT_CAP
         ? TERMINAL_HEADLINES[VERDICT_REMEDIATED_AT_CAP]
-        : String(row["verdict"] ?? "?"),
-    reviewer: String(row["reviewer_model"] ?? row["verifier_model"] ?? ""),
+        : row["type"] === ROW_PERSON_REVIEW
+          ? TERMINAL_HEADLINES[VERDICT_REVIEWED_BY_PERSON]
+          : String(row["verdict"] ?? "?"),
+    reviewer: String(row["reviewed_by"] ?? row["reviewer_model"] ?? row["verifier_model"] ?? ""),
   };
 }
 

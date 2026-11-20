@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "rounds.jsonl row (one verification round)",
-  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types may be written beside plain rounds: 'adjudication' (the Auxiliary Reviewer judged the recorded disputes) and 'remediated_at_cap' (every blocking finding of the last round was fixed and the cap left the fix unreviewed — the work lands labelled unreviewed, which is not a waiver: nothing was accepted over a standing finding). The retired 'waive' type stays readable because historical ledgers carry it; no writer emits it, and WAIVED is no longer in the writer's verdict vocabulary.",
+  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types may be written beside plain rounds: 'adjudication' (the Auxiliary Reviewer judged the recorded disputes) and 'remediated_at_cap' (every blocking finding of the last round was fixed and the cap left the fix unreviewed — the work lands labelled unreviewed, which is not a waiver: nothing was accepted over a standing finding). A third, 'person_review', is a person's own review of the work, written only by `dabbler verify person-review`, which refuses an engine: verdict REVIEWED_BY_PERSON, with the person and their reason on the row. The retired 'waive' type stays readable because historical ledgers carry it; no writer emits it, and WAIVED is no longer in the writer's verdict vocabulary.",
   "type": "object",
   "required": [
     "round",
@@ -30,7 +30,8 @@
         "VERIFIED",
         "ISSUES_FOUND",
         "WAIVED",
-        "REMEDIATED_AT_CAP"
+        "REMEDIATED_AT_CAP",
+        "REVIEWED_BY_PERSON"
       ]
     },
     "blocking": {
@@ -337,8 +338,19 @@
       "enum": [
         "adjudication",
         "waive",
-        "remediated_at_cap"
+        "remediated_at_cap",
+        "person_review"
       ]
+    },
+    "reviewed_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "On a 'person_review' row: the person who reviewed the work, as their git user.name read when they ran `dabbler verify person-review`. An engine is refused that verb, so this is never a model."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "On a 'person_review' row: why the person accepted the work, in their own words."
     },
     "excluded_providers": {
       "type": "array",
@@ -577,9 +589,36 @@
       "if": {
         "properties": {
           "type": {
+            "const": "person_review"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "reviewed_by",
+          "reason"
+        ],
+        "properties": {
+          "verdict": {
+            "const": "REVIEWED_BY_PERSON"
+          },
+          "blocking": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "enum": [
               "waive",
-              "remediated_at_cap"
+              "remediated_at_cap",
+              "person_review"
             ]
           }
         },

@@ -529,10 +529,14 @@ describe("verifying a session after its close", () => {
       () => recordClosedSessionVerified(sessionsDir, 3, { rounds: 3 }),
       /session 3 is not a session closed REMEDIATED_AT_CAP or ISSUES_FOUND/,
     );
+    assert.throws(
+      () => recordClosedSessionVerified(sessionsDir, 1, { rounds: 3 }, "ISSUES_FOUND"),
+      /becomes VERIFIED or REVIEWED_BY_PERSON, never 'ISSUES_FOUND'/,
+    );
     recordClosedSessionVerified(sessionsDir, 1, { rounds: 3 });
-    recordClosedSessionVerified(sessionsDir, 2, { rounds: 4 });
+    recordClosedSessionVerified(sessionsDir, 2, { rounds: 4, reviewedBy: "Pat" }, "REVIEWED_BY_PERSON");
     const sessions = JSON.parse(readFileSync(path, "utf8")).sessions as Array<Record<string, unknown>>;
-    assert.deepEqual(sessions.map((row) => row["verificationVerdict"]), ["VERIFIED", "VERIFIED", "VERIFIED"]);
+    assert.deepEqual(sessions.map((row) => row["verificationVerdict"]), ["VERIFIED", "REVIEWED_BY_PERSON", "VERIFIED"]);
   });
 
   it("may review again a session closed unverified, short of an adjudication", () => {

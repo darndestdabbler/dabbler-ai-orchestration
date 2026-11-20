@@ -646,6 +646,20 @@ describe("the verification view", () => {
     assert.equal(view["nits"], 2);
   });
 
+  it("reads a person's review as that verdict, clean, naming the person", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true, findings: [{ description: "a bug", severity: "major" }] });
+    recordRound(repo, {
+      round: 2, type: "person_review", verdict: "REVIEWED_BY_PERSON", blocking: false,
+      reviewed_by: "Pat", reason: "it is right", previous_tree: fakeTree("a"),
+    });
+    const view = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
+    assert.equal(view["terminal"], "REVIEWED_BY_PERSON");
+    assert.equal(view["clean"], true);
+    assert.equal(view["reviewedBy"], "Pat");
+    assert.equal(view["headline"], "reviewed by a person: Pat");
+  });
+
   it("calls a blocking round unresolved only once it is at the cap, and says nothing about a cap it did not get", () => {
     const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true, findings: [{ description: "a bug", severity: "major" }] });

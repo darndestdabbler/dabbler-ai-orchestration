@@ -45,6 +45,7 @@ import { pollJob } from "./jobs.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
+  ROW_PERSON_REVIEW,
   ROW_REMEDIATED_AT_CAP,
   readExceptions,
   readRounds,
@@ -65,8 +66,9 @@ import {
   TERMINAL_HEADLINES,
   VERDICT_ISSUES_FOUND,
   VERDICT_REMEDIATED_AT_CAP,
-  VERDICT_VERIFIED,
+  VERDICT_REVIEWED_BY_PERSON,
   sessionVerdict,
+  verdictIsAccepted,
 } from "./verdict.ts";
 
 export const SCHEMA_VERSION = 5;
@@ -1145,7 +1147,7 @@ export function buildTaskRows(
     rounds.length > 0
       ? buildVerificationView(repoRoot, sessionNumber, verificationCap(repoRoot))
       : null;
-  const verified = view !== null && view["terminal"] === VERDICT_VERIFIED;
+  const verified = view !== null && verdictIsAccepted(view["terminal"]);
   const stoppedShort = view !== null && view["terminal"] !== null && !verified;
 
   const preverify = passedRun(STAGE_PREVERIFY_TARGETED, null);
@@ -1591,8 +1593,12 @@ export function buildVerificationView(
     }
   }
 
+  // A person's review is said with the person: a reader can always tell who signed it.
+  const reviewedBy = latest["type"] === ROW_PERSON_REVIEW ? pythonStr(latest["reviewed_by"]) : null;
   let headline: string;
-  if (terminal !== null) {
+  if (reviewedBy !== null) {
+    headline = `${TERMINAL_HEADLINES[VERDICT_REVIEWED_BY_PERSON]}: ${reviewedBy}`;
+  } else if (terminal !== null) {
     headline = TERMINAL_HEADLINES[terminal];
   } else if (latest["blocking"]) {
     headline =
@@ -1608,7 +1614,8 @@ export function buildVerificationView(
   return {
     terminal,
     headline,
-    clean: terminal === VERDICT_VERIFIED,
+    clean: verdictIsAccepted(terminal),
+    ...(reviewedBy !== null ? { reviewedBy } : {}),
     verdict,
     rounds: reviewed.length,
     stoppedAtRound: stopped["round"] ?? null,
@@ -1763,6 +1770,14 @@ export function buildProjection(
       startedAt: entry["startedAt"] ?? null,
       completedAt: entry["completedAt"] ?? null,
       verificationVerdict: entry["verificationVerdict"] ?? null,
+      // Who reviewed it, where a person did: read from the state file, which
+      // travels, and not from the rounds ledger, which never leaves this
+      // machine -- a second checkout still names the person.
+      ...(entry["verificationVerdict"] === VERDICT_REVIEWED_BY_PERSON &&
+      isRecord(entry["verification"]) &&
+      typeof entry["verification"]["reviewedBy"] === "string"
+        ? { reviewedBy: entry["verification"]["reviewedBy"] }
+        : {}),
       // Present only on a session that closed having changed nothing.
       ...(entry["noChange"] === true ? { noChange: true } : {}),
       // Present only on a session whose declaration named modules -- a

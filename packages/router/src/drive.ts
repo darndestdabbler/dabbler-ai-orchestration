@@ -158,6 +158,7 @@ import {
 import {
   LedgerError,
   OUTCOME_PUBLISHED,
+  ROW_PERSON_REVIEW,
   ROW_REMEDIATED_AT_CAP,
   RUNS_DIRNAME,
   type Row,
@@ -4278,6 +4279,10 @@ class Driver {
         const standing = latestRound(this.repoRoot, this.sessionNumber);
         if (noRound === NO_ROUND_TERMINAL && standing?.["type"] === ROW_REMEDIATED_AT_CAP) {
           this.log("verification-unreviewed", { reason: "ended at the cap, unreviewed" });
+        } else if (noRound === NO_ROUND_TERMINAL && standing?.["type"] === ROW_PERSON_REVIEW) {
+          // A person's review is said as theirs, with their name, never as a
+          // round the loop settled.
+          this.log("verification-reviewed", { by: String(standing["reviewed_by"]) });
         } else {
           this.log("verification-settled", { reason: noRound });
         }

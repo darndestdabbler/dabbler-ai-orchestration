@@ -297,7 +297,7 @@
       "properties": {
         "terminal": {
           "type": ["string", "null"],
-          "description": "VERIFIED, ISSUES_FOUND (unresolved at the cap) or REMEDIATED_AT_CAP; null while the loop is still open."
+          "description": "VERIFIED, ISSUES_FOUND (unresolved at the cap), REMEDIATED_AT_CAP or REVIEWED_BY_PERSON (a person reviewed the work; reviewedBy names them); null while the loop is still open."
         },
         "headline": {
           "type": "string",
@@ -314,6 +314,11 @@
         "agency": { "$ref": "#/$defs/agency" },
         "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
         "fixPaths": { "type": "array", "items": { "type": "string" } },
+        "reviewedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Present only when terminal is REVIEWED_BY_PERSON: the person who reviewed the work, from the person_review row."
+        },
         "minor": {
           "type": "integer",
           "minimum": 0,
@@ -360,6 +365,11 @@
         "noChange": {
           "type": "boolean",
           "description": "The session closed having changed nothing, so it carries no verdict because there was nothing to verify. Present only on such a session."
+        },
+        "reviewedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who reviewed the session, where its verdict is REVIEWED_BY_PERSON: read from sessions.json, which travels with the repository, so a checkout without this machine's rounds ledger still names the person."
         },
         "modules": {
           "type": "array",

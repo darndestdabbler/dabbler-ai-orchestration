@@ -21684,7 +21684,7 @@ with the two real engines, before anything is built on it. If its page
 does not say go, 369 to 372 are re-planned by the operator, with
 Microsoft's WPF terminal control as the next candidate.
 
-### Session 368 of 374: An engine pane in Visual Studio takes the keys
+### Session 368 of 376: An engine pane in Visual Studio takes the keys
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (an Engine
 tool window, its terminal page and its key handling),
@@ -21743,7 +21743,7 @@ makes Ctrl+C a copy; a zero size is never sent. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 369 of 374: An engine outlives Visual Studio
+### Session 369 of 376: An engine outlives Visual Studio
 
 Scope: `tools/dabbler-visual-studio/` (a new project, the engine host: a
 small program shipped in the package; the pane's connection to it; the
@@ -21799,7 +21799,7 @@ has one. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 370 of 374: Start Session opens the engine inside Visual Studio
+### Session 370 of 376: Start Session opens the engine inside Visual Studio
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (`EngineTab.cs`,
 `SessionStarter.cs`, the Engine window, an options page),
@@ -21845,7 +21845,7 @@ engine is attached to; a finished session's tab is the one closed.
 
 **Releasable.** No.
 
-### Session 371 of 374: A Dabbler layout, and the way back
+### Session 371 of 376: A Dabbler layout, and the way back
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (the layout
 command, the package's window registrations, the options page),
@@ -21945,7 +21945,7 @@ with the verb 372 adds. It is not a step of either session: a session
 cannot review another while it is in flight, and the review is the
 operator's to buy.
 
-### Session 372 of 374: A session closed at the cap can be reviewed again
+### Session 372 of 376: A session closed at the cap can be reviewed again
 
 Scope: `packages/router/src/verify/reopen.ts`,
 `packages/router/src/verify/rounds.ts`, `packages/router/src/cli/verify.ts`,
@@ -22013,7 +22013,7 @@ router does not have the verb, so it is run from the tree:
 
 If the round finds something, that is a session planned before 373.
 
-### Session 373 of 374: A fix made at the cap is reviewed before the session closes
+### Session 373 of 376: A fix made at the cap is reviewed before the session closes
 
 Scope: `packages/router/src/verify/rounds.ts` (`terminateAtCap`,
 `noRoundReason`), `packages/router/src/drive.ts` and
@@ -22075,10 +22075,71 @@ the round as a plan change; an unreviewed ending is not called passed.
 
 **Releasable.** Yes, as 3.40.0 in session 374.
 
-### Session 374 of 374: Release 3.40.0 (release: 3.40.0)
+### Session 374 of 376: Release 3.40.0 (release: 3.40.0)
 
 The framework publishes sessions 368 to 373 as 3.40.0, and nothing else.
 
 It is started with the tree's build, `node packages/router/dist/dabbler.cjs
 session start`, if the installed router is older than session 372: that
 one still refuses over session 370's first verdict.
+
+### Session 375 of 376: A person may review the work, and the record says a person did
+
+Scope: `packages/router/src/verdict.ts` (the verdict vocabulary and its
+headline), `packages/router/src/verify/` (a verb a person runs to review),
+`packages/router/src/driver.ts` (the ways on at a verification stop),
+`packages/router/src/gates.ts` (`verification_clean`),
+`packages/router/src/session.ts` (the release start's refusal and the
+close), `packages/router/src/progress.ts` and
+`packages/router/src/transcript.ts` (what the record calls it), the
+record schemas the new verdict and row need, their tests,
+`docs/driving-a-session.md`, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The operator asked on 2026-11-20 why a person cannot be a
+legitimate reviewer. At every verification stop the ways on cost a model
+call (adjudication, bought rounds) or leave the session out of every
+release (closing it as it is). The one reader who can judge the work
+and is not paid by the token is never asked. The rule that refuses a
+typed verdict (ground rule 5; "there is no verdict a person can type" in
+`verdict.ts`) was written against an ENGINE writing its own verdict:
+the v1 incident's token `manual-override-development`. It was never
+about a person reviewing work.
+
+**Step 1 -- the review a person gives.** A person's verb (refused to an
+engine, as `session waive` is) shows the person what a reviewer would be
+shown: the session's section of the plan, what the session changed, and
+every round's findings with what the author did about each. It asks for
+a reason, and records a review row with the person, the reason and the
+tree reviewed. The verb works at any verification stop of the session in
+flight, and on a closed session that ended at the cap unverified, beside
+`verify reopen --session-number`.
+
+**Step 2 -- what the record calls it.** A person's review is its own
+verdict, never `VERIFIED` under another name: a reader can always tell
+that a person signed it and who. The close's verification gate and the
+release start accept it as they accept `VERIFIED`. `dabbler status`, the
+Work Explorer, the transcript and the Dabbler Terminal show it as
+reviewed by a person.
+
+**Step 3 -- offered where it helps.** Every verification stop whose way
+on today costs a model call, or ends with a session no release can
+include, offers the person's review as a way on, with what it costs:
+the person's time, and their name on the record.
+
+**Step 4 -- the pages.** `docs/driving-a-session.md` says when a person's
+review is offered and what it records; the changelog says it in a
+sentence.
+
+**Non-goals.** Letting an engine record a person's review, or record
+one for a person. Replacing cross-provider review as the default path:
+rounds still run first. Rewriting any verdict already recorded.
+
+**Tests.** A person's review at a stop records the new verdict with who
+and why, and the close and the release start accept it; the verb is
+refused to an engine; the views name it as a person's review.
+
+**Releasable.** Yes, as 3.41.0 in session 376.
+
+### Session 376 of 376: Release 3.41.0 (release: 3.41.0)
+
+The framework publishes session 375 as 3.41.0, and nothing else.

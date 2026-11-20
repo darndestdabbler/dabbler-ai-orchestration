@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'tools/dabbler-ai-orchestration/**'
+  pull_request:
+    paths:
+      - 'tools/dabbler-ai-orchestration/**'
+
+defaults:
+  run:
+    working-directory: tools/dabbler-ai-orchestration
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: tools/dabbler-ai-orchestration/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile (esbuild)
+        run: npm run compile
+
+      - name: Run unit tests (headless)
+        run: xvfb-run -a npm test
+        env:
+          DISPLAY: ':99.0'

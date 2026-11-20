@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+  <Include href="KnownImageIds.vsct" />
+
+  <Commands package="guidDabblerPackage">
+    <Menus>
+      <Menu guid="guidDabblerCommandSet" id="WorkExplorerToolbar" type="ToolWindowToolbar">
+        <CommandFlag>DefaultDocked</CommandFlag>
+        <Strings>
+          <ButtonText>Dabbler Work Explorer</ButtonText>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Groups>
+      <Group guid="guidDabblerCommandSet" id="DabblerToolsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+      <Group guid="guidDabblerCommandSet" id="WorkExplorerToolbarGroup" priority="0x0000">
+        <Parent guid="guidDabblerCommandSet" id="WorkExplorerToolbar" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidDabblerCommandSet" id="VersionCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
+        <Strings>
+          <ButtonText>Dabbler: Version</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidDabblerCommandSet" id="EndEngineCommandId" priority="0x0102" type="Button">
+        <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
+        <Strings>
+          <ButtonText>Dabbler: End Engine</ButtonText>
+          <CanonicalName>.Dabbler.EndEngine</CanonicalName>
+          <LocCanonicalName>.Dabbler.EndEngine</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidDabblerCommandSet" id="LayoutCommandId" priority="0x0103" type="Button">
+        <Parent guid="guidDabblerCommandSet" id="DabblerToolsGroup" />
+        <Icon guid="ImageCatalogGuid" id="DockPanel" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Dabbler: Layout</ButtonText>
+          <ToolTipText>Dabbler Layout: the Work Explorer, the session's engine and the Dabbler Terminal. Use it again to put your windows back.</ToolTipText>
+          <CanonicalName>.Dabbler.Layout</CanonicalName>
+          <LocCanonicalName>.Dabbler.Layout</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidDabblerCommandSet" id="WorkExplorerCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>Dabbler Work Explorer</ButtonText>
+          <CanonicalName>.Dabbler.WorkExplorer</CanonicalName>
+          <LocCanonicalName>.Dabbler.WorkExplorer</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidDabblerCommandSet" id="TerminalCommandId" priority="0x0101" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>Dabbler Terminal</ButtonText>
+          <CanonicalName>.Dabbler.Terminal</CanonicalName>
+          <LocCanonicalName>.Dabbler.Terminal</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidDabblerCommandSet" id="ConfigurationCommandId" priority="0x0102" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>Dabbler Configuration</ButtonText>
+          <CanonicalName>.Dabbler.Configuration</CanonicalName>
+          <LocCanonicalName>.Dabbler.Configuration</LocCanonicalName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <CommandPlacements>
+    <CommandPlacement guid="guidDabblerCommandSet" id="LayoutCommandId" priority="0x0100">
+      <Parent guid="guidDabblerCommandSet" id="WorkExplorerToolbarGroup" />
+    </CommandPlacement>
+  </CommandPlacements>
+
+  <!-- Unbound in Visual Studio 2026's defaults; Ctrl+Shift+Alt+D is Debug.DiagnosticAnalysis. -->
+  <KeyBindings>
+    <KeyBinding guid="guidDabblerCommandSet" id="LayoutCommandId" editor="guidVSStd97" key1="L" mod1="Control Shift Alt" />
+  </KeyBindings>
+
+  <Symbols>
+    <GuidSymbol name="guidDabblerPackage" value="{425b072f-e523-4795-9b61-5716674585bd}" />
+    <GuidSymbol name="guidDabblerCommandSet" value="{a9db3fec-b5ee-439b-acfe-21f711d1ec33}">
+      <IDSymbol name="DabblerToolsGroup" value="0x1020" />
+      <IDSymbol name="VersionCommandId" value="0x0100" />
+      <IDSymbol name="WorkExplorerCommandId" value="0x0101" />
+      <IDSymbol name="TerminalCommandId" value="0x0102" />
+      <IDSymbol name="ConfigurationCommandId" value="0x0103" />
+      <IDSymbol name="EndEngineCommandId" value="0x0105" />
+      <IDSymbol name="LayoutCommandId" value="0x0106" />
+      <IDSymbol name="WorkExplorerToolbar" value="0x1030" />
+      <IDSymbol name="WorkExplorerToolbarGroup" value="0x1031" />
+    </GuidSymbol>
+  </Symbols>
+
+</CommandTable>

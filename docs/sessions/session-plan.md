@@ -21684,7 +21684,7 @@ with the two real engines, before anything is built on it. If its page
 does not say go, 369 to 372 are re-planned by the operator, with
 Microsoft's WPF terminal control as the next candidate.
 
-### Session 368 of 376: An engine pane in Visual Studio takes the keys
+### Session 368 of 377: An engine pane in Visual Studio takes the keys
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (an Engine
 tool window, its terminal page and its key handling),
@@ -21743,7 +21743,7 @@ makes Ctrl+C a copy; a zero size is never sent. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 369 of 376: An engine outlives Visual Studio
+### Session 369 of 377: An engine outlives Visual Studio
 
 Scope: `tools/dabbler-visual-studio/` (a new project, the engine host: a
 small program shipped in the package; the pane's connection to it; the
@@ -21799,7 +21799,7 @@ has one. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 370 of 376: Start Session opens the engine inside Visual Studio
+### Session 370 of 377: Start Session opens the engine inside Visual Studio
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (`EngineTab.cs`,
 `SessionStarter.cs`, the Engine window, an options page),
@@ -21845,7 +21845,7 @@ engine is attached to; a finished session's tab is the one closed.
 
 **Releasable.** No.
 
-### Session 371 of 376: A Dabbler layout, and the way back
+### Session 371 of 377: A Dabbler layout, and the way back
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (the layout
 command, the package's window registrations, the options page),
@@ -21904,7 +21904,7 @@ its first; the option decides whether a start applies the layout. The
 docs check reads the changed guide page. The walk's page gains the
 layout, with a debugger started and stopped under it.
 
-**Releasable.** Yes, as 3.40.0 in session 374.
+**Releasable.** Yes, as 3.40.0 in session 375.
 
 ## Why sessions 372–373 exist: a session closed at the cap blocked a release, and nothing could unblock it
 
@@ -21945,7 +21945,7 @@ with the verb 372 adds. It is not a step of either session: a session
 cannot review another while it is in flight, and the review is the
 operator's to buy.
 
-### Session 372 of 376: A session closed at the cap can be reviewed again
+### Session 372 of 377: A session closed at the cap can be reviewed again
 
 Scope: `packages/router/src/verify/reopen.ts`,
 `packages/router/src/verify/rounds.ts`, `packages/router/src/cli/verify.ts`,
@@ -22003,7 +22003,7 @@ refusal names the finding; a session that is not closed at the cap is
 refused; an engine is refused; the round is shown the trunk's present
 text of the paths the session touched.
 
-**Releasable.** Yes, as 3.40.0 in session 374.
+**Releasable.** Yes, as 3.40.0 in session 375.
 
 **After it closes, the operator's, in this repository.** The installed
 router does not have the verb, so it is run from the tree:
@@ -22013,7 +22013,7 @@ router does not have the verb, so it is run from the tree:
 
 If the round finds something, that is a session planned before 373.
 
-### Session 373 of 376: A fix made at the cap is reviewed before the session closes
+### Session 373 of 377: A fix made at the cap is reviewed before the session closes
 
 Scope: `packages/router/src/verify/rounds.ts` (`terminateAtCap`,
 `noRoundReason`), `packages/router/src/drive.ts` and
@@ -22073,17 +22073,68 @@ closes the session `VERIFIED`; a blocking one stops for the person with
 the three ways on and writes no terminal; a plan-only answer is shown to
 the round as a plan change; an unreviewed ending is not called passed.
 
-**Releasable.** Yes, as 3.40.0 in session 374.
+**Releasable.** Yes, as 3.40.0 in session 375.
 
-### Session 374 of 376: Release 3.40.0 (release: 3.40.0)
+### Session 374 of 377: A session that ends also ends its engine whose tab was closed
 
-The framework publishes sessions 368 to 373 as 3.40.0, and nothing else.
+Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/DabblerPackage.cs`
+(`EndSessionEngines`), `tools/dabbler-visual-studio/Dabbler.VisualStudio/EngineHost.cs`,
+`tools/dabbler-visual-studio/Dabbler.VisualStudio.Core/EngineOpening.cs`
+and its tests, `docs/sessions/session-plan.md` (session 370's Step 3),
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** The review of session 370 after its close (round 9, 2026-11-20)
+accepted the narrowed Step 4 and found one new blocking thing, and it is
+true. Closing an Engine tab leaves its engine running, as designed, and
+the tab forgets which session it held. When that session ends,
+`EndSessionEngines` looks only through the open tabs, finds none, and
+the engine runs on after its session is over. Session 370 keeps its
+verdict until this is fixed and reviewed, and the release of 3.40.0
+stands behind it.
+
+**Step 1 -- the engine with no tab.** When a session ends, the extension
+ends every engine the host is running for that session of that
+repository, whether a tab holds it or not, and no engine of another
+session or another repository. Which of the host's records a closing
+session ends is decided in the library, beside `EngineOpening.Closes`.
+
+**Step 2 -- Step 3 of session 370 says what Step 4 says.** "A session
+never has two" is about the engines the host runs. An engine opened in
+Windows Terminal is outside it, for the reason Step 4 already gives. One
+sentence in session 370's Step 3, with the operator's approval
+(2026-11-20), so the plan does not say two things.
+
+**Step 3 -- the changelog** says it in a sentence.
+
+**Non-goals.** Finding or closing an engine opened in Windows Terminal.
+Ending an engine when its tab is closed: that stays as it is. The three
+nits of round 9 that are not this.
+
+**Tests.** In the Visual Studio library: of the host's records, a
+closing session ends its own, with or without a tab, and never another
+session's or another repository's.
+
+**Releasable.** Yes, as 3.40.0 in session 375.
+
+**After it closes, the operator's, in this repository.** Session 370 is
+reviewed again, from the tree's build:
+
+    npm run build -w dabbler-ai-router
+    node packages/router/dist/dabbler.cjs verify reopen --session-number 370 --sessions-dir docs/sessions --reason "The detached-host finding of round 9 was fixed in session 374"
+
+A clean round makes 370 `VERIFIED` and session 375 can start. If the
+round finds another blocking thing, no third fix is planned: session 376
+is moved ahead of the release, and the operator reviews 370.
+
+### Session 375 of 377: Release 3.40.0 (release: 3.40.0)
+
+The framework publishes sessions 368 to 374 as 3.40.0, and nothing else.
 
 It is started with the tree's build, `node packages/router/dist/dabbler.cjs
 session start`, if the installed router is older than session 372: that
 one still refuses over session 370's first verdict.
 
-### Session 375 of 376: A person may review the work, and the record says a person did
+### Session 376 of 377: A person may review the work, and the record says a person did
 
 Scope: `packages/router/src/verdict.ts` (the verdict vocabulary and its
 headline), `packages/router/src/verify/` (a verb a person runs to review),
@@ -22138,8 +22189,8 @@ rounds still run first. Rewriting any verdict already recorded.
 and why, and the close and the release start accept it; the verb is
 refused to an engine; the views name it as a person's review.
 
-**Releasable.** Yes, as 3.41.0 in session 376.
+**Releasable.** Yes, as 3.41.0 in session 377.
 
-### Session 376 of 376: Release 3.41.0 (release: 3.41.0)
+### Session 377 of 377: Release 3.41.0 (release: 3.41.0)
 
-The framework publishes session 375 as 3.41.0, and nothing else.
+The framework publishes session 376 as 3.41.0, and nothing else.

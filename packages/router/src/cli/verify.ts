@@ -15,7 +15,8 @@ import {
 import { recordDispute, runAdjudication } from "../verify/disputes.ts";
 import { runPrepare } from "../verify/prepare.ts";
 import { runReanchor } from "../verify/reanchor.ts";
-import { runReopen } from "../verify/reopen.ts";
+import { reviewClosedSession, runReopen } from "../verify/reopen.ts";
+import { personIsPresent } from "../session.ts";
 import { APPROVER_FLAG, APPROVER_GONE } from "./session.ts";
 import { runRound } from "../verify/rounds.ts";
 import {
@@ -123,6 +124,7 @@ function usage(): string {
     "       dabbler verify prepare [--claims FILE]",
     "       dabbler verify reanchor --commit COMMIT --reason TEXT",
     "       dabbler verify reopen --rounds N --reason TEXT",
+    "       dabbler verify reopen --session-number N --reason TEXT",
     "       dabbler verify step <open|close|status|amend|guard-commit>",
     "",
     "one cross-provider verification round; the loop continues on re-invocation",
@@ -130,6 +132,9 @@ function usage(): string {
     "reopen buys further rounds past a cap terminal that has already ended the",
     "loop -- the operator's answer when the cap stopped a review the tree still",
     "needs. It buys rounds, never a verdict, and never reaches an adjudication.",
+    "With --session-number, a person buys one review of a CLOSED session whose",
+    "verdict is REMEDIATED_AT_CAP, of what it changed as the trunk holds it now;",
+    "a clean round makes its verdict VERIFIED.",
     "",
   ].join("\n");
 }
@@ -274,7 +279,7 @@ async function reopenMain(argv: readonly string[]): Promise<number> {
     writeErr(`dabbler verify reopen: ${APPROVER_GONE}\n`);
     return EXIT_USAGE;
   }
-  const parsed = parseArgs(argv, [SESSIONS_DIR, "--rounds", "--reason"]);
+  const parsed = parseArgs(argv, [SESSIONS_DIR, "--rounds", "--reason", "--session-number"]);
   if (typeof parsed === "string") {
     writeErr(`dabbler verify reopen: ${parsed}\n`);
     return EXIT_USAGE;
@@ -283,6 +288,21 @@ async function reopenMain(argv: readonly string[]): Promise<number> {
   if (reason === undefined) {
     writeErr("dabbler verify reopen: the following arguments are required: --reason\n");
     return EXIT_USAGE;
+  }
+  const sessionNumber = integerFlag(parsed, "--session-number");
+  if (sessionNumber !== null) {
+    // A closed session's review is one round, always: what it buys is the
+    // review the cap refused, and a count would make it a budget again.
+    if (sessionNumber === "invalid" || parsed.values.has("--rounds")) {
+      writeErr(
+        "dabbler verify reopen: --session-number takes a session's number, and buys one round " +
+          "with no --rounds\n",
+      );
+      return EXIT_USAGE;
+    }
+    const closed = resolvedSessions("verify reopen", parsed);
+    if ("code" in closed) return closed.code;
+    return reviewClosedSession(closed.dir, { sessionNumber, reason, engine: !personIsPresent() });
   }
   // Defaulted, and to one. A grant is for the review in front of the
   // operator, and a number they did not type is the number that buys the

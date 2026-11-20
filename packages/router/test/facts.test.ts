@@ -22,6 +22,7 @@ import {
   appendFacts,
   assembleEvidence,
   assembleFixDeltaEvidence,
+  assembleRangeEvidence,
   buildDiffPathspecs,
   changedLines,
   checkEvidenceCap,
@@ -241,6 +242,37 @@ describe("a Word document's text in the evidence", () => {
       const evidence = assembleFixDeltaEvidence(repo, "docs/sessions", 1, "b".repeat(40));
       assert.match(evidence, /Corrected words/);
       assert.doesNotMatch(evidence, /Unchanged words/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("carries a committed range's deleted lines and its documents' text, over the named paths alone", () => {
+    const repo = tempDir();
+    writeFileSync(join(repo, "brief.docx"), docx(para("The brief as it ships")));
+    const asked: string[][] = [];
+    const restore = gitAnswers([
+      [
+        (args) => args[0] === "diff" && args.includes("--diff-filter=d"),
+        (args) => (asked.push([...args]), { stdout: "brief.docx\0" }),
+      ],
+      [
+        ["diff"],
+        (args) => (
+          asked.push([...args]),
+          { stdout: "diff --git a/gone.ts b/gone.ts\ndeleted file mode 100644\n-the removed line\n" }
+        ),
+      ],
+    ]);
+    try {
+      const evidence = assembleRangeEvidence(repo, "5".repeat(40), ["gone.ts", "brief.docx"], "The range");
+      assert.match(evidence, /-the removed line/);
+      assert.match(evidence, /The brief as it ships/);
+      for (const args of asked) {
+        assert.ok(!args.includes("--irreversible-delete"));
+        assert.deepEqual(args.slice(args.indexOf("--") + 1, args.indexOf("--") + 3), ["gone.ts", "brief.docx"]);
+        assert.ok(!args.includes("."));
+      }
     } finally {
       restore();
     }

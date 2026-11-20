@@ -49,7 +49,7 @@ import {
 } from "./progress.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
-import { VERDICT_VERIFIED, validateSessionVerdict } from "./verdict.ts";
+import { VERDICT_REMEDIATED_AT_CAP, VERDICT_VERIFIED, validateSessionVerdict } from "./verdict.ts";
 import { VERSION } from "./version.ts";
 
 export { SCHEMA_VERSION } from "./progress.ts";
@@ -543,6 +543,39 @@ export function recordSessionVerification(
       `session ${sessionNumber} not present in ${sessionsDir}`,
     );
   }
+  validateAndWriteState(sessionsDir, raw);
+}
+
+/**
+ * The one write to a CLOSED session's verdict: REMEDIATED_AT_CAP becomes
+ * VERIFIED, once a review bought after the close found nothing blocking.
+ * The verdict is not the caller's to name, and every other session --
+ * open, or closed with any other verdict -- is refused.
+ */
+export function recordClosedSessionVerified(
+  sessionsDir: string,
+  sessionNumber: number,
+  summary: Record<string, unknown>,
+): void {
+  const raw = readRawSessionState(sessionsDir);
+  const sessions = Array.isArray(raw?.["sessions"]) ? (raw["sessions"] as unknown[]) : [];
+  const record = sessions.find(
+    (row): row is Record<string, unknown> => isRecord(row) && row["number"] === sessionNumber,
+  );
+  if (
+    raw === null ||
+    record === undefined ||
+    record["status"] !== STATUS_COMPLETE ||
+    record["verificationVerdict"] !== VERDICT_REMEDIATED_AT_CAP
+  ) {
+    throw new SessionStateInvariantError(
+      2,
+      `session ${sessionNumber} is not a session closed ${VERDICT_REMEDIATED_AT_CAP} under ` +
+        `${sessionsDir}, and no other closed verdict is ever rewritten`,
+    );
+  }
+  record["verificationVerdict"] = VERDICT_VERIFIED;
+  record["verification"] = summary;
   validateAndWriteState(sessionsDir, raw);
 }
 

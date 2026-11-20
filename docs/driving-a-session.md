@@ -1339,6 +1339,35 @@ for a waiver of the verdict, which this framework does not have:
   engine types proves nothing — and no gate reads either. What the row
   buys is that the reason exists, beside the rounds it authorised.
 
+#### After the close: a release refused over a session closed at the cap
+
+A session may also close at the cap: its verdict is `REMEDIATED_AT_CAP`,
+its work landed, and nobody reviewed the fix. A release publishes only
+verified work, so the start of the next release refuses while such a
+session stands, and names each one with the verdict it carries.
+
+The way on is a review of what that session changed, bought by a person:
+
+```
+dabbler verify reopen --session-number N --reason "<why>"
+```
+
+It runs only while no session is in flight, and an engine is refused it.
+It buys one round by the Primary Reviewer, who is not the provider that
+wrote the session. The reviewer is shown the session's section of the
+session plan as it reads now, the findings the cap left unreviewed, and
+what the session changed **as the trunk holds it now**: the difference from
+the session's start commit to `HEAD`, over the paths its own commit
+touched. A later session's change to one of those paths is in it, because
+that is the text the release would ship.
+
+The grant and the round go on the session's own record, after the rows
+already there. A round with no blocking finding makes the verdict
+`VERIFIED`, and the router commits and pushes `sessions.json` as a close
+does; start the release again. A round that finds something blocking
+changes no verdict, and the release start then names those findings: plan
+a session that fixes them, and when it closes, review the session again.
+
 ## The end
 
 ```

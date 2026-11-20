@@ -718,6 +718,32 @@ export function assembleFixDeltaEvidence(
   return rendered;
 }
 
+/**
+ * A committed range over named paths: what a review after a session's close
+ * is shown. Deleted lines are shown, unlike a round's: the paths are bounded
+ * by one session's commit, and a review bought after the close is the only
+ * one the change will get.
+ */
+export function assembleRangeEvidence(
+  repoRoot: string,
+  from: string,
+  paths: readonly string[],
+  heading: string,
+): string {
+  const pathspecs = [...paths, ...buildDiffPathspecs().slice(1)];
+  const diffAt = (context: number): string => {
+    const diffRun = runGit(repoRoot, ["diff", "--no-color", `-U${context}`, from, "HEAD", "--", ...pathspecs]);
+    if (diffRun.code !== 0) throw new FactsError(`the diff from ${from.slice(0, 12)} to HEAD failed: ${diffRun.stderr}`);
+    return diffRun.stdout;
+  };
+  const texts = documentTexts(repoRoot, changedDocuments(repoRoot, from, "HEAD", pathspecs));
+  const rendered = renderWidestThatFits((context) =>
+    renderEvidence("", diffAt(context), heading, [], [], [], texts),
+  );
+  checkEvidenceCap(rendered);
+  return rendered;
+}
+
 export function checkEvidenceCap(rendered: string): void {
   const cap = evidenceCharCap();
   // Python measures a str in code points; JavaScript's `.length` counts

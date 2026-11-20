@@ -23,28 +23,62 @@
 // waiver accepted work over a standing finding while this buys the review
 // that would settle one.
 
+import { existsSync } from "node:fs";
+import { basename, join } from "node:path";
+
 import { writeErr, writeOut } from "../output.ts";
-import { repoRootFor } from "../evidence.ts";
+import { STATE_FILENAME, repoRootFor, runGit } from "../evidence.ts";
 import { loadConfig, verificationRoundCap } from "../config.ts";
+import { EXIT_FUNDS } from "../contracts/exitCodes.ts";
+import { EvidenceTooLargeError, FactsError } from "../facts.ts";
 import { nowIso, snapshotWorktreeTree } from "../journal.ts";
 import {
   LedgerError,
   ROW_ADJUDICATION,
   appendReopen,
+  appendRound,
   readRounds,
+  saveRawOutput,
   standingReopen,
   type Row,
 } from "../ledger.ts";
-import { readSessionState, whoIsWorking } from "../progress.ts";
+import { NOBODY_ON_THE_RECORD, readSessionState, whoIsWorking } from "../progress.ts";
+import { NoCandidateError, RouterError, type RouteResult } from "../route.ts";
+import { FundsError } from "../transports/api.ts";
+import {
+  VERDICT_REMEDIATED_AT_CAP,
+  VERDICT_VERIFIED,
+  classifyBlocking,
+  parseVerificationResponse,
+  sessionVerdict,
+} from "../verdict.ts";
+import { buildVerificationPrompt } from "../verifyjob.ts";
 import { VERSION } from "../version.ts";
-import { recordAmendment } from "../writers.ts";
-import { EXIT_OK, EXIT_STATE, EXIT_USAGE } from "./errors.ts";
+import { recordAmendment, recordClosedSessionVerified } from "../writers.ts";
+import {
+  EXIT_BLOCKING,
+  EXIT_CALL_FAILED,
+  EXIT_OK,
+  EXIT_STATE,
+  EXIT_UNAVAILABLE,
+  EXIT_USAGE,
+  VerifyError,
+} from "./errors.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
+  closedSessionReview,
+  costNumber,
+  dispatchVerification,
+  findingRows,
+  headCommit,
   noRoundReason,
+  reportedInputTokens,
   standingTerminal,
+  substitutionNote,
+  turnCount,
+  verificationUnavailable,
 } from "./rounds.ts";
 
 export interface ReopenOptions {
@@ -214,5 +248,215 @@ export function runReopen(sessionsDir: string, options: ReopenOptions): number {
       "stops the session again. Run the round:\n" +
       `  dabbler verify --sessions-dir ${sessionsDir}\n`,
   );
+  return EXIT_OK;
+}
+
+export interface ClosedReviewOptions {
+  readonly sessionNumber: number;
+  readonly reason: string;
+  /** The caller is an engine: the review is refused it. */
+  readonly engine: boolean;
+}
+
+/**
+ * Buy one review of a session that closed REMEDIATED_AT_CAP: the fix its
+ * cap left unreviewed, read as the trunk holds it now. A release start
+ * refuses such a session, and before this verb the refusal had no exit --
+ * `verify reopen` reaches only the session in flight.
+ *
+ * It buys a round and never a verdict: the grant and the round are appended
+ * to the session's own record after the rows already there, and only a
+ * round the Primary Reviewer returns decides what follows.
+ */
+export async function reviewClosedSession(sessionsDir: string, options: ClosedReviewOptions): Promise<number> {
+  const n = options.sessionNumber;
+  if (options.engine) {
+    writeErr(
+      "verify reopen: refused -- `verify reopen --session-number` is a person's verb, never the " +
+        "engine's: it buys a review of a closed session's work, and that judgement is not the " +
+        "engine's to make. Report the step blocked and say why; a person runs it at a terminal of " +
+        "their own.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const repoRoot = repoRootFor(sessionsDir);
+  if (repoRoot === null) {
+    writeErr(`verify reopen: not inside a git repository: ${sessionsDir}\n`);
+    return EXIT_STATE;
+  }
+  const state = readSessionState(sessionsDir);
+  const current = (state ?? {})["currentSession"];
+  if (current !== null && current !== undefined) {
+    writeErr(
+      `verify reopen: refused -- session ${String(current)} is in flight, and a closed session is ` +
+        "reviewed only when none is. Run it again once that session closes.\n",
+    );
+    return EXIT_STATE;
+  }
+  const sessions = Array.isArray(state?.["sessions"]) ? (state["sessions"] as Row[]) : [];
+  const record = sessions.find((row) => row["number"] === n);
+  const verdict = record?.["verificationVerdict"];
+  if (record === undefined || record["status"] !== "complete" || verdict !== VERDICT_REMEDIATED_AT_CAP) {
+    const found =
+      record === undefined
+        ? "there is no such session"
+        : record["status"] !== "complete"
+          ? `its status is ${String(record["status"])}`
+          : `its verdict is ${verdict === undefined || verdict === null ? "none" : String(verdict)}`;
+    writeErr(
+      `verify reopen: refused -- session ${n} cannot be reviewed again: ${found}, and only a session ` +
+        `that closed ${VERDICT_REMEDIATED_AT_CAP} can.\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr(
+      "verify reopen: refused -- a review carries a reason. A round bought for no stated reason is " +
+        "the bare override this row exists to replace.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const rounds = readRounds(repoRoot, n);
+  const last = rounds[rounds.length - 1];
+  const author =
+    [...rounds].reverse().map((row) => row["orchestrator_provider"]).find((value) => typeof value === "string") ??
+    (record["orchestrator"] as Row | undefined)?.["provider"];
+  const startCommit = record["startCommit"];
+  if (last === undefined || typeof author !== "string" || typeof startCommit !== "string") {
+    writeErr(
+      `verify reopen: refused -- session ${n}'s record does not say ` +
+        `${last === undefined ? "what its rounds were" : typeof author !== "string" ? "which provider authored it" : "where it started"}, ` +
+        "so a review could not be held to it. Nothing was written.\n",
+    );
+    return EXIT_STATE;
+  }
+
+  let prompt: string;
+  try {
+    const review = closedSessionReview(repoRoot, sessionsDir, n, startCommit, rounds);
+    prompt = buildVerificationPrompt(
+      String(loadConfig()["_verification_template"] ?? ""),
+      review.task,
+      "session-verification",
+      review.evidence,
+    );
+  } catch (error) {
+    if (error instanceof VerifyError || error instanceof FactsError || error instanceof EvidenceTooLargeError) {
+      writeErr(`verify reopen: ${error.message}\n`);
+      return EXIT_UNAVAILABLE;
+    }
+    throw error;
+  }
+
+  let result: RouteResult;
+  try {
+    result = await dispatchVerification(prompt, {
+      excludeProviders: [author],
+      authorModel: ((record["orchestrator"] as Row | undefined)?.["model"] as string | undefined) ?? null,
+      sessionNumber: n,
+      repoRoot,
+    });
+  } catch (error) {
+    if (error instanceof NoCandidateError) {
+      writeErr(verificationUnavailable(sessionsDir, author, error));
+      return EXIT_UNAVAILABLE;
+    }
+    if (error instanceof FundsError) {
+      writeErr(`verify reopen: nothing was written and no round was spent.\n${error.message}\n`);
+      return EXIT_FUNDS;
+    }
+    if (error instanceof RouterError) {
+      writeErr(`verify reopen: the reviewer call failed twice: ${error.message}\nNothing was written.\n`);
+      return EXIT_CALL_FAILED;
+    }
+    throw error;
+  }
+  if (result.truncated) {
+    writeErr("verify reopen: the reviewer's response is truncated; nothing was written.\n");
+    return EXIT_UNAVAILABLE;
+  }
+
+  const afterRound = Number(last["round"]);
+  const round = afterRound + 1;
+  const tree = runGit(repoRoot, ["rev-parse", "HEAD^{tree}"]).stdout.trim();
+  const rawPath = saveRawOutput(repoRoot, n, round, result.content);
+  const [said, issues] = parseVerificationResponse(result.content);
+  const classification = classifyBlocking(said, issues);
+  const findings = findingRows(issues, classification.blockingIssues);
+  appendReopen(repoRoot, n, {
+    schema_version: 1,
+    session_number: n,
+    after_round: afterRound,
+    terminal: "remediated_at_cap",
+    cap: round,
+    reason,
+    by: NOBODY_ON_THE_RECORD,
+    tree_at_grant: tree,
+    recorded_at: nowIso(),
+    framework_version: VERSION,
+  });
+  appendRound(repoRoot, n, {
+    round,
+    phase: "full",
+    verdict: said,
+    blocking: classification.blocking,
+    reviewer_model: result.model_name,
+    reviewer_provider: result.provider,
+    orchestrator_provider: author,
+    findings,
+    completion_tree: tree,
+    previous_tree: last["completion_tree"],
+    head_commit: headCommit(repoRoot),
+    recorded_at: nowIso("microseconds"),
+    transport: result.transport,
+    requested_model: result.model_id,
+    served_model: result.served_model_id ?? null,
+    escalation_history: result.escalation_history.map((step) => [...step]),
+    input_tokens: reportedInputTokens(result.input_tokens, result.metadata),
+    output_tokens: result.output_tokens,
+    premium_requests: costNumber(result.metadata["premium_requests"]),
+    tool_calls: turnCount(result.metadata["tool_calls"]),
+  });
+  const substituted = substitutionNote(result.model_id, result.served_model_id ?? null);
+  if (substituted !== null) writeErr(substituted);
+
+  if (classification.blocking) {
+    writeOut(
+      `verify reopen: session ${n}, round ${round} -- ${said} with ` +
+        `${classification.blockingIssues.length} blocking finding(s) (reviewer ` +
+        `${result.model_name}/${result.provider}). Raw output: ${rawPath}\n` +
+        classification.blockingIssues.map((issue) => `  - ${String(issue.description ?? "").split("\n")[0]}\n`).join("") +
+        `Session ${n}'s verdict stays ${VERDICT_REMEDIATED_AT_CAP}. Plan a session that fixes these, ` +
+        "then review the session again.\n",
+    );
+    return EXIT_BLOCKING;
+  }
+  recordClosedSessionVerified(sessionsDir, n, {
+    rounds: round,
+    verifierModel: result.model_name,
+    verifierProvider: result.provider,
+    transport: result.transport,
+  });
+  writeOut(
+    `verify reopen: session ${n}, round ${round} -- ${sessionVerdict(said, false)} (reviewer ` +
+      `${result.model_name}/${result.provider}); no blocking finding, so session ${n} is now ` +
+      `${VERDICT_VERIFIED}. Raw output: ${rawPath}\n`,
+  );
+  // Committed and pushed as the close commits its own state: by path, so
+  // nothing else in the tree rides along.
+  const stateFile = join(sessionsDir, STATE_FILENAME);
+  const committed = runGit(repoRoot, ["commit", "-m", `Verify session ${n} of ${basename(sessionsDir)} after its close`, "--", stateFile]);
+  if (committed.code !== 0) {
+    writeErr(`verify reopen: the verdict is written but the commit failed: ${committed.stderr}\n`);
+    return EXIT_STATE;
+  }
+  if (!existsSync(join(repoRoot, ".dabbler", "local-only"))) {
+    const pushed = runGit(repoRoot, ["push"]);
+    if (pushed.code !== 0) {
+      writeErr(`verify reopen: the verdict is written and committed but the push failed: ${pushed.stderr}. Run \`git push\`.\n`);
+      return EXIT_STATE;
+    }
+  }
   return EXIT_OK;
 }

@@ -55,8 +55,12 @@ import {
   type RouterConfig,
 } from "../config.ts";
 import { namedReviewingVehicle } from "../sessionState.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
+  SESSION_PLAN_FILENAME,
   changedPathsBetween,
+  planSection,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,
@@ -69,6 +73,7 @@ import {
   appendFacts,
   assembleEvidence,
   assembleFixDeltaEvidence,
+  assembleRangeEvidence,
   collectFacts,
   redFactsRefusal,
 } from "../facts.ts";
@@ -671,6 +676,94 @@ export async function terminateAtCap(
       "\n",
   );
   return EXIT_OK;
+}
+
+/**
+ * The findings a session's last round leaves standing: what a cap terminal
+ * left unreviewed, or what a round found blocking.
+ */
+export function standingFindings(row: Row | undefined): Row[] {
+  if (row === undefined) return [];
+  if (row["type"] === ROW_REMEDIATED_AT_CAP) {
+    const remediated = row["remediated"] as Row | undefined;
+    return Array.isArray(remediated?.["findings"]) ? (remediated["findings"] as Row[]) : [];
+  }
+  return row["blocking"] === true ? blockingFindings(row) : [];
+}
+
+/**
+ * What a review of a CLOSED session is shown: its section of the session
+ * plan as it reads now, the findings its last round left standing, and what
+ * it changed as the trunk holds it now -- the difference from its start
+ * commit to HEAD over the paths its own `Session N: ` commit touched. A later
+ * session's change to one of those paths is in it, because the review is of
+ * the text that would ship; a path the session never touched is not.
+ */
+export function closedSessionReview(
+  repoRoot: string,
+  sessionsDir: string,
+  sessionNumber: number,
+  startCommit: string,
+  rounds: readonly Row[],
+): { readonly task: string; readonly evidence: string } {
+  const landed = runGit(repoRoot, ["log", "-1", "--format=%H", "-E", `--grep=^Session ${sessionNumber}: `, "HEAD"]);
+  if (landed.code !== 0 || landed.stdout.trim() === "") {
+    throw new VerifyError(
+      `no commit on this branch is session ${sessionNumber}'s own ("Session ${sessionNumber}: ..."), ` +
+        "so what it changed cannot be read; nothing was written",
+    );
+  }
+  const commit = landed.stdout.trim();
+  const touched = runGit(repoRoot, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit]);
+  const paths = touched.stdout.split("\0").filter((path) => path.trim() !== "");
+  if (touched.code !== 0 || paths.length === 0) {
+    throw new VerifyError(`session ${sessionNumber}'s commit ${commit.slice(0, 12)} names no path; nothing was written`);
+  }
+  // The plan is what the work is held to: a review without it is refused
+  // rather than run against nothing.
+  let plan: string;
+  try {
+    plan = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8");
+  } catch {
+    plan = "";
+  }
+  const section = planSection(plan, sessionNumber);
+  if (section === null) {
+    throw new VerifyError(
+      `the session plan has no section for session ${sessionNumber}, so there is nothing to hold its ` +
+        "work to; nothing was written",
+    );
+  }
+  const evidence = assembleRangeEvidence(
+    repoRoot,
+    startCommit,
+    paths,
+    `What session ${sessionNumber} changed, as the trunk holds it now: the difference from its start ` +
+      `commit ${startCommit.slice(0, 12)} to HEAD, over the ${paths.length} path(s) its own commit ` +
+      `${commit.slice(0, 12)} touched. A later session's change to one of these paths is shown too: ` +
+      "this is the text that would ship.",
+  );
+  const findings = standingFindings(rounds[rounds.length - 1]);
+  const task = [
+    `Session ${sessionNumber} is closed, and its verification ended at the round cap with the fix to ` +
+      "the findings below unreviewed. This is that review, bought by a person after the close. Review " +
+      "what the session changed against its plan; for each finding below say whether the text now " +
+      "resolves it, and raise anything the plan requires that the text does not do.",
+    "",
+    "The session's section of the session plan, as it reads now:",
+    "",
+    section,
+    "",
+    "#### Findings the last round left standing",
+    "",
+    ...(findings.length === 0
+      ? ["(none recorded)"]
+      : findings.map(
+          (finding) =>
+            `- [${String(finding["severity"] ?? "major")}] ${sliceCodePoints(String(finding["description"] ?? ""), 700)}`,
+        )),
+  ].join("\n");
+  return { task, evidence };
 }
 
 /** The commit HEAD stands at, or null. */

@@ -174,9 +174,11 @@ import {
   LedgerError,
   MACHINE_DIRNAME,
   OUTCOME_PUBLISHED,
+  ROW_REMEDIATED_AT_CAP,
   RUNS_DIRNAME,
   appendException,
   latestRound,
+  readRounds,
   readAdvice,
   readExceptionRequest,
   readExceptions,
@@ -227,7 +229,8 @@ import {
   workBegunRefusal,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
-import { VERDICT_VERIFIED, sessionVerdict } from "./verdict.ts";
+import { VERDICT_REMEDIATED_AT_CAP, VERDICT_VERIFIED, sessionVerdict } from "./verdict.ts";
+import { standingFindings } from "./verify/rounds.ts";
 
 /**
  * Bring a stale record up to date before the session is registered.
@@ -1400,12 +1403,21 @@ export function setSessionUseReading(reading: typeof assessSessionUse | null): v
   sessionUseReading = reading ?? assessSessionUse;
 }
 
+/** A closed session a release would publish unverified, and what its record says of it. */
+export interface UnverifiedSession {
+  readonly number: number;
+  /** Its verdict, or null where it carries none. */
+  readonly verdict: string | null;
+  /** What a review after its close found blocking, where the last one did. */
+  readonly blocking: readonly string[];
+}
+
 /** What a release session's start is judged on, read from the repository. */
 export interface ReleaseFacts {
   /** A `packaging:` block is declared: a pack, or a tag release. */
   readonly packagingDeclared: boolean;
   /** Sessions closed after the last published release that did not verify. */
-  readonly unverified: readonly number[];
+  readonly unverified: readonly UnverifiedSession[];
   /** What the version file says, where the version is kept in one; null where it is not. */
   readonly versionFile: { readonly path: string; readonly version: string | null; readonly reason: string } | null;
   /** What the declared pack did, run into scratch; null where nothing was rehearsed. */
@@ -1434,10 +1446,23 @@ export function judgeReleasePreflight(number: number, version: string, facts: Re
     );
   }
   if (facts.unverified.length > 0) {
-    const named = facts.unverified.map(sessionDisplayNumber).join(", ");
+    const named = facts.unverified.map((session) => sessionDisplayNumber(session.number)).join(", ");
+    const ways = facts.unverified.map((session) => {
+      const which = `session ${sessionDisplayNumber(session.number)} carries ${session.verdict ?? "no verdict"}`;
+      if (session.verdict !== VERDICT_REMEDIATED_AT_CAP) {
+        return `\n- ${which}, and only a session closed ${VERDICT_REMEDIATED_AT_CAP} is reviewed after its close.`;
+      }
+      const review = `  dabbler verify reopen --session-number ${session.number} --reason "<why>"`;
+      if (session.blocking.length === 0) return `\n- ${which}: its fix was never reviewed. Review it:\n${review}`;
+      return (
+        `\n- ${which}, and its last review found it blocking:\n` +
+        session.blocking.map((finding) => `    ${finding}\n`).join("") +
+        `  Plan a session that fixes them, then review the session again:\n${review}`
+      );
+    });
     return (
       `session(s) ${named} closed after the last published release without a VERIFIED verdict, and a ` +
-      `release publishes only verified work. Plan a session that fixes and verifies it before session ${shown}.`
+      `release publishes only verified work.${ways.join("")}`
     );
   }
   const file = facts.versionFile;
@@ -1498,7 +1523,19 @@ export function readReleaseFacts(sessionsDir: string, number: number): ReleaseFa
       if (verdict === undefined || verdict === null) return row["noChange"] !== true;
       return String(verdict) !== VERDICT_VERIFIED;
     })
-    .map((row) => Number(row["number"]));
+    .map((row): UnverifiedSession => {
+      const n = Number(row["number"]);
+      const verdict = row["verificationVerdict"];
+      // A cap terminal's findings were fixed, unreviewed; only a round that
+      // reviewed the session after it can have found them still blocking.
+      const last = readRounds(root, n).at(-1);
+      const blocking = last === undefined || last["type"] === ROW_REMEDIATED_AT_CAP ? [] : standingFindings(last);
+      return {
+        number: n,
+        verdict: verdict === undefined || verdict === null ? null : String(verdict),
+        blocking: blocking.map((finding) => `- ${String(finding["description"] ?? "").split("\n")[0]}`),
+      };
+    });
   let versionFile: ReleaseFacts["versionFile"] = null;
   if (tag !== null) {
     const agreed = releaseVersion(root);

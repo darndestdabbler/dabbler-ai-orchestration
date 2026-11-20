@@ -62,6 +62,7 @@ import {
   judgeRestoration,
   judgeStartBoundary,
   judgeReleasePreflight,
+  readReleaseFacts,
   MalformedSlugError,
   parseSessionPlans,
   releaseSessionVersion,
@@ -92,6 +93,7 @@ import {
   amendmentEntries,
   readTaskDeclaration,
   recordAmendment,
+  recordClosedSessionVerified,
   recordSessionVerification,
   registerSessionStart,
   releasabilityOf,
@@ -1918,14 +1920,53 @@ describe("what a release session's start refuses", () => {
       String(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, packagingDeclared: false })),
       /no `packaging:` block.*Plan a packaging session before it/,
     );
-    assert.match(
-      String(judgeReleasePreflight(7, "2.0.0", { ...CLEAR, unverified: [4, 5] })),
-      /session\(s\) 004, 005 closed after the last published release without a VERIFIED verdict/,
+    const capped = String(
+      judgeReleasePreflight(7, "2.0.0", {
+        ...CLEAR,
+        unverified: [
+          { number: 4, verdict: "REMEDIATED_AT_CAP", blocking: [] },
+          { number: 5, verdict: "REMEDIATED_AT_CAP", blocking: ["- the tab is never closed"] },
+        ],
+      }),
     );
+    assert.match(capped, /session\(s\) 004, 005 closed after the last published release without a VERIFIED verdict/);
+    assert.match(capped, /session 004 carries REMEDIATED_AT_CAP: its fix was never reviewed[\s\S]*verify reopen --session-number 4 --reason "<why>"/);
+    assert.match(
+      capped,
+      /session 005 carries REMEDIATED_AT_CAP, and its last review found it blocking:\s+- the tab is never closed\s+Plan a session that fixes them, then review the session again:\s+dabbler verify reopen --session-number 5 /,
+    );
+    assert.doesNotMatch(capped, /fixes and verifies it/);
     assert.match(
       String(judgeReleasePreflight(7, "2.0.1", CLEAR)),
       /version\.json says 2\.0\.0, and session 007 releases 2\.0\.1.*plan one before session 007/,
     );
+  });
+
+  it("stops refusing over a session closed at the cap once a review after its close finds it clean", () => {
+    const state = stateDir();
+    try {
+      writeFileSync(
+        join(state.sessionsDir, "sessions.json"),
+        JSON.stringify({
+          schemaVersion: 5,
+          sessions: [
+            { number: 1, title: "First things", status: "complete", verificationVerdict: "REMEDIATED_AT_CAP" },
+            { number: 2, title: "Second things", status: "not-started" },
+          ],
+        }),
+        "utf8",
+      );
+      assert.match(
+        String(judgeReleasePreflight(2, "2.0.0", { ...readReleaseFacts(state.sessionsDir, 2), packagingDeclared: true })),
+        /verify reopen --session-number 1 /,
+      );
+      recordClosedSessionVerified(state.sessionsDir, 1, { rounds: 3 });
+      const facts = readReleaseFacts(state.sessionsDir, 2);
+      assert.deepEqual(facts.unverified, []);
+      assert.equal(judgeReleasePreflight(2, "2.0.0", { ...facts, packagingDeclared: true }), null);
+    } finally {
+      state.restore();
+    }
   });
 
   it("refuses a release whose pack failed its rehearsal, with the pack's last lines and its log", () => {

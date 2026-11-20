@@ -409,7 +409,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 369 | An engine outlives Visual Studio | no | 2026-11-19 |
 | 370 | Start Session opens the engine inside Visual Studio | no | 2026-11-19 |
 | 371 | A Dabbler layout, and the way back | no | 2026-11-19 |
-| 372 | Release 3.40.0 (release: 3.40.0) | — | not declared |
+| 372 | A session closed at the cap can be reviewed again | no | 2026-11-19 |
+| 373 | A fix made at the cap is reviewed before the session closes | — | not declared |
+| 374 | Release 3.40.0 (release: 3.40.0) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -4128,3 +4130,9 @@ Give the Visual Studio extension one Dabbler Layout command, and the same comman
 **Amended after acceptance:**
 
 - 2026-11-19 — step 'layout': its files: Step 1 found no call re-docks a window a profile has already placed; only the registration places it, so the Dabbler Terminal takes a new window identity (its Guid, in TerminalWindow.cs) for the right-hand registration to reach profiles that put it under Output (claude-code (anthropic, claude-opus-5-5))
+
+### Session 372 — A session closed at the cap can be reviewed again
+
+**Releasable: no.**
+
+Give a release refused over a closed session's REMEDIATED_AT_CAP verdict a forward exit. `dabbler verify reopen --session-number N --reason "<why>"` -- a person's verb, refused to an engine with the persons-verb sentence the other person's verbs use -- accepts only a session that is complete with the verdict REMEDIATED_AT_CAP while no session is in flight, and refuses every other case in one sentence naming the verdict (or status) it found. It buys exactly one round by the Primary Reviewer, dispatched through the existing `dispatchVerification` with N's authoring provider excluded, whose evidence is the diff from N's startCommit to HEAD restricted to the paths N's own `Session N: ` commit touched, N's section of session-plan.md as it reads now, and the findings N's last round left unreviewed. The grant and the round are appended to N's own ledger after its existing rows, changing none of them. A round with no blocking finding sets N's verdict to VERIFIED in sessions.json through one writer in writers.ts, which refuses any verdict but REMEDIATED_AT_CAP to change, and the router commits and pushes that file the way the close does; a blocking round changes no verdict, and nothing accepts a verdict from the caller. The release start's refusal (`judgeReleasePreflight`) names each unverified session with its verdict and the step-1 command whole and ready to paste, and, where that session's last closed review left blocking findings, names them and says to plan a session that fixes them and then review the session again; the old "Plan a session that fixes and verifies it" sentence goes. docs/driving-a-session.md gains this stop and its exit beside the cap terminal, and the changelog's 3.40.0 section says a release refused over an unreviewed session now has a way on.

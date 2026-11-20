@@ -41,6 +41,7 @@ import {
   declareSessionTask,
   planStepKey,
   recordAmendment,
+  recordClosedSessionVerified,
   recordReleaseHold,
   releaseHold,
   recordProjectPlan,
@@ -504,5 +505,30 @@ describe("the window before a session declares", () => {
     assert.match(sentence, /session 001 is in flight and has not declared its task yet/);
     assert.match(sentence, /refused while the tree carries changes/);
     assert.match(sentence, /git add -A && git commit -m/);
+  });
+});
+
+describe("verifying a session after its close", () => {
+  it("rewrites only a REMEDIATED_AT_CAP verdict, and only to VERIFIED", () => {
+    const { sessionsDir } = makeSessionsDir();
+    const path = join(sessionsDir, "sessions.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        schemaVersion: 5,
+        sessions: [
+          { number: 1, title: "First", status: "complete", verificationVerdict: "REMEDIATED_AT_CAP" },
+          { number: 2, title: "Second", status: "complete", verificationVerdict: "ISSUES_FOUND" },
+        ],
+      }),
+      "utf8",
+    );
+    assert.throws(
+      () => recordClosedSessionVerified(sessionsDir, 2, { rounds: 3 }),
+      /session 2 is not a session closed REMEDIATED_AT_CAP/,
+    );
+    recordClosedSessionVerified(sessionsDir, 1, { rounds: 3 });
+    const sessions = JSON.parse(readFileSync(path, "utf8")).sessions as Array<Record<string, unknown>>;
+    assert.deepEqual(sessions.map((row) => row["verificationVerdict"]), ["VERIFIED", "ISSUES_FOUND"]);
   });
 });

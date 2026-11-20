@@ -36,6 +36,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   again puts back the windows you had, without ending the engine
   and without adding to your saved window layouts. An option, off by
   default, applies it when a session starts.
+- **A release refused over an unreviewed session now has a way on.** When
+  a session closed at the verification cap, with its fix never reviewed,
+  the next release start refused and named a way forward that could not
+  clear it. It now names the session's verdict and the command that buys
+  the missing review, `dabbler verify reopen --session-number N --reason
+  "<why>"`: one round by the Primary Reviewer over what the session
+  changed, as it stands now. A clean round marks the session verified and
+  the release can start; a round that finds something says what, so a
+  session can be planned to fix it.
 
 ### Changed
 

@@ -9,26 +9,33 @@
 // it is written as the loop rather than as one refusal, because either verb
 // alone looked correct.
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { after, before, describe, it } from "node:test";
 
 import {
   appendDispute,
   appendReopen,
   appendRound,
   readReopens,
+  readRounds,
   standingReopen,
 } from "../src/ledger.ts";
 import { amendRoundCap, writeRun } from "../src/driver.ts";
+import { capture } from "../src/output.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_TERMINAL,
   noRoundReason,
   standingTerminal,
 } from "../src/verify/rounds.ts";
-import { classifyStuck } from "../src/verify/reopen.ts";
-import { gitAnswers, tempDir } from "./support/answers.ts";
+import { classifyStuck, reviewClosedSession } from "../src/verify/reopen.ts";
+import { verifyVerb } from "../src/cli/verify.ts";
+import { judgeReleasePreflight, readReleaseFacts } from "../src/session.ts";
+import { type AnswerRow, gitAnswers, routeAnswers, seed, tempDir, type RoutedCall } from "./support/answers.ts";
 
-gitAnswers([[(args) => args[0] === "cat-file" && args[1] === "-e", { code: 128 }]]);
+const NO_ANCHORS: AnswerRow[] = [[(args) => args[0] === "cat-file" && args[1] === "-e", { code: 128 }]];
+gitAnswers(NO_ANCHORS);
 
 /** A terminal row of the kind a spent cap writes. */
 const cappedAt = (n: number) => ({
@@ -217,5 +224,185 @@ describe("what the reopen verb refuses", () => {
       afterRound: 3,
       terminal: "cap-clean",
     });
+  });
+});
+
+describe("a review of a session that closed at the cap", () => {
+  // Session 2 changed `src/a.ts` from START; session 3, after it,
+  // changed `a.ts` again and `b.ts`, which 2 never touched. What git
+  // would say of that history, with HEAD after 3.
+  const START = "5".repeat(40);
+  const NOW: Record<string, string> = {
+    "src/a.ts": "-one\n+two, and later three",
+    "src/b.ts": "-bee\n+bee later",
+  };
+  const landed: string[] = [];
+  let restore: () => void = () => {};
+  before(() => {
+    restore = gitAnswers([
+      ...NO_ANCHORS,
+      [["rev-parse", "--show-toplevel"], (_args, at) => ({ stdout: join(at, "..", "..") })],
+      [["rev-parse", "HEAD^{tree}"], { stdout: "c".repeat(40) }],
+      [["rev-parse", "--verify", "HEAD"], { stdout: "d".repeat(40) }],
+      [(args) => args[0] === "log" && args.includes("--grep=^Session 2: "), { stdout: "3".repeat(40) }],
+      [["diff-tree"], { stdout: "src/a.ts\0" }],
+      [(args) => args[0] === "commit" || args[0] === "push", (args) => (landed.push(args.join(" ")), {})],
+      [
+        (args) => args[0] === "diff" && args.includes(START) && args.includes("HEAD"),
+        (args) => ({
+          stdout: Object.entries(NOW)
+            .filter(([path]) => args.includes(path))
+            .map(([path, change]) => `--- a/${path}\n+++ b/${path}\n${change}`)
+            .join("\n"),
+        }),
+      ],
+    ]);
+  });
+  after(() => restore());
+
+  /** Session 2 closed at the cap with one finding unreviewed. */
+  function closedAtCap(verdict = "REMEDIATED_AT_CAP"): string {
+    const repo = tempDir();
+    seed(repo, {
+      "docs/sessions/session-plan.md":
+        "### Session 2 of 3: The fix\nMake a.ts say two.\n\n### Session 3 of 3: Later\nTouch b.\n",
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [{ number: 1, title: "Before", status: "complete", verificationVerdict: "VERIFIED" }, {
+          number: 2,
+          title: "The fix",
+          status: "complete",
+          verificationVerdict: verdict,
+          startCommit: START,
+          orchestrator: { engine: "claude-code", provider: "anthropic", model: "claude-opus-5-5" },
+        }],
+      }),
+    });
+    const finding = { severity: "major", description: "a.ts still says one", blocking: true };
+    appendRound(repo, 2, {
+      round: 1,
+      verdict: "ISSUES_FOUND",
+      blocking: true,
+      reviewer_model: "m",
+      reviewer_provider: "openai",
+      orchestrator_provider: "anthropic",
+      findings: [finding],
+      completion_tree: "b".repeat(40),
+      recorded_at: "2026-11-19T10:00:00.000000-05:00",
+    });
+    appendRound(repo, 2, { ...cappedAt(2), remediated: { reviewed_round: 1, findings: [finding] } });
+    return repo;
+  }
+
+  it("refuses a session that did not close at the cap, naming the verdict it found", async () => {
+    const repo = closedAtCap("ISSUES_FOUND");
+    const run = await capture(() =>
+      reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "r", engine: false }),
+    );
+    assert.notEqual(run.value, 0);
+    assert.match(run.stderr, /session 2 cannot be reviewed again: its verdict is ISSUES_FOUND/);
+    assert.equal(readRounds(repo, 2).length, 2);
+  });
+
+  it("is refused to an engine, and writes nothing", async () => {
+    const repo = closedAtCap();
+    const run = await capture(() =>
+      reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "r", engine: true }),
+    );
+    assert.notEqual(run.value, 0);
+    assert.match(run.stderr, /a person's verb, never the engine's/);
+    assert.equal(readRounds(repo, 2).length, 2);
+  });
+
+  it("shows the reviewer the trunk's present text of the paths the session touched, and no other", async () => {
+    const repo = closedAtCap();
+    const calls: RoutedCall[] = [];
+    const restore = routeAnswers([["openai", "VERIFIED\n\nNothing blocks.\n"]], { calls });
+    try {
+      const run = await capture(() =>
+        reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "never reviewed", engine: false }),
+      );
+      assert.equal(run.value, 0, run.stderr);
+    } finally {
+      restore();
+    }
+    const shown = calls[0]?.content ?? "";
+    assert.match(shown, /\+two, and later three/);
+    assert.doesNotMatch(shown, /bee later/);
+    assert.match(shown, /Make a\.ts say two\./);
+    assert.match(shown, /a\.ts still says one/);
+    assert.deepEqual(calls[0]?.exclude, ["anthropic"]);
+    const rows = readRounds(repo, 2);
+    assert.equal(rows.length, 3);
+    assert.equal(rows[2]?.["verdict"], "VERIFIED");
+    assert.equal(readReopens(repo, 2)[0]?.["after_round"], 2);
+  });
+
+  /** The review, answered by the Primary Reviewer with `reply`. */
+  async function reviewed(repo: string, reply: string): Promise<number> {
+    const restoreRoute = routeAnswers([["openai", reply]]);
+    try {
+      return (await capture(() =>
+        reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "never reviewed", engine: false }),
+      )).value;
+    } finally {
+      restoreRoute();
+    }
+  }
+  const verdictOf = (repo: string): unknown =>
+    (JSON.parse(readFileSync(join(repo, "docs", "sessions", "sessions.json"), "utf8")).sessions[1] as Record<string, unknown>)[
+      "verificationVerdict"
+    ];
+
+  it("makes the verdict VERIFIED on a clean round, and commits and pushes the state file", async () => {
+    const repo = closedAtCap();
+    landed.length = 0;
+    assert.equal(await reviewed(repo, "VERIFIED\n\nNothing blocks.\n"), 0);
+    assert.equal(verdictOf(repo), "VERIFIED");
+    assert.match(landed[0] ?? "", /^commit -m Verify session 2 of sessions after its close -- .*sessions\.json$/);
+    assert.equal(landed[1], "push");
+  });
+
+  it("leaves the verdict where a round finds something blocking", async () => {
+    const repo = closedAtCap();
+    landed.length = 0;
+    const code = await reviewed(repo, "ISSUES FOUND\n\nIssue 1: a.ts still says one.\nSeverity: Major\nEvidence paths: src/a.ts\n");
+    assert.notEqual(code, 0);
+    assert.equal(verdictOf(repo), "REMEDIATED_AT_CAP");
+    assert.equal(readRounds(repo, 2)[2]?.["blocking"], true);
+    assert.deepEqual(landed, []);
+    // What the release start then says is read from that round.
+    const sessionsDir = join(repo, "docs", "sessions");
+    const refused = String(judgeReleasePreflight(3, "2.0.0", { ...readReleaseFacts(sessionsDir, 3), packagingDeclared: true }));
+    assert.match(refused, /session 002 carries REMEDIATED_AT_CAP, and its last review found it blocking:\s+- a\.ts still says one/);
+    assert.match(refused, /Plan a session that fixes them, then review the session again/);
+  });
+
+  it("is refused to an engine at the command line, and writes nothing", async () => {
+    const repo = closedAtCap();
+    const before = process.env["CLAUDECODE"];
+    process.env["CLAUDECODE"] = "1";
+    try {
+      const run = await capture(() =>
+        verifyVerb(["reopen", "--session-number", "2", "--reason", "review", "--sessions-dir", join(repo, "docs", "sessions")]),
+      );
+      assert.notEqual(run.value, 0);
+      assert.match(run.stderr, /a person's verb, never the engine's/);
+    } finally {
+      if (before === undefined) delete process.env["CLAUDECODE"];
+      else process.env["CLAUDECODE"] = before;
+    }
+    assert.equal(readRounds(repo, 2).length, 2);
+  });
+
+  it("refuses a session the plan has no section for, rather than reviewing against nothing", async () => {
+    const repo = closedAtCap();
+    seed(repo, { "docs/sessions/session-plan.md": "### Session 3 of 3: Later\nTouch b.\n" });
+    const run = await capture(() =>
+      reviewClosedSession(join(repo, "docs", "sessions"), { sessionNumber: 2, reason: "r", engine: false }),
+    );
+    assert.notEqual(run.value, 0);
+    assert.match(run.stderr, /the session plan has no section for session 2/);
+    assert.equal(readRounds(repo, 2).length, 2);
   });
 });

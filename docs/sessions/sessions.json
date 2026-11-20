@@ -7338,13 +7338,12 @@
         "model": "claude-opus-5-5",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verificationVerdict": "REVIEWED_BY_PERSON",
       "verification": {
-        "rounds": 7,
-        "verifierModel": "gpt-6.1-terra",
-        "verifierProvider": "openai",
-        "transport": "api",
-        "unreviewedFindings": 2
+        "rounds": 11,
+        "reviewedBy": "darndestdabbler",
+        "reason": "Read rounds 1-10. Ships in 3.40.0 with one stated limitation: a session that closes while Visual Studio is not running leaves its engine running; session 377 fixes it.",
+        "reviewedTree": "af58783d6c2c7f4be25db0925b8af9c99d399bac"
       },
       "frameworkVersion": "3.38.0",
       "startCommit": "9f87c32f2fcc267bba4c6387fc095316250c43cd"

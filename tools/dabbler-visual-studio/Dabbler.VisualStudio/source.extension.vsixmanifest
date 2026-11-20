@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="DarndestDabbler.DabblerAiOrchestration.VisualStudio" Version="3.40.0" Language="en-US" Publisher="DarndestDabbler" />
+    <DisplayName>Dabbler AI Orchestration for Visual Studio</DisplayName>
+    <Description xml:space="preserve">AI writes the code in your solution. The framework runs your build and tests, has a model from another provider review the work, and commits only what passed.</Description>
+    <MoreInfo>https://github.com/darndestdabbler/dabbler-ai-orchestration</MoreInfo>
+    <License>LICENSE</License>
+    <GettingStartedGuide>https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guide/visual-studio.md</GettingStartedGuide>
+    <Icon>darndest-dabbler-icon.png</Icon>
+    <Tags>AI, agents, code review, Claude, Copilot, sessions, testing</Tags>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,19.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+  </Assets>
+</PackageManifest>

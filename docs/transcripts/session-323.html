@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 323 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 323 transcript</h1>
+<p class="stamp">Rendered 2026-11-11T16:10:03.543Z by dabbler-ai-router 3.32.1 at 28f9212624d54c779d4ba2845d84fd85d00ee982.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-11T11:04:59.560-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 323 of 324: The listing says it in plain words, and names the transcript</h3>
+<p>Scope: <code>tools/dabbler-ai-orchestration/README.md</code>, <code>README.md</code>, <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> The operator read the 3.32.3 listing on 2026-11-11. It reads well to someone who already knows the framework, and several phrases do not read on a first pass: &quot;Work a non-goal rules out is a blocking finding&quot;, &quot;a tree that changed&quot;, &quot;deterministic&quot;, &quot;the trunk&quot;, &quot;engine CLI&quot;, &quot;reach to two provider families&quot;. The listing also never says that every session leaves a transcript page in the repository, which is the strongest answer to &quot;what did the AI actually do&quot;.</p>
+<p><strong>Step 1 -- plain words on the Marketplace page.</strong> These changes, and the same kind of change wherever else the page asks a reader to know the framework's vocabulary already:</p>
+<p>| Where | Now | Becomes | |---|---|---| | Paragraph | &quot;ordinary deterministic code&quot; | &quot;ordinary code that does the same thing every time&quot; | | Black-box row | unchanged | unchanged | | Cheats row | &quot;hashes the code so that work cannot be claimed over a tree that changed. An AI cannot easily cheat, and each way one is found to is closed with a deterministic check.&quot; | &quot;records a SHA-256 hash of the code it checked, so a passing result cannot be claimed for code that changed afterwards. An AI cannot easily cheat, and each way around the rules that turns up is closed with a new automatic check.&quot; | | Scope row | &quot;Reviewers judge the work against the plan's goals and non-goals. Work a non-goal rules out is a blocking finding.&quot; | &quot;Reviewers judge the work against what the plan says the session will and will not do. Out-of-scope work that AI does anyway is blocked by the framework.&quot; (the operator's wording) | | Untested row, risk | &quot;Code reaches the trunk untested&quot; | &quot;Untested code gets committed&quot; | | Stuck row | &quot;<strong>Consult with AI</strong>, the <strong>Mechanic</strong>, and a person's decision on the record.&quot; | &quot;A person can ask another AI what went wrong (<strong>Consult with AI</strong>), let a fresh AI make the smallest fix (the <strong>Mechanic</strong>), or decide for themselves, and the decision is recorded.&quot; | | Tests section | &quot;against a hash of the tree it ran on&quot; | &quot;against a SHA-256 hash of the code it ran on&quot; | | Requirements | &quot;An engine CLI on PATH&quot;, &quot;Reach to two provider families&quot; | &quot;An AI coding tool you run from the command line&quot;, &quot;Access to models from two different AI companies&quot; |</p>
+<p><strong>Step 2 -- the transcript.</strong> Under *You can see where the work is*, one paragraph: every session, a cancelled one included, leaves a self-contained HTML page in the repository, under <code>docs/transcripts/</code>, carrying that session's plan, the work done, each issue the reviewer found and how it was dealt with, and the tests that ran. It links to *The transcript* in <code>the-record.md</code>. It says the page is committed with the code and needs nothing to open it, and that a repository can turn it off (<code>dabbler.transcript</code>), because it can.</p>
+<p><strong>Step 3 -- the root README</strong> carries the paragraph and the table word for word as the Marketplace page does, as 321 established.</p>
+<p><strong>Step 4 -- the number.</strong> <code>version.json</code> goes to 3.32.4, stamped with <code>npm run stamp:version</code> -- a patch: wording only. The changelog's 3.32.4 section says the listing reads more plainly and names the transcript.</p>
+<p><strong>Non-goals.</strong> The guide pages: a later session if the operator wants the same pass there. A new screenshot or a changed image. Any number beyond the round cap. The font size of the listing's body text: Markdown cannot set it and the Marketplace's own stylesheet decides it, so it is not this session's to change. Any change to behaviour.</p>
+<p><strong>Tests.</strong> None added. The lint control runs <code>check-shipped-docs.mjs</code>; <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes, as 3.32.4 in session 324.</p>
+<h2>Work Plan</h2>
+<p>Put the 3.32.3 Marketplace listing (tools/dabbler-ai-orchestration/README.md) into plain words a first-time reader can follow: replace 'deterministic', 'a tree that changed', 'the trunk', 'engine CLI', 'reach to two provider families' and the non-goal wording with the phrasings the session plan gives, and do the same wherever else the page leans on the framework's own vocabulary. Add one paragraph under 'You can see where the work is' saying that every session, a cancelled one included, leaves a self-contained HTML transcript page under docs/transcripts/ with the plan, the work, each review finding and how it was dealt with, and the tests that ran; that it is committed with the code and needs nothing to open it; that a repository can turn it off with dabbler.transcript; linking to 'The transcript' in the-record.md. Carry the same opening paragraph and risk table word for word into the root README.md (and plain the root README's one sentence that repeats the requirements' vocabulary), then bump version.json to 3.32.4, stamp the manifests with npm run stamp:version, and add a 3.32.4 changelog section saying the listing reads more plainly and names the transcript.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/5c11815851d09e1408ad08c7d52a702d488868df"><code>5c11815851d09e1408ad08c7d52a702d488868df</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Plain words</td><td><p>In tools/dabbler-ai-orchestration/README.md apply the session plan's table of replacements (opening paragraph, cheats row, scope row, untested row's risk, stuck row, tests section, requirements), and make the same kind of change wherever else the page asks a reader to know the framework's vocabulary already. The black-box row is unchanged.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/README.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/README.md','utf8');const bad=['deterministic','a tree that changed','reaches the trunk','engine CLI','Reach to two provider families','Work a non-goal rules out'].filter(p=&gt;t.includes(p));const need=['SHA-256','Untested code gets committed','Access to models from two different AI companies','An AI coding tool you run from the command line'].filter(p=&gt;!t.includes(p));if(bad.length||need.length){console.error({bad,need});process.exit(1)}</code></td><td>yes</td></tr>
+<tr><td>Transcript paragraph</td><td><p>Under 'You can see where the work is' in tools/dabbler-ai-orchestration/README.md add one paragraph: every session, a cancelled one included, leaves a self-contained HTML page under docs/transcripts/ carrying its plan, the work done, each issue the reviewer found and how it was dealt with, and the tests that ran; it is committed with the code and needs nothing to open it; a repository can turn it off with dabbler.transcript. Link it to 'The transcript' section of docs/guide/the-record.md.</p></td><td><span class="mono">tools/dabbler-ai-orchestration/README.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code><br><code>node -e const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/README.md','utf8');for(const p of ['docs/transcripts/','dabbler.transcript','the-record.md#the-transcript-one-page-per-session-committed']){if(!t.includes(p)){console.error('missing '+p);process.exit(1)}}</code></td><td>yes</td></tr>
+<tr><td>Root readme</td><td><p>Carry the Marketplace page's opening paragraph and risk table into the root README.md word for word, as session 321 established, and plain the Install section's sentence that repeats 'an engine CLI' and 'reach to two provider families' to match the new requirements wording.</p></td><td><span class="mono">README.md</span></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code><br><code>node -e const fs=require('fs');const grab=f=&gt;{const t=fs.readFileSync(f,'utf8').replace(/\r\n/g,'\n');const a=t.indexOf('Dabbler lets an AI write the code');const b=t.indexOf('\n---\n',a);return t.slice(a,b)};const m=grab('tools/dabbler-ai-orchestration/README.md'),r=grab('README.md');if(!m||m!==r){console.error('root README does not carry the listing paragraph and table word for word');process.exit(1)}const root=fs.readFileSync('README.md','utf8');if(/engine CLI|reach to two provider families|deterministic/.test(root)){console.error('old wording in README.md');process.exit(1)}</code></td><td>yes</td></tr>
+<tr><td>Version 3 32 4</td><td><p>Set version.json to 3.32.4 and run npm run stamp:version to write the manifests and lockfile; add a [3.32.4] — 2026-11-11 section to the extension's CHANGELOG.md saying the listing reads more plainly and names the transcript, with no behaviour changed.</p></td><td><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.32.4'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.32.4]')){process.exit(1)}</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>The guide pages under docs/guide/ are not reworded: a later session if the operator wants the same pass there.</li><li>No new screenshot and no changed image.</li><li>The font size of the listing's body text is not changed: Markdown cannot set it and the Marketplace stylesheet decides it.</li><li>No change to behaviour, code or tests; no release is published here (session 324 releases 3.32.4).</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[16:04:59]</span> <span class="muted">run-started</span> session=323 mode=pull</div>
+<div class="line"><span class="at">[16:04:59]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[16:05:40]</span> <span class="muted">run-resumed</span> session=323 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[16:05:40]</span> <span class="muted">plan-accepted</span> steps=[&quot;plain-words&quot;,&quot;transcript-paragraph&quot;,&quot;root-readme&quot;,&quot;version-3-32-4&quot;] non_goals=4</div>
+<div class="line"><span class="at">[16:05:40]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[16:05:40]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=plain-words</div>
+<div class="line"><span class="at">[16:06:06]</span> <span class="muted">run-resumed</span> session=323 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:06:08]</span> <span class="muted">check-passed</span> step=plain-words argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[16:06:08]</span> <span class="muted">check-passed</span> step=plain-words argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/README.md','utf8');const bad=['deterministic','a tree that changed','reaches the trunk','engine CLI','Reach to two provider families','Work a non-goal rules out'].filter(p=&gt;t.includes(p));const need=['SHA-256','Untested code gets committed','Access to models from two different AI companies','An AI coding tool you run from the command line'].filter(p=&gt;!t.includes(p));if(bad.length||need.length){console.error({bad,need});process.exit(1)}&quot;]</div>
+<div class="line"><span class="at">[16:06:08]</span> <span class="muted">report-accepted</span> seq=2 step=plain-words files=[&quot;tools/dabbler-ai-orchestration/README.md&quot;] notes=Applied the plan's replacement table; also plained 'Copilot seat'/'provider API keys' in Configuration and 'declared suites' in the tests section.</div>
+<div class="line"><span class="at">[16:06:08]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=transcript-paragraph</div>
+<div class="line"><span class="at">[16:06:21]</span> <span class="muted">run-resumed</span> session=323 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:06:23]</span> <span class="muted">check-passed</span> step=transcript-paragraph argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[16:06:23]</span> <span class="muted">check-passed</span> step=transcript-paragraph argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const t=require('fs').readFileSync('tools/dabbler-ai-orchestration/README.md','utf8');for(const p of ['docs/transcripts/','dabbler.transcript','the-record.md#the-transcript-one-page-per-session-committed']){if(!t.includes(p)){console.error('missing '+p);process.exit(1)}}&quot;]</div>
+<div class="line"><span class="at">[16:06:23]</span> <span class="muted">report-accepted</span> seq=3 step=transcript-paragraph files=[&quot;tools/dabbler-ai-orchestration/README.md&quot;] notes=Added the transcript paragraph under 'You can see where the work is', linked to the-record.md#the-transcript-one-page-per-session-committed.</div>
+<div class="line"><span class="at">[16:06:23]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=root-readme</div>
+<div class="line"><span class="at">[16:06:41]</span> <span class="muted">run-resumed</span> session=323 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:06:43]</span> <span class="muted">check-passed</span> step=root-readme argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[16:06:43]</span> <span class="muted">check-passed</span> step=root-readme argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');const grab=f=&gt;{const t=fs.readFileSync(f,'utf8').replace(/\\r\\n/g,'\\n');const a=t.indexOf('Dabbler lets an AI write the code');const b=t.indexOf('\\n---\\n',a);return t.slice(a,b)};const m=grab('tools/dabbler-ai-orchestration/README.md'),r=grab('README.md');if(!m||m!==r){console.error('root README does not carry the listing paragraph and table word for word');process.exit(1)}const root=fs.readFileSync('README.md','utf8');if(/engine CLI|reach to two provider families|deterministic/.test(root)){console.error('old wording in README.md');process.exit(1)}&quot;]</div>
+<div class="line"><span class="at">[16:06:44]</span> <span class="muted">report-accepted</span> seq=4 step=root-readme files=[&quot;README.md&quot;] notes=Root README carries the listing's opening paragraph and risk table word for word; Install sentence uses the new requirements wording.</div>
+<div class="line"><span class="at">[16:06:44]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-3-32-4</div>
+<div class="line"><span class="at">[16:06:59]</span> <span class="muted">run-resumed</span> session=323 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[16:07:01]</span> <span class="muted">check-passed</span> step=version-3-32-4 argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[16:07:01]</span> <span class="muted">check-passed</span> step=version-3-32-4 argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');if(JSON.parse(fs.readFileSync('version.json','utf8')).version!=='3.32.4'||!fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8').includes('## [3.32.4]')){process.exit(1)}&quot;]</div>
+<div class="line"><span class="at">[16:07:01]</span> <span class="muted">report-accepted</span> seq=5 step=version-3-32-4 files=[&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=version.json 3.32.4, stamped with npm run stamp:version; changelog 3.32.4 section added.</div>
+<div class="line"><span class="at">[16:07:01]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[16:07:02]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[16:07:02]</span> <span class="muted">job-started</span> name=verification pid=35444 log=.dabbler/runs/s323/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:07:42]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s323/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[16:07:42]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[16:07:42]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[16:07:43]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[16:07:43]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=33612 log=.dabbler/runs/s323/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:07:44]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s323/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[16:07:44]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[16:07:45]</span> <span class="muted">job-started</span> name=run of record: typescript pid=26816 log=.dabbler/runs/s323/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:09:33]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s323/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[16:09:33]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[16:09:34]</span> <span class="muted">job-started</span> name=run of record: extension pid=34204 log=.dabbler/runs/s323/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:09:54]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s323/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[16:09:54]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[16:09:58]</span> <span class="muted">landed</span> commit=5c11815851d09e1408ad08c7d52a702d488868df</div>
+<div class="line"><span class="at">[16:09:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[16:09:58]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[16:09:58]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[16:09:58]</span> <span class="muted">job-started</span> name=close pid=41524 log=.dabbler/runs/s323/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:10:03]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s323/driver/jobs/close.log</div>
+<div class="line"><span class="at">[16:10:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>1 finding</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit — Issue:** Some framework-specific vocabulary remains in image alt text, including “engine,” “run of record,” and “land phase,” despite the broader plain-language goal. **Location:** `tools/dabbler-ai-orchestration/README.md`. **Fix:** Rephrase those terms for first-time readers in a later documentation pass.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>1s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>108s</td><td>1493</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>20s</td><td>316</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

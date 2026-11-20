@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 364 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 364 transcript</h1>
+<p class="stamp">Rendered 2026-11-18T20:37:51.743Z by dabbler-ai-router 3.35.0 at 450fdf4ff995cce56783ac3d78b34fee2bc1a4f8.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-18T15:24:39.421-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 364 of 365: Microsoft's own models can author and review</h3>
+<p>Scope: <code>packages/router/src/transports/copilot.ts</code> (the vendor a seat model's id names), <code>packages/router/src/identity.ts</code> (the refusal for a model the catalog lists and nobody has placed), <code>packages/router/src/cli/session.ts</code> (the <code>--provider</code> help), <code>packages/router/test/</code> (the tests named after those files), <code>docs/schema-reference.md</code>, <code>docs/model-and-pricing-sources.md</code>, <code>docs/guide/</code> (where the vendors are named), <code>version.json</code>, <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> A Copilot seat now lists three models Microsoft trained itself: <code>mai-code-1.1-flash</code>, <code>mai-code-2-flash</code> and <code>mai-code-2</code>. The catalog on the operator's machine has read all three, enabled, since 2026-11-18, and records each with no vendor, because the seat states none and the id-prefix table knows only <code>claude</code>, <code>gpt</code>, <code>o1</code>, <code>o3</code>, <code>o4</code> and <code>gemini</code>. A model with no vendor is never offered as a reviewer, and Start refuses it as the author with words that say it is not in the catalog, which is untrue. Nobody can choose these models for anything.</p>
+<p>They are a fourth vendor and not OpenAI under another name. Microsoft's model card of 2026-11-17 says both MAI Code 2 models were &quot;pre-trained and post-trained by Microsoft from scratch&quot;, names Microsoft's own MAI-Base-2 as the only dependency, and says the Flash model was distilled from &quot;a larger in-house MAI teacher model&quot;. That is Microsoft's own account and nobody outside can audit it; it is the same standing the other three vendors' accounts have.</p>
+<p><strong>What.</strong></p>
+<p><strong>Step 1 -- the vendor.</strong> An id that begins <code>mai</code> names the vendor <code>microsoft</code>, and <code>microsoft</code> is a vendor a seat may front. After a free <code>dabbler discovery refresh</code>, the three models are recorded with that vendor, are offered for the author and for both reviewers on the seat, and answer to the cross-vendor rule as any other model does: a Microsoft model may review work an Anthropic, OpenAI or Google model wrote, and may not review work a Microsoft model wrote.</p>
+<p><strong>Step 2 -- a catalog read before this.</strong> A machine whose catalog was read by an older router still records the three with no vendor. A person who chooses one there is told that the catalog lists the model and names no vendor for it, and that <code>dabbler discovery refresh</code> reads it again for nothing. The same words are given for any listed model whose id names no vendor, where today's say it is not listed. Nothing is placed by guessing at the time a session starts.</p>
+<p><strong>Step 3 -- the words.</strong> The <code>--provider</code> help of <code>session start</code> and <code>session next</code> names four vendors. <code>docs/schema-reference.md</code> and <code>docs/model-and-pricing-sources.md</code> say that <code>microsoft</code> is reached through the seat only: there is no key for it, and no direct endpoint. The guide names the fourth vendor wherever it names the three.</p>
+<p><strong>Step 4 -- the number.</strong> <code>version.json</code> goes to 3.38.0 (a minor: a vendor a person could not choose before), stamped, and the changelog says what a person with a Copilot seat can now choose.</p>
+<p><strong>Non-goals.</strong> A direct-API transport for Microsoft Foundry, where MAI Code 2 Flash is also served. A key or a credential row for Microsoft. Any default that picks a Microsoft model for a role nobody chose it for. A ranking of the three: which one reviews is the person's choice in Configuration. A vendor field read from the seat, which states none. Anything in the Visual Studio extension, which prints what the router says.</p>
+<p><strong>Tests.</strong> In <code>copilot.test.ts</code>: an id beginning <code>mai</code> is placed as <code>microsoft</code>, and a seat entry for one is recorded with that vendor. In <code>identity.test.ts</code>: a seat session whose model is a <code>mai</code> id resolves to <code>microsoft</code>; a listed model with no vendor is refused with words that name the refresh. In <code>roleSelection.test.ts</code>: a Microsoft model is offered to review an OpenAI author and removed for a Microsoft one. The docs check reads the changed pages.</p>
+<p><strong>After it lands, by the operator.</strong> One session whose reviewer is <code>mai-code-2</code>, chosen in Configuration, is the only proof that it reviews well enough to keep. <code>mai-code-1.1-flash</code> is reported, by one source and not by GitHub, to leave Copilot on 2026-12-18: choose one of the other two.</p>
+<p><strong>Releasable.</strong> Yes, as 3.38.0 in session 365.</p>
+<h2>Work Plan</h2>
+<p>Make Microsoft's own models on a Copilot seat choosable. An id that begins <code>mai</code> is placed as the vendor <code>microsoft</code> by the seat's id-prefix table in transports/copilot.ts, and <code>microsoft</code> joins the vendors a seat may front, so after a free <code>dabbler discovery refresh</code> mai-code-1.1-flash, mai-code-2-flash and mai-code-2 are recorded with that vendor, offered for the author and both reviewers on the seat, and held to the cross-vendor rule like any other model. Where a catalog read by an older router still lists a model with no vendor, every refusal a person meets for choosing it (identity at Start, the start's held-selection check, and the route's not-listed refusal) says the catalog lists the model and names no vendor for it, and that <code>dabbler discovery refresh</code> reads it again for nothing, instead of saying it is not listed; nothing guesses a vendor at start. The <code>--provider</code> help of <code>session start</code> and <code>session next</code> names four vendors; docs/schema-reference.md, docs/model-and-pricing-sources.md and the guide say <code>microsoft</code> is reached through the seat only, with no key and no direct endpoint. version.json goes to 3.38.0, stamped into every manifest, and the changelog's 3.38.0 section says what a person with a Copilot seat can now choose.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/67cce034fc0c65933f5be36d556fe986a13ff807"><code>67cce034fc0c65933f5be36d556fe986a13ff807</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Microsoft vendor</td><td><p>In packages/router/src/transports/copilot.ts add <code>[&quot;mai&quot;, &quot;microsoft&quot;]</code> to PROVIDER_PREFIXES and <code>microsoft</code> to KNOWN_PROVIDERS. In copilot.test.ts add a test that inferProvider places a <code>mai</code> id as <code>microsoft</code> and that a seat entry for one is recorded with that vendor; in identity.test.ts a seat session whose model is a <code>mai</code> id resolves to <code>microsoft</code>; in roleSelection.test.ts a Microsoft model is offered to review an OpenAI author and removed for a Microsoft one.</p></td><td></td><td><code>node --test packages/router/test/copilot.test.ts packages/router/test/identity.test.ts packages/router/test/roleSelection.test.ts</code></td><td>yes</td></tr>
+<tr><td>Vendorless refusal</td><td><p>Add one exported reader in packages/router/src/identity.ts that says whether this machine's catalog lists a model (by normalized token, on either block) with no vendor it can place, and one sentence for it: the catalog lists the model and names no vendor for it, and <code>dabbler discovery refresh</code> reads it again for nothing. Use it in resolveOrchestratorIdentity's multi-provider refusal, in session.ts's notACandidate (the start's held-selection reason), and in route.ts's CAUSE_NOT_LISTED message, so each says that instead of 'not listed' for such a model. No vendor is guessed. In identity.test.ts add a test that a listed model with no vendor is refused with words naming the refresh; update or confirm the session.test.ts and route.test.ts assertions on the not-listed words.</p></td><td></td><td><code>node --test packages/router/test/identity.test.ts packages/router/test/route.test.ts</code></td><td>yes</td></tr>
+<tr><td>Four vendors words</td><td><p>Make the <code>--provider</code> help of <code>session start</code> and <code>session next</code> in packages/router/src/cli/session.ts name four vendors (anthropic | openai | google | microsoft). In docs/schema-reference.md and docs/model-and-pricing-sources.md say that <code>microsoft</code> is inferred from the <code>mai</code> prefix and is reached through the Copilot seat only, with no key and no direct endpoint. In docs/guide/configuration.md and docs/guide/cost-and-what-is-sent.md, name the fourth vendor where the three are named, as seat-only.</p></td><td></td><td><code>node packages/router/scripts/check-shipped-docs.mjs</code></td><td>yes</td></tr>
+<tr><td>Version 3 38 0</td><td><p>Set version.json to 3.38.0 and run <code>npm run stamp:version</code> as the work, so every manifest carries it. Add a <code>## [3.38.0]</code> section to tools/dabbler-ai-orchestration/CHANGELOG.md under [Unreleased] saying that a person with a Copilot seat can now choose Microsoft's MAI Code models to author or review, that a refresh (free) is needed on a machine that read them before, and that mai-code-1.1-flash is reported to leave Copilot on 2026-12-18.</p></td><td></td><td><code>node packages/router/scripts/run-ts.mjs packages/router/scripts/stamp-version.ts --check</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>A direct-API transport for Microsoft Foundry, where MAI Code 2 Flash is also served</li><li>A key, env var or credential row for Microsoft</li><li>Any default or preference order that picks a Microsoft model for a role nobody chose it for</li><li>A ranking of the three MAI models</li><li>Reading a vendor field from the seat, which states none</li><li>Any change to the Visual Studio extension's code, which prints what the router says</li><li>Publishing 3.38.0, which session 365 does</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[20:24:39]</span> <span class="muted">run-started</span> session=364 mode=pull</div>
+<div class="line"><span class="at">[20:24:39]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[20:27:30]</span> <span class="muted">run-resumed</span> session=364 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[20:27:30]</span> <span class="muted">answer-taken</span> steps=4</div>
+<div class="line"><span class="at">[20:27:30]</span> <span class="muted">plan-accepted</span> steps=[&quot;microsoft-vendor&quot;,&quot;vendorless-refusal&quot;,&quot;four-vendors-words&quot;,&quot;version-3-38-0&quot;] non_goals=7</div>
+<div class="line"><span class="at">[20:27:32]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[20:27:32]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=microsoft-vendor</div>
+<div class="line"><span class="at">[20:28:34]</span> <span class="muted">run-resumed</span> session=364 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[20:28:34]</span> <span class="muted">answer-taken</span> seq=2 step=microsoft-vendor status=done notes=mai prefix places microsoft; microsoft joins KNOWN_PROVIDERS; three tests added</div>
+<div class="line"><span class="at">[20:28:37]</span> <span class="muted">check-started</span> step=microsoft-vendor argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/copilot.test.ts&quot;,&quot;packages/router/test/identity.test.ts&quot;,&quot;packages/router/test/roleSelection.test.ts&quot;]</div>
+<div class="line"><span class="at">[20:28:40]</span> <span class="muted">check-ended</span> step=microsoft-vendor argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/copilot.test.ts&quot;,&quot;packages/router/test/identity.test.ts&quot;,&quot;packages/router/test/roleSelection.test.ts&quot;] outcome=<span class="good">passed</span> seconds=3</div>
+<div class="line"><span class="at">[20:28:40]</span> <span class="muted">check-started</span> step=microsoft-vendor suite=typescript-windows command=node scripts/suite.mjs host packages/router/test/copilot.test.ts</div>
+<div class="line"><span class="at">[20:28:45]</span> <span class="muted">check-ended</span> step=microsoft-vendor suite=typescript-windows command=node scripts/suite.mjs host packages/router/test/copilot.test.ts outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[20:28:45]</span> <span class="muted">check-started</span> step=microsoft-vendor suite=typescript command=node scripts/suite.mjs container packages/router/test/identity.test.ts packages/router/test/roleSelection.test.ts</div>
+<div class="line"><span class="at">[20:28:50]</span> <span class="muted">check-ended</span> step=microsoft-vendor suite=typescript command=node scripts/suite.mjs container packages/router/test/identity.test.ts packages/router/test/roleSelection.test.ts outcome=<span class="good">passed</span> seconds=5</div>
+<div class="line"><span class="at">[20:28:51]</span> <span class="muted">report-accepted</span> seq=2 step=microsoft-vendor files=[] notes=mai prefix places microsoft; microsoft joins KNOWN_PROVIDERS; three tests added</div>
+<div class="line"><span class="at">[20:28:51]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=vendorless-refusal</div>
+<div class="line"><span class="at">[20:30:53]</span> <span class="muted">run-resumed</span> session=364 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[20:30:53]</span> <span class="muted">answer-taken</span> seq=3 step=vendorless-refusal status=done notes=listedWithoutVendor + LISTED_WITHOUT_VENDOR in identity.ts, used by identity, start's held check and route's not-listed refusal; session/route test assertions confirmed unchanged</div>
+<div class="line"><span class="at">[20:30:55]</span> <span class="muted">step-file-unchanged</span> step=vendorless-refusal file=packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[20:30:55]</span> <span class="muted">step-file-unchanged</span> step=vendorless-refusal file=packages/router/test/route.test.ts</div>
+<div class="line"><span class="at">[20:30:55]</span> <span class="muted">check-started</span> step=vendorless-refusal argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/identity.test.ts&quot;,&quot;packages/router/test/route.test.ts&quot;]</div>
+<div class="line"><span class="at">[20:30:57]</span> <span class="muted">check-ended</span> step=vendorless-refusal argv=[&quot;node&quot;,&quot;--test&quot;,&quot;packages/router/test/identity.test.ts&quot;,&quot;packages/router/test/route.test.ts&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[20:30:57]</span> <span class="muted">check-started</span> step=vendorless-refusal suite=typescript command=node scripts/suite.mjs container packages/router/test/identity.test.ts packages/router/test/route.test.ts packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[20:31:04]</span> <span class="muted">check-ended</span> step=vendorless-refusal suite=typescript command=node scripts/suite.mjs container packages/router/test/identity.test.ts packages/router/test/route.test.ts packages/router/test/session.test.ts outcome=<span class="good">passed</span> seconds=8</div>
+<div class="line"><span class="at">[20:31:05]</span> <span class="muted">report-accepted</span> seq=3 step=vendorless-refusal files=[] notes=listedWithoutVendor + LISTED_WITHOUT_VENDOR in identity.ts, used by identity, start's held check and route's not-listed refusal; session/route test assertions confirmed unchanged</div>
+<div class="line"><span class="at">[20:31:05]</span> <span class="muted">instruction-issued</span> seq=4 kind=step step=four-vendors-words</div>
+<div class="line"><span class="at">[20:31:50]</span> <span class="muted">run-resumed</span> session=364 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[20:31:50]</span> <span class="muted">answer-taken</span> seq=4 step=four-vendors-words status=done notes=The provider help names four vendors; schema-reference, model-and-pricing-sources and two guide pages say microsoft is seat-only</div>
+<div class="line"><span class="at">[20:31:52]</span> <span class="muted">check-started</span> step=four-vendors-words argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;]</div>
+<div class="line"><span class="at">[20:31:53]</span> <span class="muted">check-ended</span> step=four-vendors-words argv=[&quot;node&quot;,&quot;packages/router/scripts/check-shipped-docs.mjs&quot;] outcome=<span class="good">passed</span> seconds=2</div>
+<div class="line"><span class="at">[20:31:53]</span> <span class="muted">check-started</span> step=four-vendors-words suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts</div>
+<div class="line"><span class="at">[20:32:02]</span> <span class="muted">check-ended</span> step=four-vendors-words suite=typescript command=node scripts/suite.mjs container packages/router/test/session.test.ts outcome=<span class="good">passed</span> seconds=9</div>
+<div class="line"><span class="at">[20:32:03]</span> <span class="muted">report-accepted</span> seq=4 step=four-vendors-words files=[] notes=The provider help names four vendors; schema-reference, model-and-pricing-sources and two guide pages say microsoft is seat-only</div>
+<div class="line"><span class="at">[20:32:03]</span> <span class="muted">instruction-issued</span> seq=5 kind=step step=version-3-38-0</div>
+<div class="line"><span class="at">[20:32:30]</span> <span class="muted">run-resumed</span> session=364 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[20:32:30]</span> <span class="muted">answer-taken</span> seq=5 step=version-3-38-0 status=done notes=version.json 3.38.0 stamped into four manifests; changelog 3.38.0 section added</div>
+<div class="line"><span class="at">[20:32:31]</span> <span class="muted">check-started</span> step=version-3-38-0 argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/stamp-version.ts&quot;,&quot;--check&quot;]</div>
+<div class="line"><span class="at">[20:32:32]</span> <span class="muted">check-ended</span> step=version-3-38-0 argv=[&quot;node&quot;,&quot;packages/router/scripts/run-ts.mjs&quot;,&quot;packages/router/scripts/stamp-version.ts&quot;,&quot;--check&quot;] outcome=<span class="good">passed</span> seconds=1</div>
+<div class="line"><span class="at">[20:32:33]</span> <span class="muted">report-accepted</span> seq=5 step=version-3-38-0 files=[] notes=version.json 3.38.0 stamped into four manifests; changelog 3.38.0 section added</div>
+<div class="line"><span class="at">[20:32:33]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[20:32:33]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[20:32:35]</span> <span class="muted">job-started</span> name=verification pid=67152 log=.dabbler/runs/s364/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[20:34:10]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[20:34:10]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[20:34:10]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[20:34:10]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[20:34:11]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=42920 log=.dabbler/runs/s364/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[20:34:18]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[20:34:19]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[20:34:20]</span> <span class="muted">job-started</span> name=run of record: typescript pid=37152 log=.dabbler/runs/s364/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[20:36:43]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[20:36:44]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[20:36:45]</span> <span class="muted">job-started</span> name=run of record: extension pid=45564 log=.dabbler/runs/s364/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[20:37:08]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[20:37:08]</span> <span class="muted">run-of-record</span> suite=visual-studio stage=final-full why=visual-studio declares whole_at_close command=dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</div>
+<div class="line"><span class="at">[20:37:09]</span> <span class="muted">job-started</span> name=run of record: visual-studio pid=35320 log=.dabbler/runs/s364/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[20:37:20]</span> <span class="muted">job-finished</span> name=run of record: visual-studio exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/run-of-record-visual-studio.log</div>
+<div class="line"><span class="at">[20:37:20]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[20:37:25]</span> <span class="muted">committing</span> subject=Session 364: Microsoft's own models can author and review</div>
+<div class="line"><span class="at">[20:37:25]</span> <span class="muted">pushing</span></div>
+<div class="line"><span class="at">[20:37:29]</span> <span class="muted">landed</span> commit=67cce034fc0c65933f5be36d556fe986a13ff807</div>
+<div class="line"><span class="at">[20:37:29]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[20:37:30]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[20:37:30]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[20:37:32]</span> <span class="muted">job-started</span> name=close pid=43076 log=.dabbler/runs/s364/driver/jobs/close.log</div>
+<div class="line"><span class="at">[20:37:51]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s364/driver/jobs/close.log</div>
+<div class="line"><span class="at">[20:37:51]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div>
+<div class="line"><span class="at">[20:37:51]</span> <span class="muted">transcript-rendering</span> carry=outline</div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** `packages/router/src/cli/session.ts` updates `--provider` help for `session start` and `session drive`, but the plan explicitly requires `session start` and `session next`. The complete diff shows no corresponding `next` help update; ensure `dabbler session next --help` also names `microsoft`.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** `packages/router/src/identity.ts` overpromises that refresh “places it where this router knows its vendor” for every catalog entry with no recognized vendor. For an entry such as `auto` or any still-unknown prefix, refresh will continue recording no vendor. Keep the required truthful statement—that the catalog lists it without a vendor and refresh rereads it for nothing—without claiming refresh necessarily places it. A useful test case is a Copilot catalog containing `{ id: &quot;auto&quot;, provider: null }`, asserting that the refusal does not promise successful vendor placement.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>4s</td><td>54</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>140s</td><td>1688</td><td>0</td><td>16</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>19s</td><td>193</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+<tr><td>visual-studio</td><td>final-full</td><td><span class="good">passed</span></td><td>8s</td><td>60</td><td>0</td><td>0</td><td><span class="mono">dotnet test tools/dabbler-visual-studio/Dabbler.VisualStudio.Core.Tests/Dabbler.VisualStudio.Core.Tests.csproj --nologo</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-visual-studio</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

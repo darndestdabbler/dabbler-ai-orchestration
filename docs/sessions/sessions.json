@@ -7475,9 +7475,9 @@
     {
       "number": 377,
       "title": "A session that closes while Visual Studio is not running ends its engine",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-20T11:51:39.856000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-20T12:04:00.598000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

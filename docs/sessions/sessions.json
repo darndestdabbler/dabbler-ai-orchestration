@@ -7396,9 +7396,9 @@
     {
       "number": 373,
       "title": "A fix made at the cap is reviewed before the session closes",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-20T03:32:09.011000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-20T05:09:09.392000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

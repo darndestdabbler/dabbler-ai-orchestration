@@ -22129,15 +22129,7 @@ A clean round makes 370 `VERIFIED` and session 375 can start. If the
 round finds another blocking thing, no third fix is planned: session 376
 is moved ahead of the release, and the operator reviews 370.
 
-### Session 375 of 377: Release 3.40.0 (release: 3.40.0)
-
-The framework publishes sessions 368 to 374 as 3.40.0, and nothing else.
-
-It is started with the tree's build, `node packages/router/dist/dabbler.cjs
-session start`, if the installed router is older than session 372: that
-one still refuses over session 370's first verdict.
-
-### Session 376 of 377: A person may review the work, and the record says a person did
+### Session 375 of 377: A person may review the work, and the record says a person did
 
 Scope: `packages/router/src/verdict.ts` (the verdict vocabulary and its
 headline), `packages/router/src/verify/` (a verb a person runs to review),
@@ -22192,8 +22184,52 @@ rounds still run first. Rewriting any verdict already recorded.
 and why, and the close and the release start accept it; the verb is
 refused to an engine; the views name it as a person's review.
 
-**Releasable.** Yes, as 3.41.0 in session 377.
+**Releasable.** Yes, as part of 3.40.0 in session 376. 3.40.0 is not
+yet published, so it carries this session too, and there is no separate
+3.41.0.
 
-### Session 377 of 377: Release 3.41.0 (release: 3.41.0)
+**After it closes, the operator's, in this repository.** Session 370 is
+reviewed by a person, with this session's verb run from the tree's
+build. The person reads round 10's finding (a session that closes while
+Visual Studio is not running leaves its engine running until nothing
+ends it) and its three nits, and decides whether 3.40.0 ships with them
+as a stated limitation. A person's review of 370 lets session 376 start.
 
-The framework publishes session 376 as 3.41.0, and nothing else.
+(Moved ahead of the release with the operator's approval, 2026-11-20,
+after the review of session 370 found another blocking thing in round
+10, as session 374 said it would be.)
+
+### Session 376 of 377: Release 3.40.0 (release: 3.40.0)
+
+The framework publishes sessions 368 to 375 as 3.40.0, and nothing else.
+
+It is started with the tree's build, `node packages/router/dist/dabbler.cjs
+session start`, if the installed router is older than session 375: an
+older one does not accept a person's review of session 370.
+
+### Session 377 of 377: A session that closes while Visual Studio is not running ends its engine
+
+Scope: `tools/dabbler-visual-studio/` (the engine host and the
+extension), their tests, `tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** Round 10 of session 370's review (2026-11-20): a person closes
+Visual Studio while a session's engine runs, which the design allows,
+and the session then closes. Only the Visual Studio extension ends a
+closed session's engine, and no Visual Studio is running to do it, so
+the engine runs on after its session is over. 3.40.0 ships with this
+as a stated limitation, by the person's review of 370 in session 375.
+
+**Step 1.** A session that closes while no Visual Studio is running
+ends the engine the host runs for that session of that repository, and
+no other engine.
+
+**Step 2.** The changelog says it in a sentence.
+
+**Non-goals.** An engine opened in Windows Terminal. Ending an engine
+when its tab is closed. The three nits of round 10.
+
+**Tests.** In the Visual Studio library: what decides that a host's
+engine ends when its session closes, and never another session's or
+another repository's.
+
+**Releasable.** Yes, in a release session planned after it.

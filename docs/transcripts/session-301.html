@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session 301 transcript</title>
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1f1f1f;
+  --faint: #e4e4e4;
+  --panel: #f6f6f6;
+  --tone-milestone: #2a5db0;
+  --tone-good: #256029;
+  --tone-warn: #8a6100;
+  --tone-bad: #a31515;
+  --tone-muted: #6b6b6b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #1e1e1e;
+    --ink: #d4d4d4;
+    --faint: #3a3a3a;
+    --panel: #252526;
+  --tone-milestone: #3874db;
+  --tone-good: #54a33b;
+  --tone-warn: #b79427;
+  --tone-bad: #f14c4c;
+  --tone-muted: #8c8c8c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+main { max-width: 68rem; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--faint); padding-bottom: .3rem; }
+.stamp { color: var(--tone-muted); font-size: .85rem; margin: 0 0 .25rem; }
+.mono, pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.lines { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.line { white-space: pre-wrap; word-break: break-word; padding-left: 10.5ch; text-indent: -10.5ch; }
+.at { color: var(--tone-muted); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--faint); vertical-align: top; }
+th { color: var(--tone-muted); font-weight: 600; }
+details { margin: .5rem 0; }
+summary { cursor: pointer; }
+td details { margin: 0; }
+tr:has(details:not([open])) + tr.findings { display: none; }
+tr.findings > td { padding: 0 0 .5rem 1.5rem; }
+pre { background: var(--panel); padding: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.stop, .cancelled { border-left: 3px solid var(--tone-bad); background: var(--panel); padding: .6rem .9rem; }
+.milestone { color: var(--tone-milestone); }
+.good { color: var(--tone-good); }
+.warn { color: var(--tone-warn); }
+.bad { color: var(--tone-bad); }
+.muted { color: var(--tone-muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Session 301 transcript</h1>
+<p class="stamp">Rendered 2026-11-10T01:17:01.677Z by dabbler-ai-router 3.29.0 at e25c16306598bbaf4c134c94697af1be888a4fb4.</p>
+<p class="stamp">Engine cli, last phase <span class="milestone">log</span>, started 2026-11-09T20:01:30.160-05:00.</p>
+<h2>Session Plan</h2>
+<h3>Session 301 of 302: A suite the close does not demand cannot stop the run of record</h3>
+<p>Scope: <code>packages/router/src/drive.ts</code> (<code>phaseRunOfRecord</code>, <code>unchangedRedStop</code>), <code>packages/router/test/drive.test.ts</code>, <code>docs/driving-a-session.md</code> (the run of record), <code>version.json</code> and the manifests <code>npm run stamp:version</code> writes; <code>tools/dabbler-ai-orchestration/CHANGELOG.md</code></p>
+<p><strong>Why.</strong> From the field (<code>dabbler-platform</code>, session 21, 2026-11-09). A repository declared an <code>e2e</code> suite with <code>expensive: true</code> and <code>required_for_close: false</code>, red by design until a later session fixes the 12 tests it names. The run of record ran it whole, it failed, and the framework issued <code>fix-run-of-record</code>; the author rightly reported the step blocked, because fixing the tests was a non-goal and loosening the suite would touch a gate. The session could not reach the land.</p>
+<p>The two halves of the framework disagree. <code>landFacts</code> owes only the suites with <code>expensive &amp;&amp; suiteRequiredForClose(suite)</code>, and <code>judgeFreshness</code> fails only a <code>required</code> verdict, so the close is content with a red non-required suite. But <code>phaseRunOfRecord</code> walks every expensive suite and treats any exit 1 as a run-of-record failure, whatever <code>required_for_close</code> says. <code>required_for_close</code> was split from <code>expensive</code> so that &quot;runs in the run of record&quot; and &quot;the close demands it green&quot; could differ; the phase never read the second half.</p>
+<p><strong>Step 1 -- a red non-required suite is recorded and the walk goes on.</strong> In <code>phaseRunOfRecord</code>, when <code>test-evidence run</code> exits 1 for a suite with <code>suiteRequiredForClose(suite) === false</code>, the failed record already written by the verb stands as the run of record, the driver logs one event (<code>run-of-record-red-not-required</code>, with the suite, its command and the job log) and continues to the next suite. A required suite is unchanged: <code>tests-failed</code> and <code>fix-run-of-record</code>, as today. <code>unchangedRedStop</code> names only required suites, so a red non-required suite never becomes that stop either. Nothing about the release path changes: <code>wholeRunsBeforeRelease</code> still stops a release on any red expensive suite.</p>
+<p><strong>Step 2 -- the words.</strong> <code>docs/driving-a-session.md</code> says, where it describes the run of record, that a suite declared <code>required_for_close: false</code> is run and recorded but its failure does not stop the session, and that a release still demands it green. <code>version.json</code> goes to 3.29.1 (a patch: a phase now honours a declaration it already accepted), stamped with <code>npm run stamp:version</code>, and the changelog gets a 3.29.1 section saying what changed for a developer.</p>
+<p><strong>Non-goals.</strong> Any change to what the close gate owes or to <code>judgeFreshness</code>. Any change to <code>wholeRunsBeforeRelease</code>. A new declaration in <code>dabbler.yaml</code>. Skipping the suite rather than running it: the record must still say it was red.</p>
+<p><strong>Tests.</strong> In <code>drive.test.ts</code>: a run of record whose non-required suite exits 1 logs <code>run-of-record-red-not-required</code>, issues no <code>fix-run-of-record</code>, and reaches <code>land</code>; the same exit from a required suite still issues <code>fix-run-of-record</code>; <code>unchangedRedStop</code> leaves a red non-required suite out of its reason. <code>npm run check:version</code> checks the stamp.</p>
+<p><strong>Releasable.</strong> Yes -- as 3.29.1 in session 302.</p>
+<h2>Work Plan</h2>
+<p>Make the run of record honour <code>required_for_close</code>. In <code>phaseRunOfRecord</code> (packages/router/src/drive.ts), when <code>test-evidence run</code> exits 1 for a suite whose <code>suiteRequiredForClose(suite)</code> is false, the failed record the verb already wrote stands as the run of record, the driver logs one <code>run-of-record-red-not-required</code> event (suite, command, job log) and goes on to the next suite, so the session reaches the land; a required suite still logs <code>tests-failed</code> and is issued <code>fix-run-of-record</code>. <code>unchangedRedStop</code> names only required suites. Tests in packages/router/test/drive.test.ts cover the non-required red suite reaching the land with no fix asked, the required red suite still being asked for a fix, and the stop's reason leaving a red non-required suite out. Then docs/driving-a-session.md says a <code>required_for_close: false</code> suite is run and recorded but its failure does not stop the session, while a release still demands it green; version.json goes to 3.29.1, stamped with <code>npm run stamp:version</code>, with a 3.29.1 changelog section.</p>
+<p>Landed <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/809160acba5069165fe863dd270175b30375567a"><code>809160acba5069165fe863dd270175b30375567a</code></a>.</p>
+<table>
+<tr><th>Step</th><th>Ask</th><th>Files</th><th>Checks</th><th>Accepted</th></tr>
+<tr><td>Red not required</td><td><p>In packages/router/src/drive.ts, <code>phaseRunOfRecord</code>: on exit 1 from a suite with <code>suiteRequiredForClose(suite) === false</code>, log <code>run-of-record-red-not-required</code> with the suite, its command and the job log path, and continue to the next suite instead of logging <code>tests-failed</code> and issuing <code>fix-run-of-record</code>. In <code>unchangedRedStop</code>, consider only suites required for close. Add tests to packages/router/test/drive.test.ts: a non-required suite exiting 1 logs the event, asks no <code>fix-run-of-record</code> and reaches <code>land</code>; a required suite exiting 1 still asks <code>fix-run-of-record</code>; <code>unchangedRedStop</code>'s reason leaves out a red non-required suite.</p></td><td><span class="mono">packages/router/src/drive.ts</span><br><span class="mono">packages/router/test/drive.test.ts</span></td><td><code>npm --prefix packages/router run typecheck</code><br><code>npm --prefix packages/router run lint</code></td><td>yes</td></tr>
+<tr><td>Words and version</td><td><p>In docs/driving-a-session.md, where the run of record is described, say that a suite declared <code>required_for_close: false</code> is run and recorded but its failure does not stop the session, and that a release still demands it green. Set version.json to 3.29.1 and run <code>npm run stamp:version</code> to write the manifests and lock file. Add a 3.29.1 section to tools/dabbler-ai-orchestration/CHANGELOG.md saying what changed for a developer.</p></td><td><span class="mono">docs/driving-a-session.md</span><br><span class="mono">version.json</span><br><span class="mono">packages/router/package.json</span><br><span class="mono">tools/dabbler-ai-orchestration/package.json</span><br><span class="mono">package-lock.json</span><br><span class="mono">tools/dabbler-ai-orchestration/CHANGELOG.md</span></td><td><code>npm run check:version</code><br><code>node -e const fs=require('fs');const d=fs.readFileSync('docs/driving-a-session.md','utf8');const c=fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');if(!/required_for_close: false/.test(d)||!/## \[3\.29\.1\]/.test(c))process.exit(1)</code></td><td>yes</td></tr>
+</table>
+<p>Non-goals:</p>
+<ul><li>Any change to what the close gate owes (<code>landFacts</code>) or to <code>judgeFreshness</code>.</li><li>Any change to <code>wholeRunsBeforeRelease</code>: a release still stops on any red expensive suite.</li><li>A new declaration in <code>dabbler.yaml</code>.</li><li>Skipping a non-required suite instead of running it: the record must still say it was red.</li><li>Publishing 3.29.1 -- that is session 302's release.</li></ul>
+<h2>What the framework said</h2>
+<div class="lines"><div class="line"><span class="at">[01:01:30]</span> <span class="muted">run-started</span> session=301 mode=pull</div>
+<div class="line"><span class="at">[01:01:30]</span> <span class="muted">instruction-issued</span> seq=1 kind=step step=plan</div>
+<div class="line"><span class="at">[01:03:40]</span> <span class="muted">run-resumed</span> session=301 phase=<span class="milestone">plan</span> mode=pull</div>
+<div class="line"><span class="at">[01:03:40]</span> <span class="muted">plan-accepted</span> steps=[&quot;red-not-required&quot;,&quot;words-and-version&quot;] non_goals=5</div>
+<div class="line"><span class="at">[01:03:52]</span> <span class="milestone">phase</span> phase=<span class="milestone">work</span></div>
+<div class="line"><span class="at">[01:03:52]</span> <span class="muted">instruction-issued</span> seq=2 kind=step step=red-not-required</div>
+<div class="line"><span class="at">[01:08:20]</span> <span class="muted">run-resumed</span> session=301 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[01:08:46]</span> <span class="muted">check-passed</span> step=red-not-required argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;typecheck&quot;]</div>
+<div class="line"><span class="at">[01:08:46]</span> <span class="muted">check-passed</span> step=red-not-required argv=[&quot;npm&quot;,&quot;--prefix&quot;,&quot;packages/router&quot;,&quot;run&quot;,&quot;lint&quot;]</div>
+<div class="line"><span class="at">[01:09:50]</span> <span class="muted">named-tests-passed</span> step=red-not-required suite=typescript command=node scripts/suite.mjs container packages/router/test/drive.test.ts</div>
+<div class="line"><span class="at">[01:09:54]</span> <span class="muted">report-accepted</span> seq=2 step=red-not-required files=[&quot;packages/router/src/drive.ts&quot;,&quot;packages/router/test/drive.test.ts&quot;] notes=phaseRunOfRecord records a red non-required suite (run-of-record-red-not-required) and goes on; unchangedRedStop names only required suites via new redSuitesOwingAFix; three tests in drive.test.ts</div>
+<div class="line"><span class="at">[01:09:54]</span> <span class="muted">instruction-issued</span> seq=3 kind=step step=words-and-version</div>
+<div class="line"><span class="at">[01:10:50]</span> <span class="muted">run-resumed</span> session=301 phase=<span class="milestone">work</span> mode=pull</div>
+<div class="line"><span class="at">[01:11:07]</span> <span class="muted">check-passed</span> step=words-and-version argv=[&quot;npm&quot;,&quot;run&quot;,&quot;check:version&quot;]</div>
+<div class="line"><span class="at">[01:11:07]</span> <span class="muted">check-passed</span> step=words-and-version argv=[&quot;node&quot;,&quot;-e&quot;,&quot;const fs=require('fs');const d=fs.readFileSync('docs/driving-a-session.md','utf8');const c=fs.readFileSync('tools/dabbler-ai-orchestration/CHANGELOG.md','utf8');if(!/required_for_close: false/.test(d)||!/## \\[3\\.29\\.1\\]/.test(c))process.exit(1)&quot;]</div>
+<div class="line"><span class="at">[01:11:11]</span> <span class="muted">report-accepted</span> seq=3 step=words-and-version files=[&quot;docs/driving-a-session.md&quot;,&quot;version.json&quot;,&quot;packages/router/package.json&quot;,&quot;tools/dabbler-ai-orchestration/package.json&quot;,&quot;package-lock.json&quot;,&quot;tools/dabbler-ai-orchestration/CHANGELOG.md&quot;] notes=driving-a-session.md says a required_for_close: false suite is run and recorded but does not stop the session, a release still demands it green; version 3.29.1 stamped; 3.29.1 changelog section</div>
+<div class="line"><span class="at">[01:11:11]</span> <span class="milestone">phase</span> phase=<span class="milestone">preverify</span></div>
+<div class="line"><span class="at">[01:11:12]</span> <span class="milestone">phase</span> phase=<span class="milestone">verify</span></div>
+<div class="line"><span class="at">[01:11:19]</span> <span class="muted">job-started</span> name=verification pid=52252 log=.dabbler/runs/s301/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[01:12:41]</span> <span class="muted">job-finished</span> name=verification exit=<span class="good">0</span> log=.dabbler/runs/s301/driver/jobs/verification.log</div>
+<div class="line"><span class="at">[01:12:41]</span> <span class="muted">verification-passed</span></div>
+<div class="line"><span class="at">[01:12:41]</span> <span class="milestone">phase</span> phase=<span class="milestone">run-of-record</span></div>
+<div class="line"><span class="at">[01:12:45]</span> <span class="muted">run-of-record</span> suite=typescript-windows stage=final-full why=typescript-windows declares whole_at_close command=node scripts/suite.mjs host</div>
+<div class="line"><span class="at">[01:12:45]</span> <span class="muted">job-started</span> name=run of record: typescript-windows pid=6068 log=.dabbler/runs/s301/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[01:12:58]</span> <span class="muted">job-finished</span> name=run of record: typescript-windows exit=<span class="good">0</span> log=.dabbler/runs/s301/driver/jobs/run-of-record-typescript-windows.log</div>
+<div class="line"><span class="at">[01:13:02]</span> <span class="muted">run-of-record</span> suite=typescript stage=final-full why=typescript declares whole_at_close command=node scripts/suite.mjs container</div>
+<div class="line"><span class="at">[01:13:02]</span> <span class="muted">job-started</span> name=run of record: typescript pid=46308 log=.dabbler/runs/s301/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[01:14:56]</span> <span class="muted">job-finished</span> name=run of record: typescript exit=<span class="good">0</span> log=.dabbler/runs/s301/driver/jobs/run-of-record-typescript.log</div>
+<div class="line"><span class="at">[01:15:00]</span> <span class="muted">run-of-record</span> suite=extension stage=final-full why=extension declares whole_at_close command=node scripts/suite.mjs extension</div>
+<div class="line"><span class="at">[01:15:00]</span> <span class="muted">job-started</span> name=run of record: extension pid=25992 log=.dabbler/runs/s301/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[01:15:31]</span> <span class="muted">job-finished</span> name=run of record: extension exit=<span class="good">0</span> log=.dabbler/runs/s301/driver/jobs/run-of-record-extension.log</div>
+<div class="line"><span class="at">[01:15:31]</span> <span class="milestone">phase</span> phase=<span class="milestone">land</span></div>
+<div class="line"><span class="at">[01:16:00]</span> <span class="muted">landed</span> commit=809160acba5069165fe863dd270175b30375567a</div>
+<div class="line"><span class="at">[01:16:00]</span> <span class="milestone">phase</span> phase=<span class="milestone">publish</span></div>
+<div class="line"><span class="at">[01:16:03]</span> <span class="muted">publish-skipped</span> reason=an ordinary session never publishes</div>
+<div class="line"><span class="at">[01:16:03]</span> <span class="milestone">phase</span> phase=<span class="milestone">close</span></div>
+<div class="line"><span class="at">[01:16:07]</span> <span class="muted">job-started</span> name=close pid=2712 log=.dabbler/runs/s301/driver/jobs/close.log</div>
+<div class="line"><span class="at">[01:17:01]</span> <span class="muted">job-finished</span> name=close exit=<span class="good">0</span> log=.dabbler/runs/s301/driver/jobs/close.log</div>
+<div class="line"><span class="at">[01:17:01]</span> <span class="milestone">phase</span> phase=<span class="milestone">log</span></div></div>
+<h2>Verification</h2>
+<table>
+<tr><th>Round</th><th>Phase</th><th>Verdict</th><th>Reviewer</th><th>Provider</th><th>Transport</th><th>Findings</th></tr>
+<tr><td>1</td><td>full</td><td><span class="good">VERIFIED</span></td><td>gpt-5.6-sol</td><td>openai</td><td>api</td><td><details><summary>2 findings</summary></details></td></tr><tr class="findings"><td colspan="7"><table>
+<tr><th>#</th><th>Severity</th><th>Finding</th><th>Response</th></tr>
+<tr><td>0</td><td><strong>minor</strong></td><td>**Nit:** The promised `unchangedRedStop` reason behavior is tested only through `redSuitesOwingAFix`, not through the rendered stop. A stronger case would start with required and non-required red records, trigger the second unchanged fix, and assert the stop reason names only the required suite.</td><td>not answered</td></tr>
+<tr><td>1</td><td><strong>minor</strong></td><td>**Nit:** The non-required integration test replaces the real `test-evidence run` process and does not write or assert a failed evidence record. A real-boundary case should run an exit-1 non-required suite and assert the failed record remains, the event contains `suite`, `command`, and the job-log path, and a following suite is still executed before land.</td><td>not answered</td></tr>
+</table></td></tr>
+</table>
+<h2>Test runs</h2>
+<table>
+<tr><th>Suite</th><th>Stage</th><th>Outcome</th><th>Duration</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Command</th></tr>
+<tr><td>typescript-windows</td><td>final-full</td><td><span class="good">passed</span></td><td>5s</td><td>53</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs host</span></td></tr>
+<tr><td>typescript</td><td>final-full</td><td><span class="good">passed</span></td><td>105s</td><td>1418</td><td>0</td><td>15</td><td><span class="mono">node scripts/suite.mjs container</span></td></tr>
+<tr><td>extension</td><td>final-full</td><td><span class="good">passed</span></td><td>23s</td><td>305</td><td>0</td><td>0</td><td><span class="mono">node scripts/suite.mjs extension</span></td></tr>
+</table>
+<h2>Jobs</h2>
+<div><strong>close</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-extension</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript-windows</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>run-of-record-typescript</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+<div><strong>verification</strong> exit <span class="good">0</span> <span class="muted">(passed -- output not carried; dabbler transcript --full carries it)</span></div>
+</main>
+</body>
+</html>

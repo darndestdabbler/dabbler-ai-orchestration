@@ -21684,7 +21684,7 @@ with the two real engines, before anything is built on it. If its page
 does not say go, 369 to 372 are re-planned by the operator, with
 Microsoft's WPF terminal control as the next candidate.
 
-### Session 368 of 372: An engine pane in Visual Studio takes the keys
+### Session 368 of 374: An engine pane in Visual Studio takes the keys
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (an Engine
 tool window, its terminal page and its key handling),
@@ -21743,7 +21743,7 @@ makes Ctrl+C a copy; a zero size is never sent. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 369 of 372: An engine outlives Visual Studio
+### Session 369 of 374: An engine outlives Visual Studio
 
 Scope: `tools/dabbler-visual-studio/` (a new project, the engine host: a
 small program shipped in the package; the pane's connection to it; the
@@ -21799,7 +21799,7 @@ has one. The rest is the walk.
 
 **Releasable.** No.
 
-### Session 370 of 372: Start Session opens the engine inside Visual Studio
+### Session 370 of 374: Start Session opens the engine inside Visual Studio
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (`EngineTab.cs`,
 `SessionStarter.cs`, the Engine window, an options page),
@@ -21845,7 +21845,7 @@ engine is attached to; a finished session's tab is the one closed.
 
 **Releasable.** No.
 
-### Session 371 of 372: A Dabbler layout, and the way back
+### Session 371 of 374: A Dabbler layout, and the way back
 
 Scope: `tools/dabbler-visual-studio/Dabbler.VisualStudio/` (the layout
 command, the package's window registrations, the options page),
@@ -21904,8 +21904,181 @@ its first; the option decides whether a start applies the layout. The
 docs check reads the changed guide page. The walk's page gains the
 layout, with a debugger started and stopped under it.
 
-**Releasable.** Yes, as 3.40.0 in session 372.
+**Releasable.** Yes, as 3.40.0 in session 374.
 
-### Session 372 of 372: Release 3.40.0 (release: 3.40.0)
+## Why sessions 372–373 exist: a session closed at the cap blocked a release, and nothing could unblock it
 
-The framework publishes sessions 368 to 371 as 3.40.0, and nothing else.
+The operator, 2026-11-19, starting the release of 3.40.0: "start: refused
+-- session(s) 370 closed after the last published release without a
+VERIFIED verdict, and a release publishes only verified work. Plan a
+session that fixes and verifies it before session 372."
+
+What the record of session 370 shows. Its seven rounds each upheld the
+same two Major findings, and the author disputed both six times as a
+misreading of Step 4. At the cap the author answered "fix" instead, and
+the fix was the narrowing of Step 4 the operator approved (decision
+D282): no code changed. Both findings cited `session-plan.md`, so a
+change to that file counted as each finding answered at the site it
+cited. The verify step ran for seven seconds, called no reviewer, wrote
+`REMEDIATED_AT_CAP`, and the run's own log says `verification-passed`.
+The suites ran, the work landed, the session closed, session 371 ran on
+top of it, and nobody was told a release was now refused.
+
+Two defects, and a session for each.
+
+The refusal has no way on. The release start reads each closed session's
+own verdict and nothing else, and no verb changes the verdict of a
+closed session: `verify reopen`, `verify adjudicate` and `session waive`
+each act on the session in flight. A session planned as the refusal
+asks earns a verdict of its own and leaves 370's where it is. Session
+372 gives the stop its exit.
+
+The close and the release disagree about one verdict. The close takes
+`REMEDIATED_AT_CAP` as an ending and the release refuses it, and the
+person meets the second rule sessions after agreeing to the first.
+Session 373 makes the last fix reviewed like every other, so the
+disagreement has nothing left to be about, and says the cost in the
+stop where a person can still choose.
+
+Session 370 itself is reviewed again after 372 closes, by the operator,
+with the verb 372 adds. It is not a step of either session: a session
+cannot review another while it is in flight, and the review is the
+operator's to buy.
+
+### Session 372 of 374: A session closed at the cap can be reviewed again
+
+Scope: `packages/router/src/verify/reopen.ts`,
+`packages/router/src/verify/rounds.ts`, `packages/router/src/cli/verify.ts`,
+`packages/router/src/session.ts` (the release start's refusal),
+`packages/router/src/writers.ts` (the one write to a closed session's
+verdict), their tests, `docs/driving-a-session.md`,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** A release start that refuses over a closed session's verdict
+names a way on that cannot work, and there is no other. Every stop has a
+forward exit; this one has none, and the release of 3.40.0 stands behind
+it.
+
+**Step 1 -- the review.** `dabbler verify reopen --session-number N
+--reason "<why>"`, for a session that is complete and whose verdict is
+`REMEDIATED_AT_CAP`, with no session in flight. It buys one round by the
+Primary Reviewer, who is not the provider that authored session N. The
+round is shown what session N changed as it stands on the trunk now --
+the difference from N's start commit to HEAD, over the paths N's own
+commit touched -- and N's section of the session plan as it reads now,
+with the findings the cap left unreviewed. A person's verb, refused to an
+engine. Any other session, or any other verdict, is refused in one
+sentence that names the verdict it found.
+
+**Step 2 -- what it writes.** The grant and the round go on session N's
+own record, after the rows already there, and none of those is changed.
+A round with no blocking finding sets N's verdict to `VERIFIED` in
+`sessions.json`, and the router commits and pushes that file as it does
+at a close. A round with a blocking finding changes no verdict. It buys
+a round and never a verdict: nothing here accepts a verdict from the
+caller.
+
+**Step 3 -- the refusal tells the truth.** The release start's refusal
+names, for each session it lists, the verdict it carries and the command
+of step 1, whole and ready to paste. Where the last review of such a
+session left blocking findings, it names them, and says: plan a session
+that fixes them, then review the session again. "Plan a session that
+fixes and verifies it" goes, because a session planned that way cleared
+nothing.
+
+**Step 4 -- the page.** `docs/driving-a-session.md`, where it describes
+the cap terminal, gains this stop and its exit. The changelog says a
+release refused over an unreviewed session now has a way on.
+
+**Non-goals.** A review of a session closed with any other verdict, or
+of one still in flight, which `verify reopen` already serves. An
+adjudication of a closed session. A row action in either Work Explorer:
+the refusal carries the command. Any change to what the release start
+refuses.
+
+**Tests.** In the files named after what decides: a clean round on a
+closed capped session makes its verdict `VERIFIED` and the release start
+then passes; a round with a blocking finding leaves the verdict and the
+refusal names the finding; a session that is not closed at the cap is
+refused; an engine is refused; the round is shown the trunk's present
+text of the paths the session touched.
+
+**Releasable.** Yes, as 3.40.0 in session 374.
+
+**After it closes, the operator's, in this repository.** The installed
+router does not have the verb, so it is run from the tree:
+
+    npm run build -w dabbler-ai-router
+    node packages/router/dist/dabbler.cjs verify reopen --session-number 370 --sessions-dir docs/sessions --reason "Step 4 was narrowed with the operator's approval (D282) after round 7, and no reviewer read the narrowed plan"
+
+If the round finds something, that is a session planned before 373.
+
+### Session 373 of 374: A fix made at the cap is reviewed before the session closes
+
+Scope: `packages/router/src/verify/rounds.ts` (`terminateAtCap`,
+`noRoundReason`), `packages/router/src/drive.ts` and
+`packages/router/src/driver.ts` (the stop at the cap and its ways on),
+`packages/router/src/ledger.ts`, `packages/router/src/progress.ts` (what
+the record calls the ending), their tests, `docs/driving-a-session.md`,
+`AGENTS.md` through its template if a line of the managed body changes,
+`tools/dabbler-ai-orchestration/CHANGELOG.md`
+
+**Why.** At the cap a fix lands that no reviewer reads, and the framework
+calls it passed. In session 370 the fix was a change to the plan the
+work is measured against: the dispute the author had argued for six
+rounds was ended by relabelling it, the Auxiliary Reviewer was never
+asked, and the operator approved a plan change without being told it
+closed the session unreviewed and put a release out of reach.
+
+**Step 1 -- the last fix gets its review.** When the cap is reached and
+the author has changed the tree to answer the last round's blocking
+findings, the framework opens one more round over that change, once, and
+no report or flag asks for it. The cap still counts the rounds that may
+send work back: this round sends nothing back. If it finds nothing
+blocking the session is `VERIFIED` and carries on to its close.
+
+**Step 2 -- if that round still finds something.** The session stops for
+the person, and the stop says what the reviewer still holds and gives
+the ways on, each with what it costs: the Auxiliary Reviewer judges the
+findings (`dabbler verify adjudicate`); the person buys further rounds
+(`dabbler verify reopen`); or the session closes as it is, and the stop
+says in these words that no release can include it until it has been
+reviewed again, with the command that does that.
+
+**Step 3 -- a change to the plan is shown as one.** Where the change
+that answers a finding is to `session-plan.md` and to nothing else the
+finding cited, the round of step 1 is told so: what the section said
+when the finding was made, what it says now, and the recorded decision
+that changed it. The reviewer judges the work against the plan as
+amended and says whether the amendment answers the finding.
+
+**Step 4 -- the words.** An ending at the cap that no reviewer read is
+never reported as passed: not in the run's events, the Dabbler Terminal,
+`dabbler status` or the transcript. It reads "ended at the cap,
+unreviewed", and a close that takes it says once, as it closes, that a
+release will refuse this session and names the command of session 372.
+
+**Step 5 -- the pages.** `docs/driving-a-session.md` describes the cap
+as it now is, and loses what it says of the terminal a fix can no longer
+reach without a review. The changelog says it in a sentence.
+
+**Non-goals.** Raising the cap, or a second review round past it. Sending
+a dispute to the Auxiliary Reviewer without a person: the refusal that
+routes a standing dispute there is unchanged. Refusing a plan amendment
+at the cap: a person may still narrow a plan, and the reviewer now reads
+it. Any change to the release start.
+
+**Tests.** A fix at the cap opens exactly one round, and a clean one
+closes the session `VERIFIED`; a blocking one stops for the person with
+the three ways on and writes no terminal; a plan-only answer is shown to
+the round as a plan change; an unreviewed ending is not called passed.
+
+**Releasable.** Yes, as 3.40.0 in session 374.
+
+### Session 374 of 374: Release 3.40.0 (release: 3.40.0)
+
+The framework publishes sessions 368 to 373 as 3.40.0, and nothing else.
+
+It is started with the tree's build, `node packages/router/dist/dabbler.cjs
+session start`, if the installed router is older than session 372: that
+one still refuses over session 370's first verdict.

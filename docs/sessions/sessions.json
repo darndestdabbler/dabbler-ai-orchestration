@@ -7418,9 +7418,9 @@
     {
       "number": 374,
       "title": "A session that ends also ends its engine whose tab was closed",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-11-20T07:57:01.133000-05:00",
-      "completedAt": null,
+      "completedAt": "2026-11-20T08:08:19.062000-05:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
